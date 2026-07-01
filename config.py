@@ -5,7 +5,7 @@ import sys
 from datetime import datetime
 
 APP_NAME = "IntellaFeeder"
-APP_VERSION = "2.4"
+APP_VERSION = "2.5"
 APP_TITLE = "IntellaFeeder — Générateur de sources d'import Intella"
 
 # --- Réglages forensiques par défaut ---
