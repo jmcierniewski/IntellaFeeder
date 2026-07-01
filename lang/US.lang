@@ -1,0 +1,551 @@
+{
+  "strings": {
+    "app.title": "IntellaFeeder — Intella import source generator",
+    "topbar.title": "Common settings",
+    "topbar.user": "User (from case)",
+    "topbar.exe": "IntellaCmd.exe *",
+    "topbar.exe_locked": "(locked via .ini)",
+    "topbar.exe_dialog": "IntellaCmd.exe",
+    "topbar.language": "Language",
+    "topbar.language_restart": "The selected language will apply the next time the application starts.",
+    "common.browse": "Browse…",
+    "common.yes": "yes",
+    "common.no": "no",
+    "unit.gb": "GB",
+    "unit.mb": "MB",
+    "common.filetype_text": "Text",
+    "common.filetype_all": "All",
+    "journal.export": "Export the log…",
+    "journal.clear": "Clear",
+    "journal.cleared": "Log cleared.",
+    "journal.filetype_log": "Log",
+    "journal.exported_log": "Log exported: {p}",
+    "journal.exported_msg": "Log exported:\n{p}",
+    "journal.export_failed": "Export failed:\n{e}",
+    "common.extra_args": "Extra arguments",
+    "common.export_csv": "Export as CSV…",
+    "common.case_required_title": "Case required",
+    "common.fields_required_title": "Required fields",
+    "common.exported_to": "Exported:\n{p}",
+    "common.export_failed": "Failed:\n{e}",
+    "common.export_title": "Export",
+    "col.name": "Name",
+    "col.type": "Type",
+    "col.timezone": "Timezone",
+    "col.size": "Size",
+    "col.bytes": "Bytes",
+    "col.segments": "Segments",
+    "col.path": "Path",
+    "col.tasks": "Tasks",
+    "inventory.case_frame": "Case to inventory",
+    "inventory.case_folder": "Case folder",
+    "inventory.autolicense": "Auto-select license (-autoSelectFullProcessingLicense)",
+    "inventory.run": "Read sources (IntellaCmd)",
+    "inventory.scan": "Scan zero-size folders",
+    "inventory.export_xml": "Export XML…",
+    "inventory.export_tasks": "Export case tasks…",
+    "inventory.info_profile": "Profile info →",
+    "inventory.no_case": "No case selected.",
+    "inventory.pick_case_title": "Intella case folder",
+    "inventory.not_a_case": "⚠ Not an Intella case folder (case.xml missing).",
+    "inventory.case_folder_title": "Case folder",
+    "inventory.xml_unreadable": "⚠ case.xml is unreadable.",
+    "inventory.xml_read_failed": "Could not read case.xml:\n{e}",
+    "inventory.case_detected_log": "Case detected: « {n} » — created by {u}, {s} used.",
+    "inventory.case_detected_summary": "Case « {n} » — {s} used. « Read sources » for deduplication.",
+    "inventory.case_required_body": "First select a valid case folder (case.xml detected).",
+    "inventory.exe_required": "Set IntellaCmd.exe (above).",
+    "inventory.user_required": "User not found in case.xml.",
+    "inventory.reading": "Reading in progress…",
+    "inventory.reading_log": "Inventory of the case's sources: {c}",
+    "inventory.read_failed": "Read failed (see Log).",
+    "inventory.read_error_log": "Inventory error: {m}",
+    "inventory.sources_title": "Source inventory",
+    "inventory.n_sources_read": "{n} source(s) read in the case.",
+    "inventory.n_cached_folders": "{n} folder(s) already measured, reused from {f}.",
+    "inventory.n_unknown_folders": "{n} folder(s) with no reported size — use « Scan zero-size folders » to measure them.",
+    "inventory.cache_applied_log": "{n} zero-size folder(s) reused from cache {f} (total {t}).",
+    "inventory.size_mismatch_log": "Size consistency: case.xml {c} < sum of sources {s} (gap {p:.1f}%). Overflow safeguard based on {b}.",
+    "inventory.size_mismatch_title": "Size consistency",
+    "inventory.size_mismatch_body": "The case's used size (case.xml: {c}) is {p:.1f}% lower than the sum of the sources read ({s}).\n\nSome listed sources may not be (fully) indexed in the case.\n\nAny overflow calculation will use the larger value ({b}).",
+    "inventory.case_empty": "Case « {n} » — empty (no source indexed).",
+    "inventory.case_summary": "Case « {n} » — {c} source(s) — case size {s}",
+    "inventory.n_scannable_folders": "{n} zero-size folder(s) (scannable)",
+    "inventory.zero_folders_title": "Zero-size folders",
+    "inventory.zero_folders_none": "No folder without size to measure.\nFirst read the case's sources.",
+    "inventory.scan_start_log": "Scanning {n} zero-size folder(s)…",
+    "inventory.measuring_progress": "Measuring folders… {i}/{n}",
+    "inventory.measuring_progress_named": "Measuring folders… {i}/{n}: {f}",
+    "inventory.sizes_saved_log": "Sizes saved in {f}.",
+    "inventory.folders_measured_log": "Folders measured: {n} — total {t}.",
+    "inventory.folders_measured_summary": "{n} folder(s) measured — total {t} (added to the inventory sum).",
+    "inventory.default_profile_name": "profile",
+    "inventory.info_profile_no_inventory": "First read the case's sources (« Read sources »).",
+    "inventory.info_profile_no_selection": "Select a source in the table.",
+    "inventory.info_profile_not_found": "Source not found (re-read the sources).",
+    "inventory.info_profile_empty": "Source « {n} » exposes no usable setting (indexOptions/domainBoundaries empty).",
+    "inventory.info_profile_log": "Profile info: settings from « {n} » transferred to the Profiles tab ({c} option(s)).",
+    "inventory.export_xml_none": "No XML available.\nFirst run « Read sources ».",
+    "inventory.export_xml_log": "Sources XML exported: {p}",
+    "inventory.export_tasks_none": "No task on this case's sources.\nFirst read the sources (« Read sources »).",
+    "inventory.export_tasks_log": "Case tasks exported ({n} deduplicated task(s)): {p}",
+    "inventory.export_tasks_msg": "{n} deduplicated task(s) exported:\n{p}\n\n1 object = 1 logical task (per-source UUIDs merged by signature).",
+    "inventory.export_csv_none": "First read a case's sources.",
+    "inventory.export_csv_log": "Inventory exported as CSV: {p}",
+    "common.save": "Save",
+    "common.delete": "Delete",
+    "group.mail": "Mail & e-mails",
+    "group.chats": "Chats & conversations",
+    "group.archives": "Archives & databases",
+    "group.windows": "Windows system",
+    "group.browser": "Web & browsers",
+    "group.images": "Disk images & recovery",
+    "group.vsc": "Volume Shadow Copies (images)",
+    "group.text": "Text & analysis",
+    "group.filters": "Filters",
+    "group.cache": "Cache & advanced",
+    "opt.indexMailArchives": "Index mail archives",
+    "opt.emailsGeolocationEnabled": "E-mail geolocation",
+    "opt.indexChatMessages": "Index chat messages",
+    "opt.processingMode": "Chat processing mode",
+    "opt.splitMode": "Conversation splitting",
+    "opt.numberMessagesPerConversation": "Max messages / conversation",
+    "opt.indexArchives": "Index archives (zip, rar…)",
+    "opt.indexDatabases": "Index databases",
+    "opt.indexWindowsRegistry": "Index Windows registry",
+    "opt.indexWindowsEventLog": "Index Windows event logs",
+    "opt.indexBrowserHistory": "Index browsing history",
+    "opt.recoverDeleted": "Recover deleted files",
+    "opt.carveUnallocatedSpace": "Carve unallocated space",
+    "opt.verifyAff4Hashes": "Verify AFF4 hashes",
+    "opt.indexVolumeShadowCopies": "Index VSS shadow copies",
+    "opt.suppressUnchangedFilesInVsc": "Suppress unchanged files (VSS)",
+    "opt.preferNewestFilesInVsc": "Prefer newest files (VSS)",
+    "opt.indexChangedLastAccessFilesInVsc": "Account for last access (VSS)",
+    "opt.indexEmbeddedImages": "Index embedded images",
+    "opt.analyseParagraphs": "Analyze paragraphs",
+    "opt.indexUnstructured": "Index unstructured content",
+    "opt.sourceTypeFilter": "MIME type filter (comma-separated)",
+    "opt.sourceTypeFilterMode": "Type filter mode",
+    "opt.sourceHashFilters": "Hash lists (.md5, comma-separated)",
+    "opt.fileNameFilters": "File name filter",
+    "opt.cacheEvidenceFiles": "Cache evidence files",
+    "opt.maxBinarySizeToStore": "Max binary size stored",
+    "opt.custodian": "Custodian",
+    "opt.enableCrawlerScript": "Enable a crawler script",
+    "opt.sourceCrawlerScriptType": "Crawler script type",
+    "opt.sourceCrawlerScriptFile": "Crawler script file",
+    "profiles.intro": "A profile is a set of analysis settings applied to a source at import time (assigned in the « 2. Import » tab, « Profile » column). The « default » profile applies Intella's default settings (no option forced). Only values that differ from the default are saved and emitted.",
+    "profiles.saved": "Saved profiles",
+    "profiles.name_label": "Profile name",
+    "profiles.new": "New",
+    "profiles.rename": "Rename…",
+    "profiles.comments": "Comments",
+    "profiles.analysis_options": "Analysis options",
+    "profiles.to_verify": "to verify",
+    "profiles.images_only": "[images]",
+    "profiles.filename_filter_tip": "Wildcards allowed in file names: « ? » (one character) and « * » (several). E.g.: report_*.pdf, IMG_????.jpg",
+    "profiles.name_required": "Enter a profile name.",
+    "profiles.default_reserved": "The « default » profile is reserved.",
+    "profiles.overwrite_confirm": "Profile « {n} » already exists. Update it?",
+    "profiles.saved_log": "Profile saved: « {n} ».",
+    "profiles.saved_msg": "Profile « {n} » saved.",
+    "profiles.select_non_default": "Select a profile (≠ « default »).",
+    "profiles.rename_title": "Rename the profile",
+    "profiles.new_name": "New name:",
+    "profiles.renamed_log": "Profile renamed: « {o} » → « {n} ».",
+    "profiles.delete_confirm": "Delete profile « {n} »?",
+    "profiles.deleted_log": "Profile deleted: « {n} ».",
+    "profiles.err_name_empty": "The profile name is empty.",
+    "profiles.err_default_reserved": "The « default » profile is reserved and cannot be edited.",
+    "profiles.err_default_no_delete": "The « default » profile cannot be deleted.",
+    "profiles.err_default_reserved_short": "The « default » profile is reserved.",
+    "profiles.err_new_name_empty": "The new name is empty.",
+    "profiles.err_not_found": "Profile not found: {n}",
+    "profiles.err_already_exists": "A profile « {n} » already exists.",
+    "tabs.inventory": "1. Case inventory",
+    "tabs.detail": "Case details",
+    "tabs.import": "2. Import",
+    "tabs.profiles": "Profiles",
+    "tabs.journal": "Log",
+    "tabs.help": "Help",
+    "detail.no_case": "Select a case in the « 1. Case inventory » tab.",
+    "detail.h1_case": "Case",
+    "detail.name": "Name",
+    "detail.folder": "Folder",
+    "detail.description": "Description",
+    "detail.id": "ID",
+    "detail.created": "Created on",
+    "detail.last_opened": "Last opened",
+    "detail.created_by": "Created by",
+    "detail.size": "Size used",
+    "detail.size_value": "{h}  ({b:,} bytes)",
+    "detail.version": "Version (original / current)",
+    "detail.h1_prefs": "Case preferences",
+    "detail.optim_folder": "Optimization folder",
+    "detail.authorized_users": "Authorized users",
+    "detail.email_threading": "Email threading done",
+    "detail.saved_searches": "Saved searches done",
+    "detail.hash_algo": "Message hashing algorithm",
+    "detail.h1_tasks2": "Post-indexing tasks (tasks2.json)",
+    "detail.no_tasks2": "No post-indexing task declared.",
+    "import.already_used": "already {s} used",
+    "import.and_n_more": "… and {n} more.",
+    "import.auto_removed_log": "{n} source(s) already indexed, removed automatically.",
+    "import.case_label": "Case:",
+    "import.case_prefix": "Case « {n} » : ",
+    "import.case_tasks": "Case tasks (inventory)",
+    "import.case_tasks_none": "No task is defined on this case's sources.",
+    "import.case_tasks_not_loaded": "The case's source list is not loaded.\nRun « Read sources » in the « 1. Case inventory » tab.",
+    "import.case_tasks_recycled_log": "Tasks recycled from the case inventory: {n} task(s).",
+    "import.case_tasks_recycled_msg": "{n} case task(s) loaded (deduplicated).\nThey apply like a task file: check them per source.",
+    "import.case_tasks_unreadable": "Unreadable tasks:\n{e}",
+    "import.check_all": "Imp.: check all",
+    "import.close": "Close",
+    "import.col_delete": "Del.",
+    "import.col_import": "Imp.",
+    "import.col_import_log": "Import log",
+    "import.col_in_case": "In the case",
+    "import.col_name": "Source name",
+    "import.col_profile": "Profile",
+    "import.col_source": "Source",
+    "import.compute_size": "Compute size",
+    "import.computing_missing_sizes_log": "Computing missing sizes (checked sources) before generation…",
+    "import.computing_size_log": "Computing the size of {n} checked source(s)…",
+    "import.corrections_needed": "Corrections needed",
+    "import.default_profile_label": "Default profile:",
+    "import.empty": "empty",
+    "import.empty_selection_body": "Check at least one source in the « Imp. » (Import) column.",
+    "import.empty_selection_title": "Empty selection",
+    "import.export_list": "Export the list…",
+    "import.folders_panel": "Standard folders (FOLDER_OR_FILE) — 1 path/line",
+    "import.generate": "Generate the import files",
+    "import.generate_anyway": "Generate anyway?",
+    "import.images_panel": "Forensic images (DISK_IMAGE) — 1 path/line",
+    "import.import_list": "Import a list…",
+    "import.integrity_check_log": "Source integrity verification: ",
+    "import.integrity_disabled_log": "DISABLED (« {a} » added to the arguments).",
+    "import.integrity_enabled_log": "enabled (argument removed).",
+    "import.integrity_title": "Source integrity",
+    "import.inventory_exceeds": "(inventory sum > case.xml {s})",
+    "import.launch_failed_log": "Failed to launch the import: {e}",
+    "import.launch_impossible": "Cannot launch:\n{e}",
+    "import.launched_log": "Import launched: {b}",
+    "import.limit_exceeded_body": "The {lim:g} GB limit would be exceeded.\n\n{n} source(s) ({v}) were UNCHECKED (the part that fits stays checked):\n{list}\n\nNothing was generated. Check/adjust the « Imp. » boxes, then run « Generate » again to import what you kept.\n\nFor the rest: create the sub-case manually in Intella, target it, re-check and re-import.",
+    "import.limit_exceeded_log": "Limit exceeded: {n} source(s) unchecked ({v}). Generation suspended — adjust the checkboxes then run « Generate » again.",
+    "import.limit_exceeded_title": "Limit reached — generation suspended",
+    "import.limit_label": "Limit / case (GB)",
+    "import.limit_status": "{etat} the limit ({eff} / {lim})",
+    "import.list_imported_log": "Summary imported: {n} source(s) from {p}",
+    "import.list_imported_removed": "({n} already in the case, removed).",
+    "import.list_invalid_format": "Invalid format (a list of sources was expected).",
+    "import.list_replace_confirm": "Replace the current summary ({cur} source(s)) with {new} source(s) from the file?",
+    "import.list_unreadable": "Could not read:\n{e}",
+    "import.location_label": "Location:",
+    "import.log_failed": "FAILED: {m}",
+    "import.log_ok": "OK",
+    "import.n_indexed": "{n} source(s) indexed",
+    "import.n_removed_auto": "{n} already indexed in the case, removed automatically.",
+    "import.n_sources_loaded": "{n} source(s) loaded.",
+    "import.no_bat_found": "No import file found for this case.\nFirst click « Generate the import files ».",
+    "import.no_case_selected": "ⓘ No case selected — choose one in the « 1. Case inventory » tab.",
+    "import.no_checked": "No source checked « Import ».\nOnly checked rows are measured.",
+    "import.no_inventory_read": "⚠ source list not read (tab 1) → no deduplication.",
+    "import.no_rows_to_export": "No row to export.",
+    "import.over_limit": "⚠ exceeds",
+    "import.partial": "(partial)",
+    "import.profile_applied_all_log": "Profile « {p} » applied to all sources ({n}).",
+    "import.recap_empty": "The summary is empty.",
+    "import.recap_exported_log": "Summary exported ({n} source(s)): {p}",
+    "import.recap_exported_msg": "{n} source(s) exported:\n{p}",
+    "import.recap_frame": "Source summary",
+    "import.reload_tasks": "Reload tasks",
+    "import.report_done": "Generation complete — {n} source(s) imported.",
+    "import.report_existing": "Already in the case: {e}  →  total {t}.",
+    "import.report_folder": "Folder: {d}",
+    "import.report_new_volume": "New sources volume: {v}.",
+    "import.report_no_subcase": "No sub-case is created automatically: create it manually in Intella then re-import the rest.",
+    "import.report_open_folder": "Open the scripts folder?",
+    "import.report_over_limit": "⚠ The total exceeds the {lim:g} GB limit by {ov}.",
+    "import.report_oversized": "⚠ Single source(s) > limit (cannot be split): {n}",
+    "import.report_resilient": "Resilient import: 1 command per source, 1 log per source.",
+    "import.report_run_logs": "Logs for this run: logs\\{r}\\ (« Validate operations » will read this run).",
+    "import.report_single_case": "A single case (under the limit).",
+    "import.report_title": "Done",
+    "import.run_confirm": "Run the import into Intella?\n\n{b}\n\nIntellaCmd will add the sources to the case (not reversible on the case side). A console window opens and shows progress.\n\nContinue?",
+    "import.run_import": "Import (run the .bat)",
+    "import.select_case_first": "First select a case (« 1. Case inventory » tab).",
+    "import.select_case_short": "First select a case (« 1. Case inventory » tab).",
+    "import.select_case_target": "First select a case in the « 1. Case inventory » tab.",
+    "import.size_done_log": "Size computation done. Total checked: {t}.",
+    "import.size_title": "Size",
+    "import.skip_integrity": "Do not verify source integrity (multi-segment images — works around the Vound bug)",
+    "import.source_removed_log": "Source removed from the summary: {n}",
+    "import.summarize": "▼ Summarize",
+    "import.summary_log": "Summary: {n} source(s).",
+    "import.summary_removed_log": "{n} already in the case, removed.",
+    "import.target_case_frame": "Target case (set by the « 1. Case inventory » tab)",
+    "import.tasks_check_all": "Tasks: check all",
+    "import.tasks_file_label": "Task file",
+    "import.tasks_file_loaded_log": "Task file loaded: {n} task(s).",
+    "import.tasks_file_not_found": "Not found:\n{p}",
+    "import.tasks_file_read_error_log": "Error reading the task file: {e}",
+    "import.tasks_file_title": "Task file",
+    "import.tasks_file_unavailable_log": "Task file unavailable (field cleared or file missing): using the definitions already loaded in memory.",
+    "import.tasks_file_unreadable": "Could not read:\n{e}",
+    "import.tasks_uncheck_all": "Tasks: uncheck all",
+    "import.timezone_label": "Timezone",
+    "import.total_summary": "{n} source(s), {c} to import — checked size: {t}{suffix}",
+    "import.uncheck_all": "Imp.: uncheck all",
+    "import.under_limit": "under",
+    "import.validate": "Validate operations",
+    "import.validate_absent": "  ✗ {n}: absent from the case (no matching import log).",
+    "import.validate_failed": "  ✗ {n}: failed — {m}",
+    "import.validate_head": "Case « {c} » : {n} source(s) present.  Out of {v} checked: {ok} in the case, {ko} absent.  {l} log(s) analyzed.",
+    "import.validate_other": "  • {n} : {m}",
+    "import.validate_present": "  ✔ {n}: present in the case.",
+    "import.validate_requires": "IntellaCmd.exe and the user are required.",
+    "import.validate_rescan_failed_log": "Validation: re-scan failed: {m}",
+    "import.validate_run_analyzed": "  Run analyzed: {r}.",
+    "import.validate_run_suffix": " (run {r})",
+    "import.validate_start_log": "Validating operations: re-scanning the case + analyzing logs…",
+    "import.validate_summary_log": "Validation{r} : {n} source(s) in the case, {l} log(s) analyzed.",
+    "import.validation_exported_log": "Validation exported as CSV: {p}",
+    "import.warnings_title": "Warnings",
+    "import.write_title": "Writing",
+    "import.zero_sources": "0 source",
+    "type.folder": "Folder",
+    "type.image": "Image",
+    "validation.case_location_required": "The case location is required.",
+    "validation.exe_not_found": "IntellaCmd.exe not found: {p}",
+    "validation.exe_required": "The IntellaCmd.exe path is required.",
+    "validation.no_sources": "No source. Paste paths then click « Summarize ».",
+    "validation.non_first_segment": "Image segment may not be the first one (point to the 1st, .E01): {p}",
+    "validation.output_dir_required": "The output folder is required.",
+    "validation.path_not_absolute": "Path not absolute (IntellaCmd requires absolute paths): {p}",
+    "validation.path_not_found": "Path not found: {p}",
+    "validation.tasks_unreadable": "Tasks are checked but the task file could not be read.",
+    "validation.user_required": "The « User » field is required.",
+    "import.size_cache_reused_log": "{n} source(s) already measured, reused from cache (IF_<case>.info).",
+    "task_builder.err_not_array": "Tasks must be a JSON array (format exported by Intella).",
+    "task_builder.default_task_name": "Task {n}",
+    "case_meta.err_no_case_xml": "case.xml not found at this location. Make sure you are pointing to an Intella case folder.",
+    "op_validation.log_unreadable": "Unreadable log: {e}",
+    "op_validation.added_but": "Added OK but: {m}",
+    "op_validation.no_confirmation": "No confirmation of addition in the log."
+  },
+  "help": [
+    [
+      "h1",
+      "IntellaFeeder — Help"
+    ],
+    [
+      "p",
+      "This tool prepares the automatic import of sources into an existing Intella case, without going through the web wizard. You paste lists of paths, choose which extra tasks to run, and the tool generates the files and a ready-to-run « .bat » script."
+    ],
+    [
+      "h1",
+      "Recommended workflow"
+    ],
+    [
+      "b",
+      "1. « Case inventory » tab: first read the sources already present in the case. This tells you how much space is already used and flags sources already indexed (so you don't add them twice). The « Export XML » button saves a copy of the list that was read."
+    ],
+    [
+      "b",
+      "2. « Import » tab: paste the paths of the new sources (1 path per line) — forensic images on the left, folders/files on the right."
+    ],
+    [
+      "b",
+      "3. Click « Summarize »: the table lists the sources. Sources already present in the case (per the inventory) are highlighted."
+    ],
+    [
+      "b",
+      "4. Click « Compute size » to know the volume of the sources. This step is OPTIONAL: by default the tool already uses the used-size value declared in the case's case.xml file (fetched in the « 1. Case inventory » tab). But that figure does not count sources already referenced in Intella as long as they haven't been indexed yet (a source added to a case can stay pending indexing) — so it may underestimate the actual volume used. « Compute size » measures the checked new sources directly on disk, for a more reliable safeguard if you are close to the limit. Each measurement is saved to a file created at the root of the case folder (IF_<case name>.info): a source already measured in a previous session is not rescanned."
+    ],
+    [
+      "b",
+      "5. For each source, check the extra tasks to run (columns T1, T2…)."
+    ],
+    [
+      "b",
+      "6. Click « Generate »: the tool writes the output files and the « .bat » script(s). Run the « .bat » to perform the import into Intella."
+    ],
+    [
+      "h1",
+      "Interface tips"
+    ],
+    [
+      "b",
+      "Real name of a task: hover over a T1, T2… column header (or its ✓ / ✗ buttons) to see the task's full name."
+    ],
+    [
+      "b",
+      "Sorting: click a column header to sort (an ▲ / ▼ arrow shows the direction). Click again to reverse the sort."
+    ],
+    [
+      "b",
+      "Horizontal scrolling: the bottom scrollbar lets you see all task columns when there are many."
+    ],
+    [
+      "b",
+      "Rename a source: double-click its name in the table. This only changes the LABEL displayed in Intella (the source's name) — the actual path being integrated (the file/folder it points to) is not changed: the original source is imported normally. Useful for giving a more readable name than a technical file name, without changing anything about what gets indexed."
+    ],
+    [
+      "b",
+      "Quick check/uncheck: « Check all / Uncheck all », or the « T1 ✓ / T1 ✗ » buttons to (un)check a whole column at once."
+    ],
+    [
+      "b",
+      "Quotes: you can paste paths surrounded by quotes, they are cleaned up automatically."
+    ],
+    [
+      "b",
+      "Multi-segment images (.E01/.E02… or .ad1/.ad2…): only enter the FIRST segment; the others are picked up automatically."
+    ],
+    [
+      "h1",
+      "Analysis-parameter profiles"
+    ],
+    [
+      "p",
+      "A « profile » groups indexing settings (mail, archives, deleted-file recovery, filters…) that you apply to a source at import time. Profiles are created in the « Profiles » tab and are shared across your cases."
+    ],
+    [
+      "b",
+      "In the « Profiles » tab: pick a profile from the list to see its options, or click « New » to start from the defaults. Check the options you want, give it a name, then « Save »."
+    ],
+    [
+      "b",
+      "The « default » profile applies Intella's standard settings: it forces no option and cannot be edited."
+    ],
+    [
+      "b",
+      "« Profile info » tip: set up a sample source in Intella, then in the « Case inventory » tab read the sources, select that source and click « Profile info → ». Its settings (including the type filter) automatically fill in the Profiles tab: all that's left is to name and save the profile."
+    ],
+    [
+      "b",
+      "Each profile is saved as a file in the « profils » folder (next to the program); you can back them up or share them. The « Comments » field (at the top) lets you note what the profile is for."
+    ],
+    [
+      "b",
+      "File name filter: you can use the wildcards « ? » (one character) and « * » (several characters), e.g. report_*.pdf."
+    ],
+    [
+      "b",
+      "MIME type filter: it's a long list; the box grows when you click inside it, to make copy/paste easier."
+    ],
+    [
+      "b",
+      "In the Import tab's summary table, the « Profile » column lets you choose the profile for each source. The « Default profile » menu applies the chosen profile to every row at once."
+    ],
+    [
+      "h1",
+      "MIME types for the type filter"
+    ],
+    [
+      "p",
+      "The « MIME type filter » field expects a comma-separated list, combined with either « include » or « exclude » mode. This list mixes TWO levels that coexist:"
+    ],
+    [
+      "b",
+      "Intella CATEGORIES (« category/… »): real thematic groupings defined by Intella. Checking a category selects all the formats it contains at once."
+    ],
+    [
+      "b",
+      "INDIVIDUAL TYPES (« application/x-pdf », « application/rtf »…): one precise format, checked on its own, independently of its category."
+    ],
+    [
+      "p",
+      "An individual type is therefore NOT « contained » in a « category/… » entry in the list: the two are chosen separately. Example: application/x-pdf belongs thematically to Documents, but is checked on its own (Intella does not nest them). The exact list depends on your case — the most reliable approach is to use « Profile info » on a source configured in Intella."
+    ],
+    [
+      "h2",
+      "Intella categories (the real categories)"
+    ],
+    [
+      "pcsv",
+      "category/accounts, category/browser_cookies, category/browser_downloads, category/chat, category/contacts, category/containers, category/crypto_currency, category/formulas, category/graphics, category/hangul_document, category/launched_programs, category/media, category/other_communications, category/other_documents, category/other_media, category/others, category/presentations, category/recently_accessed_files, category/scheduling, category/system, category/user_activity, category/user_sessions, category/video, category/voice, category/word_processing"
+    ],
+    [
+      "h2",
+      "Individual types (precise formats)"
+    ],
+    [
+      "p",
+      "These are NOT Intella categories. The thematic grouping below is ours, only to make reading easier."
+    ],
+    [
+      "bcsv",
+      "Word processing & office: application/rtf, text/rtf, application/x-pdf, application/msonenote, application/vnd.fdf, application/vnd.framemaker, application/x-framemaker, application/vnd.ms-publisher, application/vnd.ms-xpsdocument, application/vnd.oasis.opendocument.text (and -master, -template, -web), application/vnd.stardivision.writer (and -global), application/vnd.stardivision.math, application/vnd.stardivision.draw, application/vnd.sun.xml.writer (and .template), application/vnd.wordperfect, application/wps-office.wps/.wpt/.dpt/.ett, application/x-mspowerpoint, text/vnd.wap.wml"
+    ],
+    [
+      "bcsv",
+      "Images, video & media: image/iff, image/x-iff, application/iff, application/x-iff, application/ogg, application/riff, application/x-iso-base-media, application/x-shockwave-flash, video/x-ms-asf, video/x-ms-wm"
+    ],
+    [
+      "bcsv",
+      "Archives & containers: application/binhex, application/unix-v7-tar, application/x-java-webarchive, application/x-rar-compressed-v5, application/x-sitx"
+    ],
+    [
+      "bcsv",
+      "Windows & forensic artifacts (Intella): application/vnd.ms-registry, application/vnd.ms-registry-key, application/vnd.ms-windows-xml-event-log-entry, application/x-intella-windows-registry-artifacts, application/x-intella-windows-shellbag, application/x-intella-windows-10-timeline-entry, application/x-intella-windows-push-notification-entry, application/x-intella-operating-system-information, application/x-intella-startup-program, application/x-intella-installed-application, application/x-intella-time-zone-information, application/x-intella-usb-storage-device, application/x-intella-boot-sector-file, application/x-intella-net-connection, application/x-intella-device-acquisition, application/x-intella-aws-s3-bucket, application/x-intella-imap-connection, application/x-intella-sharepoint-post"
+    ],
+    [
+      "bcsv",
+      "Network & e-mail: application/pcap, application/vnd.tcpdump.pcap, message/rfc822-headers, application/applefile, multipart/appledouble"
+    ],
+    [
+      "h1",
+      "Multi-segment images: integrity"
+    ],
+    [
+      "p",
+      "A known issue in the vendor's software (Vound) can cause integrity verification to fail for forensic images split into several files. Until a fix is released, the Import tab offers a « Do not verify source integrity » checkbox."
+    ],
+    [
+      "b",
+      "When checked, the « -validateDiskImage false » option is automatically added to the « Extra arguments » field: the import no longer performs integrity verification. The setting is remembered per case."
+    ],
+    [
+      "h1",
+      "Avoiding double indexing"
+    ],
+    [
+      "p",
+      "After reading a case's inventory, the Import tab compares the paths you paste with those already indexed. Sources already present are automatically removed from the summary table (both when clicking « Summarize » and when importing a list)."
+    ],
+    [
+      "h1",
+      "When the case gets too big"
+    ],
+    [
+      "p",
+      "An Intella case is capped for safety (950 GB here, out of the 1 TB allowed). The tool adds up the volume already in the case and that of the new sources:"
+    ],
+    [
+      "b",
+      "If the total stays under the limit: a single import, into the existing case."
+    ],
+    [
+      "b",
+      "If the total exceeds the limit: the tool WARNS, automatically unchecks the last sources so only what fits remains, and SUSPENDS generation (nothing is written). No sub-case is created automatically."
+    ],
+    [
+      "b",
+      "What to do: check/adjust the « Imp. » checkboxes then run « Generate » again to import what you kept. For the rest: create the sub-case manually in Intella, target it as the case, re-check and re-import the remaining sources."
+    ],
+    [
+      "b",
+      "The « Imp. » column (checkbox) selects which sources are measured and imported; the « ✕ » cross removes a row from the summary. The « Export / Import a list » buttons save the state of the summary table."
+    ],
+    [
+      "b",
+      "A single source larger than the limit cannot be imported as-is: it is flagged."
+    ],
+    [
+      "p",
+      "Note: the volume of « folder » sources is not always known from the inventory; in that case the displayed total is marked « partial » and the decision may be optimistic. Check these folders if you are close to the limit."
+    ]
+  ]
+}

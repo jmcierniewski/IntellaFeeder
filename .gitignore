@@ -1,0 +1,24 @@
+# Cache Python
+__pycache__/
+*.pyc
+
+# Environnement virtuel
+venv*/
+.venv/
+
+# Build PyInstaller
+build/
+dist/
+*.spec
+*.exe
+
+# Données locales générées à l'exécution (pas de code, pas à versionner)
+Cas/
+profils/*.json
+intellafeeder.ini
+
+# Divers éditeurs / OS
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
