@@ -100,7 +100,7 @@ class ImportTab(ttk.Frame):
         # Bug Vound confirmé sur les images forensiques multi-tronçons : option
         # pour ne pas vérifier l'intégrité (validateDiskImage:false). État
         # mémorisé par cas dans IF_<cas>.info.
-        self.var_skip_integrity = tk.BooleanVar(value=False)
+        self.var_skip_integrity = tk.BooleanVar(value=True)
         chk = ttk.Checkbutton(
             frame, variable=self.var_skip_integrity,
             text=i18n.t("import.skip_integrity",
@@ -243,7 +243,7 @@ class ImportTab(ttk.Frame):
         else:
             self.var_case.set("")
             self.var_casename.set("")
-            self.var_skip_integrity.set(False)
+            self.var_skip_integrity.set(True)
         # Reflète l'état dans le champ « Arguments suppl. » (cocher = y mettre
         # « -validateDiskImage false »).
         self._sync_integrity_arg()
