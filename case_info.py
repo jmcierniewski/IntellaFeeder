@@ -40,7 +40,7 @@ def _default(case_name: str) -> dict:
         "case_name": case_name,
         "updated": "",
         "folder_sizes": {},
-        "skip_integrity_check": False,
+        "skip_integrity_check": True,
     }
 
 
@@ -98,7 +98,7 @@ def update_folder_sizes(folder: str, case_name: str, measured: dict) -> bool:
 
 
 def get_skip_integrity(folder: str, case_name: str) -> bool:
-    return bool(read_info(folder, case_name).get("skip_integrity_check", False))
+    return bool(read_info(folder, case_name).get("skip_integrity_check", True))
 
 
 def set_skip_integrity(folder: str, case_name: str, value: bool) -> bool:
