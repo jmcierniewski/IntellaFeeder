@@ -16,6 +16,10 @@ import i18n
 # Sous-dossier de run : groupe date-heure yyyyMMdd_HHmm (cf. generator).
 _RUN_RE = re.compile(r"^\d{8}_\d{4}$")
 _RE_ADDED = re.compile(r"Added new source:\s*(.+?)\s*(?:\[urn:uuid|$)", re.IGNORECASE)
+# Lignes de bootstrap logback (ex. "14:34:44,187 |-INFO in ch.qos.logback...
+# - Could NOT find resource [logback-test.scmo]") : toujours présentes, jamais
+# une erreur d'import (cf. réponse support Vound).
+_RE_LOGBACK_BOOT = re.compile(r"ch\.qos\.logback", re.IGNORECASE)
 _FAIL_MARKERS = (
     "validation failed",
     "error validating",
@@ -41,6 +45,10 @@ def parse_import_log(path: str) -> dict:
                 m = _RE_ADDED.search(line)
                 if m:
                     added = m.group(1).strip()
+                    continue
+                if _RE_LOGBACK_BOOT.search(line):
+                    # Bootstrap logback (recherche de logback.xml/.scmo absents,
+                    # normal à chaque lancement) : jamais une erreur d'import.
                     continue
                 low = line.lower()
                 if fail_line is None and any(mk in low for mk in _FAIL_MARKERS):
