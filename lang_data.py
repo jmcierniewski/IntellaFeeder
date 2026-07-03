@@ -566,6 +566,14 @@ BUILTIN = {
             [
                 "p",
                 "Remarque : le volume des sources de type « dossier » n'est pas toujours connu via l'inventaire ; dans ce cas le total affiché est marqué « partiel » et la décision peut être optimiste. Vérifiez ces dossiers si vous êtes proche de la limite."
+            ],
+            [
+                "h1",
+                "Fichiers de langue"
+            ],
+            [
+                "p",
+                "Le dossier « lang » (à côté du programme) contient les fichiers FR.lang et US.lang. Ces fichiers sont FACULTATIFS : le français et l'anglais sont déjà intégrés à l'application (codés en dur), qui fonctionne donc normalement même si ce dossier est absent. Ils peuvent servir d'exemple pour créer une traduction dans une autre langue."
             ]
         ]
     },
@@ -1117,6 +1125,14 @@ BUILTIN = {
             [
                 "p",
                 "Note: the volume of « folder » sources is not always known from the inventory; in that case the displayed total is marked « partial » and the decision may be optimistic. Check these folders if you are close to the limit."
+            ],
+            [
+                "h1",
+                "Language files"
+            ],
+            [
+                "p",
+                "The « lang » folder (next to the program) contains the FR.lang and US.lang files. These files are OPTIONAL: French and English are already built into the application (hard-coded), so it runs normally even without this folder. They can be used as a template to create a translation into another language."
             ]
         ]
     }
