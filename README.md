@@ -11,6 +11,9 @@ Avoids the repetitive clicks of the Intella web wizard: paste lists of paths
 tool generates the JSON files plus a resilient `.bat` script (one IntellaCmd
 command per source, continues after a failure) ready to run.
 
+More info in the wiki
+
+
 ## Features
 
 - **Case inventory**: reads sources already indexed in a case (`-exportSourceList`),
@@ -83,6 +86,9 @@ chemins (images forensiques / dossiers), on choisit les tâches et le profil
 d'analyse à appliquer par source, et l'outil génère les fichiers JSON et un
 script `.bat` résilient (1 commande IntellaCmd par source, poursuit après un
 échec) prêt à lancer.
+
+Plus d'informations dans le wiki
+
 
 ## Fonctionnalités
 
