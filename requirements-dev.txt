@@ -1,0 +1,7 @@
+# Dépendances de DÉVELOPPEMENT uniquement (tests).
+# L'application elle-même n'a AUCUNE dépendance externe : bibliothèque standard
+# Python seulement — ne rien ajouter ici qui doive être embarqué dans l'exe.
+#
+#   python -m pip install -r requirements-dev.txt
+#   python -m pytest
+pytest>=8.0

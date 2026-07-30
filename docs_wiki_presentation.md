@@ -37,8 +37,8 @@ click "Generate" → run the resulting `.bat`.
 2. **Case detail** (tab 2): a read-only, human-friendly view of `case.xml`,
    `case.prefs` and the case's task list (`tasks2.json`).
 3. **Import** (tab 3, the main tab): paste one path per line (forensic images
-   on one side, folders/files on the other). Click "Récapituler" to build a
-   table of sources — already-indexed ones are flagged automatically. Tick
+   on one side, folders/files on the other). Click "Analyse paths" to build the
+   list of sources to import — already-indexed ones are flagged automatically. Tick
    which annex tasks to run per source (dynamic T1/T2… columns, one per task
    found in the loaded task file), pick an analysis profile per source, then
    click "Générer".
@@ -182,8 +182,8 @@ cocher des cases → cliquer « Générer » → lancer le `.bat` produit.
 2. **Détail du cas** (onglet 2) : vue lecture seule et humanisée de
    `case.xml`, `case.prefs` et de la liste des tâches du cas (`tasks2.json`).
 3. **Import** (onglet 3, l'onglet principal) : on colle un chemin par ligne
-   (images forensiques d'un côté, dossiers/fichiers de l'autre). « Récapituler »
-   construit un tableau des sources — celles déjà indexées sont signalées
+   (images forensiques d'un côté, dossiers/fichiers de l'autre). « Analyser les
+   chemins » construit la liste des sources à importer — celles déjà indexées sont signalées
    automatiquement. On coche, pour chaque source, les tâches annexes à
    exécuter (colonnes dynamiques T1, T2…, une par tâche du fichier de tâches
    chargé), on choisit un profil d'analyse par source, puis on clique

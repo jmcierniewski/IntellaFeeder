@@ -27,6 +27,11 @@ def case_xml_path(folder: str) -> str:
     return os.path.join(folder, CASE_XML)
 
 
+def tasks2_path(folder: str) -> str:
+    """Chemin de ``prefs\\tasks2.json`` (peut ne pas exister)."""
+    return os.path.join(folder, PREFS_DIR, TASKS2_JSON)
+
+
 def has_case_xml(folder: str) -> bool:
     return bool(folder) and os.path.isfile(case_xml_path(folder))
 
@@ -83,7 +88,7 @@ def read_prefs(folder: str) -> dict:
 
 def read_tasks2(folder: str) -> list[str]:
     """Noms des tâches de ``prefs\\tasks2.json`` (post-indexation). [] si absent."""
-    path = os.path.join(folder, PREFS_DIR, TASKS2_JSON)
+    path = tasks2_path(folder)
     names: list[str] = []
     if not os.path.isfile(path):
         return names

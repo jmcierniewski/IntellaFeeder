@@ -12,6 +12,7 @@ Première étape du workflow :
 
 import json
 import os
+import queue
 import shutil
 import threading
 import tkinter as tk
@@ -25,7 +26,7 @@ import i18n
 import path_parser
 import profile_translate
 import sizing
-from ui_widgets import make_button
+from ui_widgets import MeasureBar, make_button
 
 # En-têtes affichés du tableau (les clés internes des lignes restent en
 # français partout dans le code — ``case_export``, CSV… — pour ne rien casser ;
@@ -47,7 +48,8 @@ class ExportTab(ttk.Frame):
         self.app = app
         self.rows: list[dict] = []
         self.columns: list[str] = []
-
+        self._scan_running = False   # scan des dossiers à 0 en cours
+        self._scan_cancel = False    # annulation demandée (lue par le worker)
 
         top = ttk.LabelFrame(self, text=i18n.t("inventory.case_frame", "Cas à inventorier"))
         top.pack(fill="x", padx=8, pady=8)
@@ -105,6 +107,10 @@ class ExportTab(ttk.Frame):
         # visuellement (réglages de la source sélectionnée → onglet Profils).
         self._mk_btn(actions, i18n.t("inventory.info_profile", "Info Profil →"), self._info_profile,
                      color=config.PROFILE_TAB_COLOR).pack(side="left", padx=6)
+
+        # Bandeau de progression du scan des dossiers à 0 (masqué au repos) :
+        # même widget que l'onglet Import (progression + annulation).
+        self.scan_bar = MeasureBar(self, pack_opts={"fill": "x", "padx": 12, "pady": (0, 4)})
 
         self.lbl_summary = ttk.Label(self, text=i18n.t("inventory.no_case", "Aucun cas sélectionné."))
         self.lbl_summary.pack(anchor="w", padx=12, pady=(0, 4))
@@ -368,6 +374,14 @@ class ExportTab(ttk.Frame):
     # Scan facultatif des dossiers à taille 0                            #
     # ------------------------------------------------------------------ #
     def _scan_zero(self):
+        """Mesure les dossiers que l'export XML reporte à 0 (mesure INDICATIVE).
+
+        Contrairement à l'onglet Import, ces sources sont **déjà indexées** :
+        leur volume ne conditionne pas le garde-fou (``case.xml/size`` fait foi),
+        il affine seulement l'affichage. D'où deux différences assumées :
+        les résultats partiels sont **conservés et persistés immédiatement**
+        (une source du cas ne bougera plus), et l'annulation est sans conséquence.
+        """
         inv = self.app.inventory
         if not inv or not inv.get("folder_unknown"):
             messagebox.showinfo(
@@ -375,44 +389,68 @@ class ExportTab(ttk.Frame):
                 i18n.t("inventory.zero_folders_none",
                       "Aucun dossier sans taille à mesurer.\nLisez d'abord les sources du cas."))
             return
+        if self._scan_running:
+            return
         folders = list(inv["folder_unknown"])
+        self._scan_running = True
+        self._scan_cancel = False
         self.btn_scan.config(state="disabled")
-        self._show_scan_progress(len(folders))
+        self.scan_bar.start(len(folders), on_cancel=self._cancel_scan,
+                            cancel_text=i18n.t("common.cancel_btn", "✕ Annuler"))
+        self.scan_bar.set_step(1, len(folders), i18n.t(
+            "inventory.measuring_progress", "Mesure des dossiers… {i}/{n}", i=1, n=len(folders)))
         self.app.log.log(i18n.t(
             "inventory.scan_start_log", "Scan de {n} dossier(s) à taille 0…", n=len(folders)))
-        threading.Thread(target=self._scan_zero_worker,
-                         args=(folders,), daemon=True).start()
+        # Moteur de mesure partagé avec l'onglet Import (cf. `sizing`) : le worker
+        # ne touche aucun widget, `_poll_scan` draine la file côté UI.
+        self._scan_queue = queue.Queue()
+        items = [{"key": f["path"], "path": f["path"],
+                  "label": f.get("name") or f["path"], "type": config.SOURCE_TYPE_FOLDER}
+                 for f in folders]
+        threading.Thread(
+            target=sizing.measure_sources,
+            args=(items, self._scan_queue, lambda: self._scan_cancel),
+            daemon=True).start()
+        self.after(100, self._poll_scan)
 
-    def _show_scan_progress(self, total):
-        """Affiche une barre de progression déterminée pour le scan en cours."""
-        if not hasattr(self, "scan_progress") or not self.scan_progress.winfo_exists():
-            self.scan_progress = ttk.Progressbar(self, mode="determinate")
-        self.scan_progress.config(maximum=max(1, total), value=0)
-        self.scan_progress.pack(fill="x", padx=12, pady=(0, 4))
-        self.lbl_summary.config(text=i18n.t(
-            "inventory.measuring_progress", "Mesure des dossiers… {i}/{n}", i=0, n=total))
+    def _cancel_scan(self):
+        self._scan_cancel = True
+        self.scan_bar.cancelling(i18n.t("common.cancelling", "Annulation en cours…"))
+        self.app.log.log(i18n.t("inventory.scan_cancel_log", "Scan des dossiers : annulation demandée."))
 
-    def _scan_zero_worker(self, folders):
-        total = len(folders)
-        results = []
-        for i, f in enumerate(folders, start=1):
-            # Signale le dossier en cours AVANT la mesure (folder_size peut être
-            # long sur de gros volumes) puis incrémente la barre une fois mesuré.
-            self.after(0, self._scan_zero_progress, i, total, f.get("name") or f["path"])
-            results.append((f["path"], sizing.folder_size(f["path"])))
-        self.after(0, self._scan_zero_done, results)
+    def _poll_scan(self):
+        try:
+            while True:
+                msg = self._scan_queue.get_nowait()
+                if msg[0] == "progress":
+                    self._scan_zero_progress(*msg[1:])
+                elif msg[0] == "row":
+                    self.scan_bar.step_done()
+                else:
+                    self._scan_zero_done(msg[1], msg[3])
+                    return
+        except queue.Empty:
+            pass
+        self.after(100, self._poll_scan)
 
-    def _scan_zero_progress(self, i, total, name):
-        if hasattr(self, "scan_progress") and self.scan_progress.winfo_exists():
-            self.scan_progress["value"] = i - 1
-        self.lbl_summary.config(text=i18n.t(
-            "inventory.measuring_progress_named", "Mesure des dossiers… {i}/{n} : {f}",
-            i=i, n=total, f=name))
+    def _scan_zero_progress(self, i, total, label, files, nbytes, elapsed):
+        if self._scan_cancel:
+            return
+        text = i18n.t("inventory.measuring_progress_named", "Mesure des dossiers… {i}/{n} : {f}",
+                      i=i, n=total, f=label)
+        if files:
+            text += "  —  " + i18n.t(
+                "common.scan_stats", "{f} fichiers, {b}, {s}s ({r}/s)",
+                f=files, b=config.human_size(nbytes), s=int(elapsed),
+                r=config.human_size(int(nbytes / elapsed)) if elapsed >= 1 else "…")
+        self.scan_bar.set_step(i, total, text)
 
-    def _scan_zero_done(self, results):
+    def _scan_zero_done(self, results_map, cancelled=False):
+        self._scan_running = False
+        self._scan_cancel = False
         self.btn_scan.config(state="normal")
-        if hasattr(self, "scan_progress") and self.scan_progress.winfo_exists():
-            self.scan_progress.pack_forget()
+        self.scan_bar.stop()
+        results = list(results_map.items())
         by_path = dict(results)
         for r in self.rows:
             b = by_path.get(r.get("Chemin"))
@@ -421,13 +459,19 @@ class ExportTab(ttk.Frame):
                 r["Octets"] = str(b)
         self._fill_tree()
         total = sum(b for _p, b in results)
-        # Intègre les dossiers mesurés à la somme inventaire et lève l'alerte
-        # (plus de taille à 0), puis ré-évalue la cohérence des tailles.
+        # Intègre les dossiers mesurés à la somme inventaire. Après une
+        # interruption, les dossiers NON mesurés restent listés (l'alerte de scan
+        # reste donc allumée) : on ne prétend pas connaître ce qu'on n'a pas vu.
+        restants = []
         if self.app.inventory is not None:
+            restants = [f for f in (self.app.inventory.get("folder_unknown") or [])
+                        if f["path"] not in by_path]
             self.app.inventory["known_bytes"] = self._inventory_total_bytes() + total
-            self.app.inventory["folder_unknown"] = []
-        self._set_scan_alert(False)
-        # Persiste les mesures dans IF_<cas>.info pour ne pas re-scanner ensuite.
+            self.app.inventory["folder_unknown"] = restants
+        self._set_scan_alert(bool(restants))
+        # Persistance IMMÉDIATE (contrairement à l'onglet Import) : ces sources
+        # sont déjà indexées dans le cas, leur contenu ne bougera plus — même les
+        # mesures d'un scan interrompu sont bonnes à garder.
         meta = self.app.case_meta
         if meta and results:
             if case_info.update_folder_sizes(meta["folder"], meta["name"], dict(results)):
@@ -437,10 +481,20 @@ class ExportTab(ttk.Frame):
         self.app.log.log(i18n.t(
             "inventory.folders_measured_log", "Dossiers mesurés : {n} — total {t}.",
             n=len(results), t=config.human_size(total)))
-        self.lbl_summary.config(text=i18n.t(
-            "inventory.folders_measured_summary",
-            "{n} dossier(s) mesuré(s) — total {t} (intégré à la somme inventaire).",
-            n=len(results), t=config.human_size(total)))
+        if cancelled:
+            self.app.log.log(i18n.t(
+                "inventory.scan_cancelled_log",
+                "Scan interrompu : {n} dossier(s) mesuré(s), {m} restant(s) à 0.",
+                n=len(results), m=len(restants)), level="WARN")
+            self.lbl_summary.config(text=i18n.t(
+                "inventory.scan_cancelled_summary",
+                "Scan interrompu — {n} dossier(s) mesuré(s) (total {t}), {m} restant(s) à 0.",
+                n=len(results), t=config.human_size(total), m=len(restants)))
+        else:
+            self.lbl_summary.config(text=i18n.t(
+                "inventory.folders_measured_summary",
+                "{n} dossier(s) mesuré(s) — total {t} (intégré à la somme inventaire).",
+                n=len(results), t=config.human_size(total)))
         self._check_size_consistency()
 
     def _info_profile(self):

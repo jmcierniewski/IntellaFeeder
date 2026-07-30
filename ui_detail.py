@@ -4,17 +4,29 @@ Lit ``app.case_meta`` (rempli par l'onglet Inventaire dès qu'un ``case.xml`` es
 détecté) et l'affiche en clair. Lecture seule, informatif.
 """
 
+import os
+import shutil
 import tkinter as tk
-from tkinter import ttk
+from tkinter import filedialog, messagebox, ttk
 
+import case_meta
 import config
 import i18n
+from ui_widgets import make_button
 
 
 class DetailTab(ttk.Frame):
     def __init__(self, parent, app):
         super().__init__(parent)
         self.app = app
+
+        # Barre d'action : export de tasks2.json comme fichier de tâches.
+        actions = ttk.Frame(self)
+        actions.pack(fill="x", padx=12, pady=(8, 0))
+        self.btn_export_tasks2 = make_button(
+            actions, i18n.t("detail.export_tasks2", "Exporter ces tâches (fichier de tâches)…"),
+            self._export_tasks2)
+        self.btn_export_tasks2.pack(side="left")
 
         holder = ttk.Frame(self)
         holder.pack(fill="both", expand=True, padx=8, pady=8)
@@ -40,6 +52,7 @@ class DetailTab(ttk.Frame):
         meta = self.app.case_meta
         self.text.configure(state="normal")
         self.text.delete("1.0", "end")
+        self.btn_export_tasks2.configure(state="disabled")
         if not meta:
             self.text.insert(
                 "end",
@@ -88,6 +101,17 @@ class DetailTab(ttk.Frame):
         if tasks2:
             for name in tasks2:
                 self.text.insert("end", "•  " + name + "\n", "v")
+            # Le fichier est un tableau JSON de tâches : réutilisable tel quel
+            # comme « fichier de tâches » de l'onglet Import (après export).
+            self.text.insert(
+                "end",
+                i18n.t("detail.tasks2_hint",
+                       "Ces tâches peuvent être exportées (bouton en haut) puis désignées "
+                       "comme « fichier de tâches » dans l'onglet « Import » : elles seront "
+                       "alors exécutées pendant l'import, source par source.") + "\n",
+                "muted")
+            if os.path.isfile(case_meta.tasks2_path(meta["folder"])):
+                self.btn_export_tasks2.configure(state="normal")
         else:
             self.text.insert(
                 "end",
@@ -95,6 +119,39 @@ class DetailTab(ttk.Frame):
                 "muted")
 
         self.text.configure(state="disabled")
+
+    # ------------------------------------------------------------------ #
+    def _export_tasks2(self):
+        """Copie ``prefs\\tasks2.json`` où l'utilisateur veut.
+
+        Copie **verbatim** (pas de re-sérialisation) : le fichier est déjà un
+        tableau JSON de tâches au format attendu par ``task_builder.load_tasks``,
+        donc directement désignable comme « fichier de tâches » à l'Import.
+        """
+        title = i18n.t("detail.export_tasks2_title", "Exporter les tâches post-indexation")
+        meta = self.app.case_meta
+        src = case_meta.tasks2_path(meta["folder"]) if meta else ""
+        if not src or not os.path.isfile(src):
+            messagebox.showinfo(title, i18n.t(
+                "detail.export_tasks2_none",
+                "Ce cas ne déclare aucune tâche post-indexation (tasks2.json absent)."))
+            return
+        safe = config.sanitize_filename(meta["name"] or "Case")
+        path = filedialog.asksaveasfilename(
+            defaultextension=".json", initialfile=f"tasks2_{safe}.json",
+            filetypes=[("JSON", "*.json"), (i18n.t("common.filetype_all", "Tous"), "*.*")])
+        if not path:
+            return
+        try:
+            shutil.copyfile(src, path)
+            self.app.log.log(i18n.t(
+                "detail.export_tasks2_log", "Tâches post-indexation exportées : {p}", p=path))
+            messagebox.showinfo(title, i18n.t(
+                "detail.export_tasks2_msg",
+                "Tâches exportées :\n{p}\n\nDésignez ce fichier comme « fichier de tâches » "
+                "dans l'onglet « Import » pour les exécuter pendant l'indexation.", p=path))
+        except OSError as exc:
+            messagebox.showerror(title, i18n.t("common.export_failed", "Échec :\n{e}", e=exc))
 
     def _h1(self, title):
         self.text.insert("end", title + "\n", "h1")

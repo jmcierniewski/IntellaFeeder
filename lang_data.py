@@ -28,6 +28,9 @@ BUILTIN = {
             "topbar.exe_dialog": "IntellaCmd.exe",
             "topbar.language": "Langue",
             "topbar.language_restart": "La langue choisie sera appliquée au prochain démarrage de l'application.",
+            "common.scan_stats": "{f} fichiers, {b}, {s}s ({r}/s)",
+            "common.cancelling": "Annulation en cours…",
+            "common.cancel_btn": "✕ Annuler",
             "common.browse": "Parcourir…",
             "common.yes": "oui",
             "common.no": "non",
@@ -93,6 +96,9 @@ BUILTIN = {
             "inventory.n_scannable_folders": "{n} dossier(s) à 0 (scannables)",
             "inventory.zero_folders_title": "Dossiers à 0",
             "inventory.zero_folders_none": "Aucun dossier sans taille à mesurer.\nLisez d'abord les sources du cas.",
+            "inventory.scan_cancel_log": "Scan des dossiers : annulation demandée.",
+            "inventory.scan_cancelled_log": "Scan interrompu : {n} dossier(s) mesuré(s), {m} restant(s) à 0.",
+            "inventory.scan_cancelled_summary": "Scan interrompu — {n} dossier(s) mesuré(s) (total {t}), {m} restant(s) à 0.",
             "inventory.scan_start_log": "Scan de {n} dossier(s) à taille 0…",
             "inventory.measuring_progress": "Mesure des dossiers… {i}/{n}",
             "inventory.measuring_progress_named": "Mesure des dossiers… {i}/{n} : {f}",
@@ -209,6 +215,12 @@ BUILTIN = {
             "detail.hash_algo": "Hachage des messages",
             "detail.h1_tasks2": "Tâches post-indexation (tasks2.json)",
             "detail.no_tasks2": "Aucune tâche post-indexation déclarée.",
+            "detail.tasks2_hint": "Ces tâches peuvent être exportées (bouton en haut) puis désignées comme « fichier de tâches » dans l'onglet « Import » : elles seront alors exécutées pendant l'import, source par source.",
+            "detail.export_tasks2": "Exporter ces tâches (fichier de tâches)…",
+            "detail.export_tasks2_title": "Exporter les tâches post-indexation",
+            "detail.export_tasks2_none": "Ce cas ne déclare aucune tâche post-indexation (tasks2.json absent).",
+            "detail.export_tasks2_log": "Tâches post-indexation exportées : {p}",
+            "detail.export_tasks2_msg": "Tâches exportées :\n{p}\n\nDésignez ce fichier comme « fichier de tâches » dans l'onglet « Import » pour les exécuter pendant l'indexation.",
             "import.already_used": "déjà {s} occupé(s)",
             "import.and_n_more": "… et {n} autre(s).",
             "import.auto_removed_log": "{n} source(s) déjà indexée(s) retirée(s) automatiquement.",
@@ -230,7 +242,6 @@ BUILTIN = {
             "import.col_profile": "Profil",
             "import.col_source": "Source",
             "import.compute_size": "Calculer la taille",
-            "import.computing_missing_sizes_log": "Calcul des tailles manquantes (sources cochées) avant génération…",
             "import.computing_size_log": "Calcul de la taille de {n} source(s) cochée(s)…",
             "import.corrections_needed": "Corrections nécessaires",
             "import.default_profile_label": "Profil par défaut :",
@@ -250,16 +261,23 @@ BUILTIN = {
             "import.inventory_exceeds": "(somme inventaire > case.xml {s})",
             "import.launch_failed_log": "Échec du lancement de l'import : {e}",
             "import.launch_impossible": "Lancement impossible :\n{e}",
+            "import.sizes_required_title": "Tailles non calculées",
+            "import.sizes_required_body": "{n} source(s) cochée(s) n'ont pas de taille :\n{list}\n\nCliquez sur « Calculer la taille » avant de générer (sans les tailles, le contrôle de la limite du cas est impossible).",
+            "import.already_running": "Un import est déjà en cours (fenêtre de console ouverte).",
+            "import.busy_measuring": "Calcul de taille en cours : la liste des sources ne peut pas être modifiée. Attendez la fin de la mesure.",
+            "import.autovalidate_unavailable": "IntellaCmd.exe et/ou l'utilisateur ne sont pas renseignés : « Valider les opérations » ne pourra pas être lancé automatiquement à la fin de l'import.\n\nLancer l'import quand même ?",
+            "import.finished_no_validate_log": "Import terminé (code {c}) — validation automatique ignorée (IntellaCmd.exe ou utilisateur manquant).",
+            "import.finished_log": "Import terminé (code {c}) — lancement automatique de « Valider les opérations ».",
             "import.launched_log": "Import lancé : {b}",
             "import.limit_exceeded_body": "La limite de {lim:g} Go serait dépassée.\n\n{n} source(s) ({v}) ont été DÉCOCHÉES (la partie qui tient reste cochée) :\n{list}\n\nRien n'a été généré. Vérifiez / ajustez les coches « Imp. », puis relancez « Générer » pour importer ce que vous gardez.\n\nPour le reste : créez le sous-cas manuellement dans Intella, ciblez-le comme cas, recochez et réimportez.",
             "import.limit_exceeded_log": "Dépassement limite : {n} source(s) décochée(s) ({v}). Génération suspendue — ajustez les coches puis relancez « Générer ».",
             "import.limit_exceeded_title": "Limite atteinte — génération suspendue",
             "import.limit_label": "Limite / cas (Go)",
             "import.limit_status": "{etat} la limite ({eff} / {lim})",
-            "import.list_imported_log": "Récapitulatif importé : {n} source(s) depuis {p}",
+            "import.list_imported_log": "Liste importée : {n} source(s) depuis {p}",
             "import.list_imported_removed": "({n} déjà dans le cas, retirée(s)).",
             "import.list_invalid_format": "Format invalide (liste de sources attendue).",
-            "import.list_replace_confirm": "Remplacer le récapitulatif actuel ({cur} source(s)) par {new} source(s) du fichier ?",
+            "import.list_replace_confirm": "Remplacer la liste actuelle ({cur} source(s)) par {new} source(s) du fichier ?",
             "import.list_unreadable": "Lecture impossible :\n{e}",
             "import.location_label": "Emplacement :",
             "import.log_failed": "ÉCHEC : {m}",
@@ -275,10 +293,10 @@ BUILTIN = {
             "import.over_limit": "⚠ dépasse",
             "import.partial": "(partiel)",
             "import.profile_applied_all_log": "Profil « {p} » appliqué à toutes les sources ({n}).",
-            "import.recap_empty": "Le récapitulatif est vide.",
-            "import.recap_exported_log": "Récapitulatif exporté ({n} source(s)) : {p}",
+            "import.recap_empty": "La liste des sources à importer est vide.",
+            "import.recap_exported_log": "Liste exportée ({n} source(s)) : {p}",
             "import.recap_exported_msg": "{n} source(s) exportée(s) :\n{p}",
-            "import.recap_frame": "Récapitulatif des sources",
+            "import.recap_frame": "Sources à importer",
             "import.reload_tasks": "Recharger les tâches",
             "import.report_done": "Génération terminée — {n} source(s) importée(s).",
             "import.report_existing": "Déjà dans le cas : {e}  →  total {t}.",
@@ -292,7 +310,7 @@ BUILTIN = {
             "import.report_run_logs": "Logs de ce run : logs\\{r}\\ (« Valider les opérations » lira ce run).",
             "import.report_single_case": "Un seul cas (sous la limite).",
             "import.report_title": "Terminé",
-            "import.run_confirm": "Lancer l'import dans Intella ?\n\n{b}\n\nIntellaCmd va ajouter les sources au cas (action non réversible côté cas). Une fenêtre de console s'ouvre et affiche la progression.\n\nContinuer ?",
+            "import.run_confirm": "Lancer l'import dans Intella ?\n\n{b}\n\nIntellaCmd va ajouter les sources au cas (action non réversible côté cas). Une fenêtre de console s'ouvre et affiche la progression.\n\n« Valider les opérations » sera lancé automatiquement à la fin de l'import.\n\nContinuer ?",
             "import.run_import": "Importer (lancer le .bat)",
             "import.select_case_first": "Sélectionnez d'abord un cas (onglet « 1. Inventaire du cas »).",
             "import.select_case_short": "Sélectionnez d'abord un cas (onglet « 1. Inventaire du cas »).",
@@ -300,9 +318,9 @@ BUILTIN = {
             "import.size_done_log": "Calcul des tailles terminé. Total cochées : {t}.",
             "import.size_title": "Taille",
             "import.skip_integrity": "Ne pas vérifier l'intégrité des sources (images multi-tronçons — contourne le bug Vound)",
-            "import.source_removed_log": "Source retirée du récapitulatif : {n}",
-            "import.summarize": "▼ Récapituler",
-            "import.summary_log": "Récapitulatif : {n} source(s).",
+            "import.source_removed_log": "Source retirée de la liste : {n}",
+            "import.summarize": "▼ Analyser les chemins",
+            "import.summary_log": "Analyse : {n} source(s).",
             "import.summary_removed_log": "{n} déjà dans le cas, retirée(s).",
             "import.target_case_frame": "Cas cible (défini par l'onglet « 1. Inventaire du cas »)",
             "import.tasks_check_all": "Tâches : tout cocher",
@@ -324,6 +342,7 @@ BUILTIN = {
             "import.validate_head": "Cas « {c} » : {n} source(s) présente(s).  Sur {v} vérifiée(s) : {ok} dans le cas, {ko} absente(s).  {l} log(s) analysé(s).",
             "import.validate_other": "  • {n} : {m}",
             "import.validate_present": "  ✔ {n} : présente dans le cas.",
+            "import.validate_busy": "Validation : re-scan du cas et analyse des logs…",
             "import.validate_requires": "IntellaCmd.exe et l'utilisateur sont requis.",
             "import.validate_rescan_failed_log": "Validation : échec du re-scan : {m}",
             "import.validate_run_analyzed": "  Run analysé : {r}.",
@@ -339,13 +358,19 @@ BUILTIN = {
             "validation.case_location_required": "L'emplacement du cas est obligatoire.",
             "validation.exe_not_found": "IntellaCmd.exe introuvable : {p}",
             "validation.exe_required": "Le chemin de IntellaCmd.exe est obligatoire.",
-            "validation.no_sources": "Aucune source. Collez des chemins puis cliquez sur « Récapituler ».",
+            "validation.no_sources": "Aucune source. Collez des chemins puis cliquez sur « Analyser les chemins ».",
             "validation.non_first_segment": "Segment d'image peut-être non initial (pointez le 1er, .E01) : {p}",
             "validation.output_dir_required": "Le dossier de sortie est obligatoire.",
             "validation.path_not_absolute": "Chemin non absolu (IntellaCmd exige des chemins absolus) : {p}",
             "validation.path_not_found": "Chemin introuvable : {p}",
             "validation.tasks_unreadable": "Des tâches sont cochées mais le fichier de tâches n'a pas pu être lu.",
             "validation.user_required": "Le champ « Utilisateur » est obligatoire.",
+            "import.size_progress": "Mesure {i}/{n} : {name}",
+            "import.size_pending_log": "{n} taille(s) mesurée(s) — mémorisée(s) dans IF_<cas>.info seulement après « Valider les opérations ».",
+            "import.sizes_persisted_log": "{n} taille(s) mémorisée(s) dans IF_<cas>.info (sources confirmées dans le cas).",
+            "import.size_cancel_log": "Calcul des tailles : annulation demandée.",
+            "import.size_cancelled_log": "Calcul interrompu : {n} source(s) mesurée(s), {m} restante(s) sans taille.",
+            "import.size_cancelled_msg": "Mesure interrompue.\n\n{n} source(s) mesurée(s), {m} sans taille.\nLes sources sans taille bloqueront la génération : relancez « Calculer la taille » pour les compléter (les mesures déjà faites ne seront pas refaites).",
             "import.size_cache_reused_log": "{n} source(s) déjà mesurée(s) reprise(s) du cache (IF_<cas>.info).",
             "task_builder.err_not_array": "Les tâches doivent être un tableau JSON (format exporté par Intella).",
             "task_builder.default_task_name": "Tâche {n}",
@@ -377,11 +402,11 @@ BUILTIN = {
             ],
             [
                 "b",
-                "3. Cliquez « Récapituler » : le tableau liste les sources. Les sources déjà présentes dans le cas (d'après l'inventaire) sont surlignées."
+                "3. Cliquez « Analyser les chemins » : le tableau liste les sources à importer. Les sources déjà présentes dans le cas (d'après l'inventaire) sont surlignées."
             ],
             [
                 "b",
-                "4. Cliquez « Calculer la taille » pour connaître le volume des sources. Cette étape est FACULTATIVE : l'outil utilise déjà, par défaut, la taille occupée déclarée dans le fichier case.xml du cas (récupérée à l'onglet « 1. Inventaire du cas »). Mais ce chiffre ne compte pas les sources déjà référencées dans Intella tant qu'elles n'ont pas été indexées (une source ajoutée à un cas peut rester en attente d'indexation) — il peut donc sous-estimer le volume réellement occupé. « Calculer la taille » mesure directement sur le disque les nouvelles sources cochées, pour un garde-fou plus fiable si vous approchez de la limite. Le résultat de chaque mesure est enregistré dans un fichier créé à la racine du dossier du cas (IF_<nom du cas>.info) : une source déjà mesurée lors d'une session précédente n'est pas rescannée."
+                "4. Cliquez « Calculer la taille » : la mesure est OBLIGATOIRE avant de générer (sans elle, l'outil ne peut pas vérifier que le cas restera sous la limite). Une barre de progression indique la source en cours de mesure. La taille occupée déclarée dans le case.xml du cas (onglet « 1. Inventaire du cas ») ne suffit pas : elle ne compte pas les sources ajoutées mais pas encore indexées, et peut donc sous-estimer le volume réel. Les mesures ne sont mémorisées (fichier IF_<nom du cas>.info à la racine du dossier du cas) qu'une fois les sources confirmées présentes dans le cas par « Valider les opérations » : si vous allégez une source avant de l'importer, elle sera bien remesurée."
             ],
             [
                 "b",
@@ -389,7 +414,11 @@ BUILTIN = {
             ],
             [
                 "b",
-                "6. Cliquez « Générer » : l'outil écrit les fichiers de sortie et le(s) script(s) « .bat ». Lancez le « .bat » pour réaliser l'import dans Intella."
+                "Origine des tâches : le champ « Fichier de tâches » de l'onglet Import accepte tout fichier de tâches exporté d'Intella. Vous pouvez aussi recycler les tâches déjà appliquées aux sources du cas (bouton « Tâches du cas (inventaire) »), ou exporter les tâches post-indexation du cas depuis l'onglet « Détail du cas » puis désigner le fichier obtenu ici."
+            ],
+            [
+                "b",
+                "6. Cliquez « Générer » : l'outil écrit les fichiers de sortie et le script « .bat ». Le bouton « Importer (lancer le .bat) » l'exécute et enchaîne AUTOMATIQUEMENT sur « Valider les opérations » dès la fin de l'import. Le bouton « Valider les opérations » reste utile si vous lancez le « .bat » vous-même, hors de l'application."
             ],
             [
                 "h1",
@@ -457,7 +486,7 @@ BUILTIN = {
             ],
             [
                 "b",
-                "Dans le récapitulatif de l'onglet Import, la colonne « Profil » permet de choisir le profil de chaque source. Le menu « Profil par défaut » applique le profil choisi à toutes les lignes d'un coup."
+                "Dans la liste des sources de l'onglet Import, la colonne « Profil » permet de choisir le profil de chaque source. Le menu « Profil par défaut » applique le profil choisi à toutes les lignes d'un coup."
             ],
             [
                 "h1",
@@ -533,7 +562,7 @@ BUILTIN = {
             ],
             [
                 "p",
-                "Après avoir lu l'inventaire d'un cas, l'onglet Import compare les chemins que vous collez avec ceux déjà indexés. Les sources déjà présentes sont retirées automatiquement du récapitulatif (au « Récapituler » comme à l'import d'une liste)."
+                "Après avoir lu l'inventaire d'un cas, l'onglet Import compare les chemins que vous collez avec ceux déjà indexés. Les sources déjà présentes sont retirées automatiquement de la liste (à l'« Analyser les chemins » comme à l'import d'une liste)."
             ],
             [
                 "h1",
@@ -557,7 +586,7 @@ BUILTIN = {
             ],
             [
                 "b",
-                "La colonne « Imp. » (case à cocher) choisit les sources à mesurer et à importer ; la croix « ✕ » retire une ligne du récapitulatif. Les boutons « Exporter / Importer une liste » sauvegardent l'état du récapitulatif."
+                "La colonne « Imp. » (case à cocher) choisit les sources à mesurer et à importer ; la croix « ✕ » retire une ligne de la liste. Les boutons « Exporter / Importer une liste » sauvegardent l'état de la liste."
             ],
             [
                 "b",
@@ -587,6 +616,9 @@ BUILTIN = {
             "topbar.exe_dialog": "IntellaCmd.exe",
             "topbar.language": "Language",
             "topbar.language_restart": "The selected language will apply the next time the application starts.",
+            "common.scan_stats": "{f} files, {b}, {s}s ({r}/s)",
+            "common.cancelling": "Cancelling…",
+            "common.cancel_btn": "✕ Cancel",
             "common.browse": "Browse…",
             "common.yes": "yes",
             "common.no": "no",
@@ -652,6 +684,9 @@ BUILTIN = {
             "inventory.n_scannable_folders": "{n} zero-size folder(s) (scannable)",
             "inventory.zero_folders_title": "Zero-size folders",
             "inventory.zero_folders_none": "No folder without size to measure.\nFirst read the case's sources.",
+            "inventory.scan_cancel_log": "Folder scan: cancellation requested.",
+            "inventory.scan_cancelled_log": "Scan interrupted: {n} folder(s) measured, {m} still at 0.",
+            "inventory.scan_cancelled_summary": "Scan interrupted — {n} folder(s) measured (total {t}), {m} still at 0.",
             "inventory.scan_start_log": "Scanning {n} zero-size folder(s)…",
             "inventory.measuring_progress": "Measuring folders… {i}/{n}",
             "inventory.measuring_progress_named": "Measuring folders… {i}/{n}: {f}",
@@ -768,6 +803,12 @@ BUILTIN = {
             "detail.hash_algo": "Message hashing algorithm",
             "detail.h1_tasks2": "Post-indexing tasks (tasks2.json)",
             "detail.no_tasks2": "No post-indexing task declared.",
+            "detail.tasks2_hint": "These tasks can be exported (button above) then selected as the « task file » in the « Import » tab: they will run during the import, source by source.",
+            "detail.export_tasks2": "Export these tasks (task file)…",
+            "detail.export_tasks2_title": "Export post-indexing tasks",
+            "detail.export_tasks2_none": "This case declares no post-indexing task (tasks2.json missing).",
+            "detail.export_tasks2_log": "Post-indexing tasks exported: {p}",
+            "detail.export_tasks2_msg": "Tasks exported:\n{p}\n\nSelect this file as the « task file » in the « Import » tab to run them during indexing.",
             "import.already_used": "already {s} used",
             "import.and_n_more": "… and {n} more.",
             "import.auto_removed_log": "{n} source(s) already indexed, removed automatically.",
@@ -789,7 +830,6 @@ BUILTIN = {
             "import.col_profile": "Profile",
             "import.col_source": "Source",
             "import.compute_size": "Compute size",
-            "import.computing_missing_sizes_log": "Computing missing sizes (checked sources) before generation…",
             "import.computing_size_log": "Computing the size of {n} checked source(s)…",
             "import.corrections_needed": "Corrections needed",
             "import.default_profile_label": "Default profile:",
@@ -809,16 +849,23 @@ BUILTIN = {
             "import.inventory_exceeds": "(inventory sum > case.xml {s})",
             "import.launch_failed_log": "Failed to launch the import: {e}",
             "import.launch_impossible": "Cannot launch:\n{e}",
+            "import.sizes_required_title": "Sizes not computed",
+            "import.sizes_required_body": "{n} checked source(s) have no size:\n{list}\n\nClick « Compute size » before generating (without sizes, the case limit cannot be checked).",
+            "import.already_running": "An import is already running (console window open).",
+            "import.busy_measuring": "Size computation in progress: the source list cannot be modified. Wait for the measurement to finish.",
+            "import.autovalidate_unavailable": "IntellaCmd.exe and/or the user are not set: « Validate operations » cannot be started automatically when the import finishes.\n\nRun the import anyway?",
+            "import.finished_no_validate_log": "Import finished (exit code {c}) — automatic validation skipped (IntellaCmd.exe or user missing).",
+            "import.finished_log": "Import finished (exit code {c}) — « Validate operations » started automatically.",
             "import.launched_log": "Import launched: {b}",
             "import.limit_exceeded_body": "The {lim:g} GB limit would be exceeded.\n\n{n} source(s) ({v}) were UNCHECKED (the part that fits stays checked):\n{list}\n\nNothing was generated. Check/adjust the « Imp. » boxes, then run « Generate » again to import what you kept.\n\nFor the rest: create the sub-case manually in Intella, target it, re-check and re-import.",
             "import.limit_exceeded_log": "Limit exceeded: {n} source(s) unchecked ({v}). Generation suspended — adjust the checkboxes then run « Generate » again.",
             "import.limit_exceeded_title": "Limit reached — generation suspended",
             "import.limit_label": "Limit / case (GB)",
             "import.limit_status": "{etat} the limit ({eff} / {lim})",
-            "import.list_imported_log": "Summary imported: {n} source(s) from {p}",
+            "import.list_imported_log": "List imported: {n} source(s) from {p}",
             "import.list_imported_removed": "({n} already in the case, removed).",
             "import.list_invalid_format": "Invalid format (a list of sources was expected).",
-            "import.list_replace_confirm": "Replace the current summary ({cur} source(s)) with {new} source(s) from the file?",
+            "import.list_replace_confirm": "Replace the current list ({cur} source(s)) with {new} source(s) from the file?",
             "import.list_unreadable": "Could not read:\n{e}",
             "import.location_label": "Location:",
             "import.log_failed": "FAILED: {m}",
@@ -834,10 +881,10 @@ BUILTIN = {
             "import.over_limit": "⚠ exceeds",
             "import.partial": "(partial)",
             "import.profile_applied_all_log": "Profile « {p} » applied to all sources ({n}).",
-            "import.recap_empty": "The summary is empty.",
-            "import.recap_exported_log": "Summary exported ({n} source(s)): {p}",
+            "import.recap_empty": "The list of sources to import is empty.",
+            "import.recap_exported_log": "List exported ({n} source(s)): {p}",
             "import.recap_exported_msg": "{n} source(s) exported:\n{p}",
-            "import.recap_frame": "Source summary",
+            "import.recap_frame": "Sources to import",
             "import.reload_tasks": "Reload tasks",
             "import.report_done": "Generation complete — {n} source(s) imported.",
             "import.report_existing": "Already in the case: {e}  →  total {t}.",
@@ -851,7 +898,7 @@ BUILTIN = {
             "import.report_run_logs": "Logs for this run: logs\\{r}\\ (« Validate operations » will read this run).",
             "import.report_single_case": "A single case (under the limit).",
             "import.report_title": "Done",
-            "import.run_confirm": "Run the import into Intella?\n\n{b}\n\nIntellaCmd will add the sources to the case (not reversible on the case side). A console window opens and shows progress.\n\nContinue?",
+            "import.run_confirm": "Run the import into Intella?\n\n{b}\n\nIntellaCmd will add the sources to the case (not reversible on the case side). A console window opens and shows progress.\n\n« Validate operations » will start automatically when the import finishes.\n\nContinue?",
             "import.run_import": "Import (run the .bat)",
             "import.select_case_first": "First select a case (« 1. Case inventory » tab).",
             "import.select_case_short": "First select a case (« 1. Case inventory » tab).",
@@ -859,9 +906,9 @@ BUILTIN = {
             "import.size_done_log": "Size computation done. Total checked: {t}.",
             "import.size_title": "Size",
             "import.skip_integrity": "Do not verify source integrity (multi-segment images — works around the Vound bug)",
-            "import.source_removed_log": "Source removed from the summary: {n}",
-            "import.summarize": "▼ Summarize",
-            "import.summary_log": "Summary: {n} source(s).",
+            "import.source_removed_log": "Source removed from the list: {n}",
+            "import.summarize": "▼ Analyse paths",
+            "import.summary_log": "Analysis: {n} source(s).",
             "import.summary_removed_log": "{n} already in the case, removed.",
             "import.target_case_frame": "Target case (set by the « 1. Case inventory » tab)",
             "import.tasks_check_all": "Tasks: check all",
@@ -883,6 +930,7 @@ BUILTIN = {
             "import.validate_head": "Case « {c} » : {n} source(s) present.  Out of {v} checked: {ok} in the case, {ko} absent.  {l} log(s) analyzed.",
             "import.validate_other": "  • {n} : {m}",
             "import.validate_present": "  ✔ {n}: present in the case.",
+            "import.validate_busy": "Validation: re-scanning the case and analysing the logs…",
             "import.validate_requires": "IntellaCmd.exe and the user are required.",
             "import.validate_rescan_failed_log": "Validation: re-scan failed: {m}",
             "import.validate_run_analyzed": "  Run analyzed: {r}.",
@@ -898,13 +946,19 @@ BUILTIN = {
             "validation.case_location_required": "The case location is required.",
             "validation.exe_not_found": "IntellaCmd.exe not found: {p}",
             "validation.exe_required": "The IntellaCmd.exe path is required.",
-            "validation.no_sources": "No source. Paste paths then click « Summarize ».",
+            "validation.no_sources": "No source. Paste paths then click « Analyse paths ».",
             "validation.non_first_segment": "Image segment may not be the first one (point to the 1st, .E01): {p}",
             "validation.output_dir_required": "The output folder is required.",
             "validation.path_not_absolute": "Path not absolute (IntellaCmd requires absolute paths): {p}",
             "validation.path_not_found": "Path not found: {p}",
             "validation.tasks_unreadable": "Tasks are checked but the task file could not be read.",
             "validation.user_required": "The « User » field is required.",
+            "import.size_progress": "Measuring {i}/{n}: {name}",
+            "import.size_pending_log": "{n} size(s) measured — saved to IF_<case>.info only after « Validate operations ».",
+            "import.sizes_persisted_log": "{n} size(s) saved to IF_<case>.info (sources confirmed in the case).",
+            "import.size_cancel_log": "Size computation: cancellation requested.",
+            "import.size_cancelled_log": "Computation interrupted: {n} source(s) measured, {m} left without a size.",
+            "import.size_cancelled_msg": "Measurement interrupted.\n\n{n} source(s) measured, {m} without a size.\nSources without a size will block generation: run « Compute size » again to complete them (measurements already done will not be redone).",
             "import.size_cache_reused_log": "{n} source(s) already measured, reused from cache (IF_<case>.info).",
             "task_builder.err_not_array": "Tasks must be a JSON array (format exported by Intella).",
             "task_builder.default_task_name": "Task {n}",
@@ -936,11 +990,11 @@ BUILTIN = {
             ],
             [
                 "b",
-                "3. Click « Summarize »: the table lists the sources. Sources already present in the case (per the inventory) are highlighted."
+                "3. Click « Analyse paths »: the table lists the sources to import. Sources already present in the case (per the inventory) are highlighted."
             ],
             [
                 "b",
-                "4. Click « Compute size » to know the volume of the sources. This step is OPTIONAL: by default the tool already uses the used-size value declared in the case's case.xml file (fetched in the « 1. Case inventory » tab). But that figure does not count sources already referenced in Intella as long as they haven't been indexed yet (a source added to a case can stay pending indexing) — so it may underestimate the actual volume used. « Compute size » measures the checked new sources directly on disk, for a more reliable safeguard if you are close to the limit. Each measurement is saved to a file created at the root of the case folder (IF_<case name>.info): a source already measured in a previous session is not rescanned."
+                "4. Click « Compute size »: measuring is MANDATORY before generating (without it, the tool cannot check that the case stays under the limit). A progress bar shows the source being measured. The used size declared in the case's case.xml (« 1. Case inventory » tab) is not enough: it does not count sources added but not yet indexed, so it may underestimate the actual volume. Measurements are only saved (file IF_<case name>.info at the root of the case folder) once the sources are confirmed present in the case by « Validate operations »: if you trim a source before importing it, it will be measured again."
             ],
             [
                 "b",
@@ -948,7 +1002,11 @@ BUILTIN = {
             ],
             [
                 "b",
-                "6. Click « Generate »: the tool writes the output files and the « .bat » script(s). Run the « .bat » to perform the import into Intella."
+                "Where tasks come from: the Import tab's « Task file » field accepts any task file exported from Intella. You can also recycle the tasks already applied to the case's sources (« Case tasks (inventory) » button), or export the case's post-indexing tasks from the « Case detail » tab and select the resulting file here."
+            ],
+            [
+                "b",
+                "6. Click « Generate »: the tool writes the output files and the « .bat » script. The « Run import (.bat) » button executes it and AUTOMATICALLY chains to « Validate operations » as soon as the import finishes. The « Validate operations » button remains useful if you run the « .bat » yourself, outside the application."
             ],
             [
                 "h1",
@@ -1016,7 +1074,7 @@ BUILTIN = {
             ],
             [
                 "b",
-                "In the Import tab's summary table, the « Profile » column lets you choose the profile for each source. The « Default profile » menu applies the chosen profile to every row at once."
+                "In the Import tab's source list, the « Profile » column lets you choose the profile for each source. The « Default profile » menu applies the chosen profile to every row at once."
             ],
             [
                 "h1",
@@ -1092,7 +1150,7 @@ BUILTIN = {
             ],
             [
                 "p",
-                "After reading a case's inventory, the Import tab compares the paths you paste with those already indexed. Sources already present are automatically removed from the summary table (both when clicking « Summarize » and when importing a list)."
+                "After reading a case's inventory, the Import tab compares the paths you paste with those already indexed. Sources already present are automatically removed from the list (both when clicking « Analyse paths » and when importing a list)."
             ],
             [
                 "h1",
@@ -1116,7 +1174,7 @@ BUILTIN = {
             ],
             [
                 "b",
-                "The « Imp. » column (checkbox) selects which sources are measured and imported; the « ✕ » cross removes a row from the summary. The « Export / Import a list » buttons save the state of the summary table."
+                "The « Imp. » column (checkbox) selects which sources are measured and imported; the « ✕ » cross removes a row from the list. The « Export / Import a list » buttons save the state of the list."
             ],
             [
                 "b",

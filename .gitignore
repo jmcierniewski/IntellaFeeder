@@ -2,6 +2,9 @@
 __pycache__/
 *.pyc
 
+# Tests
+.pytest_cache/
+
 # Environnement virtuel
 venv*/
 .venv/

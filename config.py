@@ -55,6 +55,9 @@ UNCHECK = "☐"
 # --- Couleurs d'onglets (pastilles + boutons « cross-onglet ») ---
 INVENTORY_TAB_COLOR = "#3b82f6"   # onglet « 1. Inventaire du cas »
 PROFILE_TAB_COLOR = "#8b5cf6"     # onglet « Profils » (bouton « Info Profil »)
+# Vert = étapes du parcours nominal de l'onglet Import (analyser les chemins →
+# calculer la taille → générer les fichiers d'import).
+ACTION_COLOR = "#16a34a"
 
 
 def glyph(state: bool) -> str:

@@ -9,7 +9,9 @@ opérations » recroise un re-scan du cas et l'analyse des logs d'import.
 import csv
 import json
 import os
+import queue
 import re
+import subprocess
 import threading
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
@@ -26,7 +28,7 @@ import profiles
 import sizing
 import task_builder
 import validation
-from ui_widgets import Tooltip, make_button
+from ui_widgets import MeasureBar, Tooltip, make_button
 
 _LEAD_COLS = ("import",)            # case à cocher « Importer »
 _BASE_COLS = ("name", "type", "size", "profile")
@@ -44,6 +46,20 @@ class ImportTab(ttk.Frame):
         self._sort_col = None
         self._sort_asc = True
         self._heading_base = {}    # colid -> texte d'en-tête de base
+        self._size_running = False  # calcul de taille en cours (anti double-clic)
+        self._size_cancel = False   # annulation demandée (lue par le worker)
+        self._size_by_key = {}      # chemin -> Source (retour du moteur de mesure)
+        # Mesures d'un calcul INTERROMPU, réutilisées à la relance (reprise) puis
+        # oubliées dès qu'un calcul va au bout — sinon on ne pourrait plus
+        # remesurer une source allégée entre-temps.
+        self._resume_sizes = {}
+        # Tailles mesurées cette session, EN ATTENTE d'écriture dans IF_<cas>.info :
+        # persistées seulement pour les sources confirmées dans le cas par
+        # « Valider les opérations » (une source pas encore importée peut être
+        # allégée entre-temps → une taille mise en cache trop tôt serait fausse).
+        self._pending_sizes = {}   # chemin (tel que saisi) -> octets
+        self._import_proc = None   # Popen du .bat en cours (auto-validation à la fin)
+        self._auto_validate = True  # prérequis (exe + user) vérifiés au lancement
 
         self._build_params()
         self._build_panels()
@@ -149,18 +165,25 @@ class ImportTab(ttk.Frame):
         # ligne 2 = tout ce qui concerne les TÂCHES.
         toolbar = ttk.Frame(frame)
         toolbar.pack(fill="x", padx=4, pady=(4, 0))
-        make_button(toolbar, i18n.t("import.summarize", "▼ Récapituler"), self.recapituler).pack(side="left")
-        make_button(toolbar, i18n.t("import.compute_size", "Calculer la taille"),
-                   self.calculer_taille).pack(side="left", padx=6)
+        # Vert = les 3 étapes du parcours nominal (analyser → mesurer → générer).
+        self.btn_analyze = make_button(toolbar, i18n.t("import.summarize", "▼ Récapituler"),
+                                       self.recapituler, color=config.ACTION_COLOR)
+        self.btn_analyze.pack(side="left")
+        self.btn_size = make_button(toolbar, i18n.t("import.compute_size", "Calculer la taille"),
+                                    self.calculer_taille, color=config.ACTION_COLOR)
+        self.btn_size.pack(side="left", padx=6)
         make_button(toolbar, i18n.t("import.export_list", "Exporter la liste…"),
                    self._export_recap).pack(side="left")
-        make_button(toolbar, i18n.t("import.import_list", "Importer une liste…"),
-                   self._import_recap).pack(side="left", padx=4)
+        self.btn_import_list = make_button(toolbar, i18n.t("import.import_list", "Importer une liste…"),
+                                           self._import_recap)
+        self.btn_import_list.pack(side="left", padx=4)
         ttk.Separator(toolbar, orient="vertical").pack(side="left", fill="y", padx=8)
-        make_button(toolbar, i18n.t("import.check_all", "Imp. : tout cocher"),
-                   lambda: self._set_all_import(True)).pack(side="left")
-        make_button(toolbar, i18n.t("import.uncheck_all", "Imp. : tout décocher"),
-                   lambda: self._set_all_import(False)).pack(side="left", padx=4)
+        self.btn_check_all = make_button(toolbar, i18n.t("import.check_all", "Imp. : tout cocher"),
+                                         lambda: self._set_all_import(True))
+        self.btn_check_all.pack(side="left")
+        self.btn_uncheck_all = make_button(toolbar, i18n.t("import.uncheck_all", "Imp. : tout décocher"),
+                                           lambda: self._set_all_import(False))
+        self.btn_uncheck_all.pack(side="left", padx=4)
         ttk.Separator(toolbar, orient="vertical").pack(side="left", fill="y", padx=8)
         # Profil par défaut : choisir un profil l'applique à TOUTES les lignes.
         ttk.Label(toolbar, text=i18n.t("import.default_profile_label", "Profil par défaut :")).pack(side="left")
@@ -209,18 +232,55 @@ class ImportTab(ttk.Frame):
         self.tree.bind("<Motion>", self._on_motion)
         self.tree.bind("<Leave>", lambda _e: self.tooltip.hide())
 
+        # Bandeau de progression (masqué au repos) : scan long sur NAS → il faut
+        # voir l'avancement et pouvoir interrompre. Sert aussi à la validation.
+        self.size_bar = MeasureBar(frame)
+
         self.lbl_total = ttk.Label(frame, text=i18n.t("import.zero_sources", "0 source"))
         self.lbl_total.pack(anchor="w", padx=6, pady=(0, 2))
         self.lbl_inventory = ttk.Label(frame, text="", foreground="#64748b")
         self.lbl_inventory.pack(anchor="w", padx=6, pady=(0, 4))
+
+    def _busy_measuring(self) -> bool:
+        """Vrai (+ message) si une mesure est en cours : la liste ne doit pas bouger.
+
+        Doublon volontaire du grisage de `_set_busy` : les boutons grisés
+        protègent l'utilisateur, cette garde protège la fonction elle-même
+        (raccourci clavier, appel interne, évolution future de l'UI).
+        """
+        if not self._size_running:
+            return False
+        messagebox.showinfo(
+            i18n.t("import.size_title", "Taille"),
+            i18n.t("import.busy_measuring",
+                   "Calcul de taille en cours : la liste des sources ne peut pas être "
+                   "modifiée. Attendez la fin de la mesure."))
+        return True
+
+    def _set_busy(self, busy: bool):
+        """Verrouille les actions qui modifieraient la liste pendant une mesure.
+
+        Le worker travaille sur un instantané de ``self.sources`` : si la liste
+        est remplacée (« Analyser les chemins », « Importer une liste ») ou si des
+        lignes disparaissent pendant le scan, les tailles mesurées atterrissent
+        sur des objets devenus orphelins — sans erreur visible. On grise donc tout
+        ce qui touche à la liste, plus les actions aval (Générer / Importer) qui
+        n'ont pas de sens tant que les tailles ne sont pas connues.
+        """
+        state = "disabled" if busy else "normal"
+        for w in (self.btn_analyze, self.btn_import_list, self.btn_check_all,
+                  self.btn_uncheck_all, self.btn_generate, self.btn_import):
+            w.config(state=state)
+        self.cb_default_profile.config(state="disabled" if busy else "readonly")
 
     def _build_actions(self):
         # Ordre visuel gauche → droite : Générer | Importer | Valider.
         bar = ttk.Frame(self)
         bar.pack(fill="x", padx=8, pady=(0, 8))
         # « Générer » = action principale → vert (primary) ; les autres en style standard.
-        make_button(bar, i18n.t("import.generate", "Générer les fichiers d'import"), self.generer,
-                    color="#16a34a").pack(side="left")
+        self.btn_generate = make_button(bar, i18n.t("import.generate", "Générer les fichiers d'import"),
+                                        self.generer, color=config.ACTION_COLOR)
+        self.btn_generate.pack(side="left")
         self.btn_validate = make_button(bar, i18n.t("import.validate", "Valider les opérations"),
                                         self.valider_operations)
         self.btn_validate.pack(side="right", padx=6)
@@ -417,6 +477,8 @@ class ImportTab(ttk.Frame):
     # Récapitulatif                                                      #
     # ------------------------------------------------------------------ #
     def recapituler(self):
+        if self._busy_measuring():
+            return
         prev = {s.path.lower(): s for s in self.sources}
         parsed = []
         parsed += path_parser.parse_lines(self.txt_images.get("1.0", "end"), config.SOURCE_TYPE_DISK_IMAGE)
@@ -609,6 +671,8 @@ class ImportTab(ttk.Frame):
             messagebox.showerror(title, i18n.t("common.export_failed", "Échec :\n{e}", e=exc))
 
     def _import_recap(self):
+        if self._busy_measuring():
+            return
         title = i18n.t("import.import_list", "Importer une liste…")
         path = filedialog.askopenfilename(
             title=title,
@@ -674,6 +738,8 @@ class ImportTab(ttk.Frame):
         return cols[idx] if 0 <= idx < len(cols) else None
 
     def _on_click(self, event):
+        if self._size_running:
+            return          # mesure en cours : la liste ne doit pas bouger (✕, coches)
         if self.tree.identify("region", event.x, event.y) != "cell":
             return
         row = self.tree.identify_row(event.y)
@@ -706,6 +772,8 @@ class ImportTab(ttk.Frame):
         self.tree.set(row, colid, config.glyph(task_id in s.selected_task_ids))
 
     def _on_double_click(self, event):
+        if self._size_running:
+            return          # renommage interdit pendant la mesure (cf. _set_busy)
         if self.tree.identify("region", event.x, event.y) != "cell":
             return
         if self._colid_at(event.x) != "name":
@@ -829,6 +897,8 @@ class ImportTab(ttk.Frame):
         return lambda s: ""
 
     def _sort_by(self, colid):
+        if self._size_running:
+            return          # réordonner pendant la mesure brouille les lignes
         self._sort_asc = not self._sort_asc if self._sort_col == colid else True
         self._sort_col = colid
         self.sources.sort(key=self._sort_key(colid), reverse=not self._sort_asc)
@@ -845,6 +915,8 @@ class ImportTab(ttk.Frame):
     # Calcul de taille (thread)                                          #
     # ------------------------------------------------------------------ #
     def calculer_taille(self):
+        if self._size_running:
+            return                       # déjà en cours : le bouton est grisé, on ignore
         checked = [s for s in self.sources if s.import_selected]
         if not checked:
             messagebox.showinfo(
@@ -854,40 +926,147 @@ class ImportTab(ttk.Frame):
             return
         self.app.log.log(i18n.t(
             "import.computing_size_log", "Calcul de la taille de {n} source(s) cochée(s)…", n=len(checked)))
-        threading.Thread(target=self._size_worker, daemon=True).start()
-
-    def _size_worker(self):
-        snapshot = [s for s in self.sources if s.import_selected]
+        self._size_running = True
+        self._size_cancel = False
+        self._size_by_key = {s.path: s for s in checked}
+        self.btn_size.config(state="disabled")
+        self._set_busy(True)
+        self.size_bar.start(len(checked), on_cancel=self._cancel_size,
+                            cancel_text=i18n.t("common.cancel_btn", "✕ Annuler"))
+        self.size_bar.set_step(1, len(checked), i18n.t(
+            "import.size_progress", "Mesure {i}/{n} : {name}", i=1, n=len(checked), name="…"))
+        # Les lignes en attente affichent « … » plutôt qu'une taille périmée.
+        for s in checked:
+            rid = self._row_id_of(s)
+            if rid is not None:
+                self.tree.set(rid, "size", "…")
+        # Le worker ne touche PAS aux widgets : il poste ses avancées dans une
+        # file, drainée par `_poll_size` sur le thread UI (tkinter n'est pas
+        # thread-safe ; appeler `after` depuis le worker lève « main thread is
+        # not in main loop » selon le moment).
+        self._size_queue = queue.Queue()
         meta = self.app.case_meta
-        # Réutilise les tailles déjà mesurées (cache IF_<cas>.info, par chemin) :
-        # évite de rescanner une source déjà mesurée lors d'une session précédente.
-        cache = case_info.get_folder_sizes(meta["folder"], meta["name"]) if meta else {}
-        to_persist = {}
-        for s in snapshot:
-            cached = cache.get(path_parser.normalize_path(s.path).lower())
-            if cached is not None:
-                s.size_bytes = int(cached)
-            else:
-                s.size_bytes = sizing.source_size(s)
-                to_persist[s.path] = s.size_bytes
-        if meta and to_persist:
-            case_info.update_folder_sizes(meta["folder"], meta["name"], to_persist)
-        reused = len(snapshot) - len(to_persist)
-        if reused:
-            self.app.log.log(i18n.t(
-                "import.size_cache_reused_log",
-                "{n} source(s) déjà mesurée(s) reprise(s) du cache (IF_<cas>.info).", n=reused))
-        self.after(0, self._size_done)
+        cache = dict(case_info.get_folder_sizes(meta["folder"], meta["name"]) if meta else {})
+        # Reprise après annulation : les sources déjà mesurées au tour précédent
+        # ne sont pas rescannées. Vidé après un calcul mené à son terme, pour
+        # qu'un nouveau clic remesure bien (source allégée entre-temps).
+        cache.update({sizing.cache_key(k): v for k, v in self._resume_sizes.items()})
+        items = [{"key": s.path, "path": s.path, "label": s.name, "type": s.source_type}
+                 for s in checked]
+        threading.Thread(
+            target=sizing.measure_sources,
+            args=(items, self._size_queue, lambda: self._size_cancel, cache),
+            daemon=True).start()
+        self.after(100, self._poll_size)
 
-    def _size_done(self):
+    def _cancel_size(self):
+        """Demande l'arrêt : le worker s'arrête à la prochaine vérification."""
+        self._size_cancel = True
+        self.size_bar.cancelling(i18n.t("common.cancelling", "Annulation en cours…"))
+        self.app.log.log(i18n.t("import.size_cancel_log", "Calcul des tailles : annulation demandée."))
+
+    def _row_id_of(self, source):
+        """Identifiant de ligne du Treeview pour ``source`` (index dans ``sources``)."""
+        try:
+            rid = str(self.sources.index(source))
+        except ValueError:
+            return None
+        return rid if self.tree.exists(rid) else None
+
+    def _poll_size(self):
+        """Draine la file du moteur de mesure sur le thread UI (cf. `sizing`)."""
+        try:
+            while True:
+                msg = self._size_queue.get_nowait()
+                if msg[0] == "progress":
+                    self._size_progress(*msg[1:])
+                elif msg[0] == "row":
+                    self._size_row_done(msg[1], msg[2])
+                else:
+                    self._size_done(msg[1], msg[2], msg[3])
+                    return
+        except queue.Empty:
+            pass
+        self.after(100, self._poll_size)
+
+    def _size_progress(self, i, total, label, files, nbytes, elapsed):
+        if self._size_cancel:
+            return                      # « Annulation en cours… » reste affiché
+        text = i18n.t("import.size_progress", "Mesure {i}/{n} : {name}", i=i, n=total, name=label)
+        if files:
+            text += "  —  " + i18n.t(
+                "common.scan_stats", "{f} fichiers, {b}, {s}s ({r}/s)",
+                f=files, b=config.human_size(nbytes), s=int(elapsed),
+                r=config.human_size(int(nbytes / elapsed)) if elapsed >= 1 else "…")
+        self.size_bar.set_step(i, total, text)
+
+    def _size_row_done(self, key, size_bytes):
+        """Affiche la taille dès qu'une source est mesurée (retour au fil de l'eau)."""
+        source = self._size_by_key.get(key)
+        if source is not None:
+            source.size_bytes = size_bytes
+            rid = self._row_id_of(source)
+            if rid is not None:
+                self.tree.set(rid, "size", self._size_text(source))
+        self.size_bar.step_done()
+
+    def _size_done(self, results=None, cached_keys=None, cancelled=False):
+        # try/finally : une erreur d'affichage ne doit jamais laisser l'UI grisée.
+        try:
+            self._size_finish(results or {}, cached_keys or set(), cancelled)
+        finally:
+            self._size_running = False
+            self._size_cancel = False
+            self.btn_size.config(state="normal")
+            self.size_bar.stop()
+            self._set_busy(False)
+
+    def _size_finish(self, results, cached_keys, cancelled=False):
+        # Seules les sources mesurées ce tour-ci sont à persister : celles reprises
+        # du cache y sont déjà.
+        measured = {k: v for k, v in results.items() if k not in cached_keys}
         for i, s in enumerate(self.sources):
             if self.tree.exists(str(i)):
                 self.tree.set(str(i), "size", self._size_text(s))
         self._update_total()
         total = sum((s.size_bytes or 0) for s in self.sources if s.import_selected)
-        self.app.log.log(i18n.t(
-            "import.size_done_log", "Calcul des tailles terminé. Total cochées : {t}.",
-            t=config.human_size(total)))
+        if cancelled:
+            # Les sources non mesurées restent sans taille → « Générer » les
+            # refusera tant qu'elles ne sont pas mesurées (contrat v2.5h).
+            self._resume_sizes.update(results)
+            manquantes = sum(1 for s in self.sources if s.import_selected and s.size_bytes is None)
+            self.app.log.log(i18n.t(
+                "import.size_cancelled_log",
+                "Calcul interrompu : {n} source(s) mesurée(s), {m} restante(s) sans taille.",
+                n=len(results), m=manquantes), level="WARN")
+            messagebox.showinfo(
+                i18n.t("import.size_title", "Taille"),
+                i18n.t("import.size_cancelled_msg",
+                       "Mesure interrompue.\n\n{n} source(s) mesurée(s), {m} sans taille.\n"
+                       "Les sources sans taille bloqueront la génération : relancez "
+                       "« Calculer la taille » pour les compléter (les mesures déjà "
+                       "faites ne seront pas refaites).", n=len(results), m=manquantes))
+        else:
+            self._resume_sizes = {}     # calcul complet : plus rien à reprendre
+            self.app.log.log(i18n.t(
+                "import.size_done_log", "Calcul des tailles terminé. Total cochées : {t}.",
+                t=config.human_size(total)))
+        if cached_keys:
+            self.app.log.log(i18n.t(
+                "import.size_cache_reused_log",
+                "{n} source(s) déjà mesurée(s) reprise(s) du cache (IF_<cas>.info).",
+                n=len(cached_keys)))
+        # Mesures NON persistées ici : une source pas encore importée peut être
+        # allégée (suppression de sous-dossiers) avant l'import, auquel cas un
+        # cache écrit trop tôt fige une taille périmée. Elles ne sont écrites dans
+        # IF_<cas>.info qu'une fois la source confirmée dans le cas, par
+        # « Valider les opérations » (cf. `_persist_measured_sizes`).
+        if measured:
+            self._pending_sizes.update(measured)
+            self.app.log.log(i18n.t(
+                "import.size_pending_log",
+                "{n} taille(s) mesurée(s) — mémorisée(s) dans IF_<cas>.info seulement "
+                "après « Valider les opérations ».", n=len(measured)))
 
     # ------------------------------------------------------------------ #
     # Génération                                                         #
@@ -985,15 +1164,21 @@ class ImportTab(ttk.Frame):
                 self._format_list(errors, 30))
             return
 
+        # Tailles obligatoires : le garde-fou de limite n'a aucun sens sans elles.
+        # On ne les calcule plus en silence ici (scan long, UI figée, aucune
+        # progression) : l'utilisateur passe par « Calculer la taille ».
+        missing = [s for s in selected if s.size_bytes is None]
+        if missing:
+            messagebox.showerror(
+                i18n.t("import.sizes_required_title", "Tailles non calculées"),
+                i18n.t("import.sizes_required_body",
+                       "{n} source(s) cochée(s) n'ont pas de taille :\n{list}\n\n"
+                       "Cliquez sur « Calculer la taille » avant de générer "
+                       "(sans les tailles, le contrôle de la limite du cas est impossible).",
+                       n=len(missing), list=self._format_list([s.name for s in missing], 12)))
+            return
+
         limit_b = self._limit_gb() * config.GB
-        if limit_b > 0 and any(s.size_bytes is None for s in selected):
-            self.app.log.log(i18n.t(
-                "import.computing_missing_sizes_log",
-                "Calcul des tailles manquantes (sources cochées) avant génération…"))
-            for s in selected:
-                if s.size_bytes is None:
-                    s.size_bytes = sizing.source_size(s)
-            self._refresh_tree()
 
         # Dépassement : on décoche le surplus (séquentiellement) pour montrer ce qui
         # tient, on AVERTIT, et on s'ARRÊTE — pas de génération. L'utilisateur ajuste
@@ -1134,21 +1319,73 @@ class ImportTab(ttk.Frame):
                 "Aucun fichier d'import trouvé pour ce cas.\n"
                 "Cliquez d'abord sur « Générer les fichiers d'import »."))
             return
+        if self._import_proc is not None and self._import_proc.poll() is None:
+            messagebox.showinfo(title, i18n.t(
+                "import.already_running", "Un import est déjà en cours (fenêtre de console ouverte)."))
+            return
+        # Prérequis de la validation automatique vérifiés AVANT de lancer le .bat :
+        # sinon l'utilisateur reçoit une erreur juste après un import réussi.
+        exe = path_parser.clean_field(self.app.var_exe.get())
+        user = self.app.var_user.get().strip()
+        self._auto_validate = bool(exe and user)
+        if not self._auto_validate and not messagebox.askyesno(
+            title, i18n.t(
+                "import.autovalidate_unavailable",
+                "IntellaCmd.exe et/ou l'utilisateur ne sont pas renseignés : "
+                "« Valider les opérations » ne pourra pas être lancé automatiquement "
+                "à la fin de l'import.\n\nLancer l'import quand même ?")):
+            return
         if not messagebox.askyesno(
             title, i18n.t(
                 "import.run_confirm",
                 "Lancer l'import dans Intella ?\n\n{b}\n\n"
                 "IntellaCmd va ajouter les sources au cas (action non réversible "
                 "côté cas). Une fenêtre de console s'ouvre et affiche la progression.\n\n"
+                "« Valider les opérations » sera lancé automatiquement à la fin de l'import.\n\n"
                 "Continuer ?", b=os.path.basename(bat))):
             return
         try:
-            os.startfile(bat)  # Windows : exécute le .bat dans une console
+            # Popen (et non os.startfile) : il faut le handle du processus pour
+            # savoir QUAND l'import se termine et enchaîner sur la validation.
+            # CREATE_NEW_CONSOLE conserve la console de progression d'IntellaCmd.
+            self._import_proc = subprocess.Popen(
+                ["cmd", "/c", bat], cwd=os.path.dirname(bat),
+                creationflags=getattr(subprocess, "CREATE_NEW_CONSOLE", 0))
             self.app.log.log(i18n.t("import.launched_log", "Import lancé : {b}", b=bat))
         except OSError as exc:
+            self._import_proc = None
             self.app.log.log(i18n.t(
                 "import.launch_failed_log", "Échec du lancement de l'import : {e}", e=exc), level="ERROR")
             messagebox.showerror(title, i18n.t("import.launch_impossible", "Lancement impossible :\n{e}", e=exc))
+            return
+        self.btn_import.config(state="disabled")
+        self.after(1000, self._poll_import)
+
+    def _poll_import(self):
+        """Attend la fin du .bat puis enchaîne sur « Valider les opérations ».
+
+        Le bouton « Valider les opérations » reste utile pour les scripts lancés
+        à la main (hors application).
+        """
+        proc = self._import_proc
+        if proc is None:
+            return
+        if proc.poll() is None:
+            self.after(1000, self._poll_import)
+            return
+        self._import_proc = None
+        self.btn_import.config(state="normal")
+        if not self._auto_validate:
+            self.app.log.log(i18n.t(
+                "import.finished_no_validate_log",
+                "Import terminé (code {c}) — validation automatique ignorée "
+                "(IntellaCmd.exe ou utilisateur manquant).", c=proc.returncode))
+            return
+        self.app.log.log(i18n.t(
+            "import.finished_log",
+            "Import terminé (code {c}) — lancement automatique de « Valider les opérations ».",
+            c=proc.returncode))
+        self.valider_operations()
 
     # ------------------------------------------------------------------ #
     # Validation des opérations (re-scan du cas + analyse des logs)      #
@@ -1168,6 +1405,10 @@ class ImportTab(ttk.Frame):
             return
         logs_dir = config.case_logs_dir(meta["name"])
         self.btn_validate.config(state="disabled")
+        # Durée inconnue (re-scan IntellaCmd) → barre indéterminée, sans annulation
+        # (interrompre un -exportSourceList en cours n'apporterait rien d'utile).
+        self.size_bar.start_busy(i18n.t(
+            "import.validate_busy", "Validation : re-scan du cas et analyse des logs…"))
         self.app.log.log(i18n.t(
             "import.validate_start_log", "Validation des opérations : re-scan du cas + analyse des logs…"))
         threading.Thread(target=self._validate_worker,
@@ -1188,12 +1429,14 @@ class ImportTab(ttk.Frame):
 
     def _validate_error(self, msg):
         self.btn_validate.config(state="normal")
+        self.size_bar.stop()
         self.app.log.log(i18n.t("import.validate_rescan_failed_log", "Validation : échec du re-scan : {m}", m=msg),
                          level="ERROR")
         messagebox.showerror(i18n.t("import.validate", "Valider les opérations"), msg)
 
     def _validate_done(self, inventory, logs, run_dir=None):
         self.btn_validate.config(state="normal")
+        self.size_bar.stop()
         existing = inventory["existing_paths"]
         # Index logs par chemin d'évidence (normalisé) pour le recoupement.
         log_by_path = {}
@@ -1203,12 +1446,18 @@ class ImportTab(ttk.Frame):
                 log_by_path[path_parser.normalize_path(ev).lower()] = lg
 
         rows = []
+        # Chemins (tels que saisis) des sources confirmées dans le cas : sert à
+        # persister les tailles. Indexé par CHEMIN et pas par nom — les noms sont
+        # renommables au double-clic, donc non uniques.
+        confirmed_paths = []
         if self.sources:
             for s in self.sources:
                 key = path_parser.normalize_path(s.path).lower()
                 in_case = key in existing
                 lg = log_by_path.get(key)
                 rows.append((s.name, in_case, lg))
+                if in_case and (lg is None or lg["ok"]):
+                    confirmed_paths.append(s.path)
         else:
             # Pas de récap en mémoire : on se base sur les logs trouvés.
             for lg in logs:
@@ -1239,7 +1488,31 @@ class ImportTab(ttk.Frame):
                     level="ERROR")
             else:
                 self.app.log.log(i18n.t("import.validate_other", "  • {n} : {m}", n=name, m=lg['message']))
+        self._persist_measured_sizes(confirmed_paths)
         self._show_validation(inventory, logs, rows, run_dir)
+
+    def _persist_measured_sizes(self, confirmed_paths):
+        """Écrit dans IF_<cas>.info les tailles des sources CONFIRMÉES dans le cas.
+
+        ``confirmed_paths`` : chemins (tels que saisis) des sources retrouvées
+        dans le cas et sans erreur de log. Les autres (absentes, en échec)
+        restent hors cache : leur contenu peut encore changer avant un nouvel
+        import — elles seront remesurées.
+        """
+        meta = self.app.case_meta
+        if not meta or not self._pending_sizes:
+            return
+        to_persist = {p: self._pending_sizes[p] for p in confirmed_paths
+                      if p in self._pending_sizes}
+        if not to_persist:
+            return
+        if case_info.update_folder_sizes(meta["folder"], meta["name"], to_persist):
+            for path in to_persist:
+                self._pending_sizes.pop(path, None)
+            self.app.log.log(i18n.t(
+                "import.sizes_persisted_log",
+                "{n} taille(s) mémorisée(s) dans IF_<cas>.info (sources confirmées dans le cas).",
+                n=len(to_persist)))
 
     def _show_validation(self, inventory, logs, rows, run_dir=None):
         win = tk.Toplevel(self)

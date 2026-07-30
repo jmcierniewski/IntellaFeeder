@@ -57,6 +57,19 @@ embedded in the exe (`lang_data.py`) — the `lang/` folder is optional, but can
 shipped alongside the exe to add or fix a translation without rebuilding (see
 `i18n.py`).
 
+## Tests
+
+```powershell
+python -m pip install -r requirements-dev.txt
+python -m pytest
+```
+
+The suite covers the non-GUI modules only (path parsing, sizing, task files,
+import JSON, profile catalog and XML translation, log analysis, case info file,
+upfront validation): no tkinter, no IntellaCmd, no network. pytest is a
+**development** dependency — the application itself needs the standard library
+only.
+
 ## Architecture
 
 Modular layout (one module = one responsibility): see the docstring at the top
@@ -131,6 +144,19 @@ pyinstaller --onefile --noconsole --name IntellaFeeder intellaFeeder.py
 embarquées dans l'exe (`lang_data.py`) — le dossier `lang/` est facultatif,
 mais peut être livré à côté pour permettre d'ajouter/corriger une traduction
 sans recompiler (voir `i18n.py`).
+
+## Tests
+
+```powershell
+python -m pip install -r requirements-dev.txt
+python -m pytest
+```
+
+La suite couvre uniquement les modules **sans interface** (analyse de chemins,
+calcul de tailles, fichiers de tâches, JSON d'import, catalogue de profils et
+traduction XML, analyse des logs, fichier d'info du cas, validation amont) :
+pas de tkinter, pas d'IntellaCmd, pas de réseau. pytest est une dépendance de
+**développement** — l'application, elle, n'utilise que la bibliothèque standard.
 
 ## Architecture
 
