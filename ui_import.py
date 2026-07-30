@@ -158,7 +158,7 @@ class ImportTab(ttk.Frame):
         return txt
 
     def _build_recap(self):
-        frame = ttk.LabelFrame(self, text=i18n.t("import.recap_frame", "Récapitulatif des sources"))
+        frame = ttk.LabelFrame(self, text=i18n.t("import.recap_frame", "Sources à importer"))
         frame.pack(fill="both", expand=True, padx=8, pady=4)
 
         # Barre d'outils sur 2 lignes : ligne 1 = tout ce qui concerne les SOURCES,
@@ -166,7 +166,7 @@ class ImportTab(ttk.Frame):
         toolbar = ttk.Frame(frame)
         toolbar.pack(fill="x", padx=4, pady=(4, 0))
         # Vert = les 3 étapes du parcours nominal (analyser → mesurer → générer).
-        self.btn_analyze = make_button(toolbar, i18n.t("import.summarize", "▼ Récapituler"),
+        self.btn_analyze = make_button(toolbar, i18n.t("import.summarize", "▼ Analyser les chemins"),
                                        self.recapituler, color=config.ACTION_COLOR)
         self.btn_analyze.pack(side="left")
         self.btn_size = make_button(toolbar, i18n.t("import.compute_size", "Calculer la taille"),
@@ -502,7 +502,7 @@ class ImportTab(ttk.Frame):
         self._sort_col = None
         removed = self._drop_indexed()  # retrait auto des déjà indexées
         self._refresh_tree()
-        msg = i18n.t("import.summary_log", "Récapitulatif : {n} source(s).", n=len(self.sources))
+        msg = i18n.t("import.summary_log", "Analyse : {n} source(s).", n=len(self.sources))
         if removed:
             msg += " " + i18n.t("import.summary_removed_log", "{n} déjà dans le cas, retirée(s).", n=removed)
         self.app.log.log(msg)
@@ -633,7 +633,7 @@ class ImportTab(ttk.Frame):
     def _export_recap(self):
         title = i18n.t("import.export_list", "Exporter la liste…")
         if not self.sources:
-            messagebox.showinfo(title, i18n.t("import.recap_empty", "Le récapitulatif est vide."))
+            messagebox.showinfo(title, i18n.t("import.recap_empty", "La liste des sources à importer est vide."))
             return
         # Par défaut : dans le dossier du cas (Script\Cas\<nom>\, à côté de l'exe),
         # nom de fichier incluant le nom du cas.
@@ -663,7 +663,7 @@ class ImportTab(ttk.Frame):
             with open(path, "w", encoding="utf-8") as f:
                 json.dump({"sources": data}, f, ensure_ascii=False, indent=2)
             self.app.log.log(i18n.t(
-                "import.recap_exported_log", "Récapitulatif exporté ({n} source(s)) : {p}",
+                "import.recap_exported_log", "Liste exportée ({n} source(s)) : {p}",
                 n=len(data), p=path))
             messagebox.showinfo(title, i18n.t(
                 "import.recap_exported_msg", "{n} source(s) exportée(s) :\n{p}", n=len(data), p=path))
@@ -693,7 +693,7 @@ class ImportTab(ttk.Frame):
         if self.sources and not messagebox.askyesno(
             title, i18n.t(
                 "import.list_replace_confirm",
-                "Remplacer le récapitulatif actuel ({cur} source(s)) par {new} source(s) du fichier ?",
+                "Remplacer la liste actuelle ({cur} source(s)) par {new} source(s) du fichier ?",
                 cur=len(self.sources), new=len(items))):
             return
         loaded = []
@@ -713,7 +713,7 @@ class ImportTab(ttk.Frame):
         self._sort_col = None
         removed = self._drop_indexed()  # dédoublonnage auto (comme « Récapituler »)
         self._refresh_tree()
-        msg = i18n.t("import.list_imported_log", "Récapitulatif importé : {n} source(s) depuis {p}",
+        msg = i18n.t("import.list_imported_log", "Liste importée : {n} source(s) depuis {p}",
                     n=len(self.sources), p=path)
         if removed:
             msg += " " + i18n.t("import.list_imported_removed", "({n} déjà dans le cas, retirée(s)).", n=removed)
@@ -756,7 +756,7 @@ class ImportTab(ttk.Frame):
             self.sources.pop(int(row))
             self._refresh_tree()
             self.app.log.log(i18n.t(
-                "import.source_removed_log", "Source retirée du récapitulatif : {n}", n=s.name))
+                "import.source_removed_log", "Source retirée de la liste : {n}", n=s.name))
             return
         if colid == "profile":
             self._edit_profile(row)

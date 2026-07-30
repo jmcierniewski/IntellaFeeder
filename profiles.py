@@ -106,9 +106,22 @@ def save_profile(name: str, values: dict, comment: str = "") -> None:
     if name == DEFAULT_NAME:
         raise ValueError(i18n.t("profiles.err_default_reserved",
                                 "Le profil « défaut » est réservé et non modifiable."))
+    path = _file_for(name)
+    # Collision de noms de fichiers : deux noms différents peuvent s'assainir en
+    # un même fichier (« a:b » et « a/b » → « a_b.json »). Sans ce contrôle, le
+    # second profil écrasait le premier SILENCIEUSEMENT.
+    other = _load_file(path)
+    if other and other["name"] != name:
+        raise ValueError(i18n.t(
+            "profiles.err_name_collision",
+            "Le nom « {n} » produirait le même fichier que le profil « {o} » "
+            "({f}) : les caractères interdits dans un nom de fichier sont "
+            "remplacés par « _ ». Choisissez un nom qui en diffère autrement "
+            "que par ces caractères.",
+            n=name, o=other["name"], f=os.path.basename(path)))
     payload = {"name": name, "comment": comment or "",
                "options": profile_catalog.diff_from_default(values)}
-    with open(_file_for(name), "w", encoding="utf-8") as f:
+    with open(path, "w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False, indent=2)
 
 

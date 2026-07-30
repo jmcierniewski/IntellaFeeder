@@ -5,7 +5,9 @@ import sys
 from datetime import datetime
 
 APP_NAME = "IntellaFeeder"
-APP_VERSION = "2.5"
+# Affichée dans le titre de la fenêtre et le journal → à incrémenter à CHAQUE
+# construction d'exe livrée, sinon impossible de savoir quel build tourne.
+APP_VERSION = "2.5k"
 APP_TITLE = "IntellaFeeder — Générateur de sources d'import Intella"
 
 # --- Réglages forensiques par défaut ---
@@ -32,8 +34,7 @@ def type_label(source_type: str) -> str:
     return i18n.t(key, TYPE_LABELS.get(source_type, source_type)) if key else source_type
 
 # --- Fichiers produits ---
-SOURCES_JSON = "sources.json"
-BAT_NAME = "import_intella.bat"
+# (les noms des JSON/.bat sont dérivés du nom du cas, cf. generator.py)
 DEFAULT_TASKS_FILENAME = "tasks.json"
 INI_NAME = "intellafeeder.ini"
 

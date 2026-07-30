@@ -186,6 +186,7 @@ BUILTIN = {
             "profiles.err_default_reserved": "Le profil « défaut » est réservé et non modifiable.",
             "profiles.err_default_no_delete": "Le profil « défaut » ne peut pas être supprimé.",
             "profiles.err_default_reserved_short": "Le profil « défaut » est réservé.",
+            "profiles.err_name_collision": "Le nom « {n} » produirait le même fichier que le profil « {o} » ({f}) : les caractères interdits dans un nom de fichier sont remplacés par « _ ». Choisissez un nom qui en diffère autrement que par ces caractères.",
             "profiles.err_new_name_empty": "Le nouveau nom est vide.",
             "profiles.err_not_found": "Profil introuvable : {n}",
             "profiles.err_already_exists": "Un profil « {n} » existe déjà.",
@@ -394,7 +395,7 @@ BUILTIN = {
             ],
             [
                 "b",
-                "1. Onglet « Inventaire du cas » : lisez d'abord les sources déjà présentes dans le cas. Cela sert à connaître le volume déjà occupé et à repérer les sources déjà indexées (pour ne pas les ajouter deux fois). Le bouton « Exporter le XML » enregistre une copie de la liste lue."
+                "1. Onglet « Inventaire du cas » : lisez d'abord les sources déjà présentes dans le cas. Cela sert surtout à repérer les sources déjà indexées, pour ne pas les ajouter deux fois (elles sont retirées automatiquement de la liste d'import). Le volume déjà occupé, lui, est donné par le fichier case.xml du cas : il est connu même sans lire les sources. Le bouton « Exporter le XML » enregistre une copie de la liste lue. « Scanner les dossiers à 0 » mesure les dossiers dont Intella ne reporte pas la taille : c'est une information indicative (affichage), pas un élément du contrôle de la limite — la mesure affiche sa progression et peut être interrompue à tout moment, les dossiers déjà mesurés étant conservés."
             ],
             [
                 "b",
@@ -774,6 +775,7 @@ BUILTIN = {
             "profiles.err_default_reserved": "The « default » profile is reserved and cannot be edited.",
             "profiles.err_default_no_delete": "The « default » profile cannot be deleted.",
             "profiles.err_default_reserved_short": "The « default » profile is reserved.",
+            "profiles.err_name_collision": "The name « {n} » would produce the same file as profile « {o} » ({f}): characters not allowed in a file name are replaced with « _ ». Pick a name that differs by more than those characters.",
             "profiles.err_new_name_empty": "The new name is empty.",
             "profiles.err_not_found": "Profile not found: {n}",
             "profiles.err_already_exists": "A profile « {n} » already exists.",
@@ -982,7 +984,7 @@ BUILTIN = {
             ],
             [
                 "b",
-                "1. « Case inventory » tab: first read the sources already present in the case. This tells you how much space is already used and flags sources already indexed (so you don't add them twice). The « Export XML » button saves a copy of the list that was read."
+                "1. « Case inventory » tab: first read the sources already present in the case. Its main purpose is to flag sources already indexed so you don't add them twice (they are removed from the import list automatically). The space already used comes from the case's case.xml file: it is known even without reading the sources. The « Export XML » button saves a copy of the list that was read. « Scan zero-size folders » measures the folders whose size Intella does not report: this is indicative information (display only), not part of the limit check — the measurement shows its progress and can be interrupted at any time, keeping the folders already measured."
             ],
             [
                 "b",

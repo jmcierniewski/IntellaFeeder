@@ -1,4 +1,11 @@
-"""Construction des fichiers sources.json et des scripts .bat IntellaCmd."""
+"""Construction des JSON de sources et du script .bat IntellaCmd.
+
+Import **résilient** (v2.2) : un JSON par source et une commande IntellaCmd par
+source dans le .bat, chacune journalisée à part — l'échec d'une source n'arrête
+pas les autres. Les fonctions « tout en un » d'origine (un seul sources.json,
+un .bat enchaînant les commandes) ont été retirées au lot 4 : plus appelées
+depuis ce changement de modèle.
+"""
 
 import json
 import os
@@ -9,36 +16,6 @@ import config
 def _strip_trailing(path: str) -> str:
     """Retire les séparateurs de fin (problème connu entre guillemets)."""
     return path.rstrip().rstrip("\\/")
-
-
-def build_sources_json(sources, timezone: str, taskfile_for,
-                       output_dir: str, filename: str = None) -> str:
-    """Écrit un sources.json (format -addSourcesFromJson) et retourne son chemin.
-
-    ``taskfile_for`` : callable(source) -> chemin du fichier de tâche ou None.
-    Réglages d'indexation par défaut : on n'émet que name, evidencePath,
-    sourceType, timezone et taskFile éventuel. ensure_ascii=True → chemins
-    accentués échappés (sûr quel que soit l'encodage lu par IntellaCmd).
-    """
-    output_dir = os.path.abspath(output_dir)
-    filename = filename or config.SOURCES_JSON
-    arr = []
-    for s in sources:
-        obj = {
-            "name": s.name,
-            "evidencePath": s.path,
-            "sourceType": s.source_type,
-            "timezone": timezone,
-        }
-        taskfile = taskfile_for(s)
-        if taskfile:
-            obj["taskFile"] = taskfile
-        arr.append(obj)
-
-    path = os.path.join(output_dir, filename)
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump({"sources": arr}, f, ensure_ascii=True, indent=2)
-    return path
 
 
 def build_single_source_json(source, timezone: str, taskfile,
@@ -121,22 +98,6 @@ def write_resilient_bat(entries, output_dir: str, filename: str,
         lines.append(f"echo [{i}/{total}] {_echo_safe(label)}")
         lines.append(cmd)
         lines.append('if errorlevel 1 (echo    [ECHEC] code %errorlevel%) else (echo    [OK])')
-        lines.append("")
-    lines += ["echo.", "echo Termine.", "pause"]
-
-    path = os.path.join(output_dir, filename)
-    with open(path, "w", encoding="utf-8", newline="\r\n") as f:
-        f.write("\n".join(lines))
-    return path
-
-
-def write_bat(commands, output_dir: str, filename: str,
-              title: str = "import de sources Intella") -> str:
-    """Écrit un .bat (UTF-8, CRLF) enchaînant ``commands`` et retourne son chemin."""
-    output_dir = os.path.abspath(output_dir)
-    lines = ["@echo off", "chcp 65001 >nul", f"rem Genere par {config.APP_NAME} - {title}", ""]
-    for c in commands:
-        lines.append(c)
         lines.append("")
     lines += ["echo.", "echo Termine.", "pause"]
 

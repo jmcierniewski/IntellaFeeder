@@ -38,7 +38,7 @@ def collect(sources, params: dict, tasks_loaded: bool):
     if not sources:
         errors.append(i18n.t(
             "validation.no_sources",
-            "Aucune source. Collez des chemins puis cliquez sur « Récapituler »."))
+            "Aucune source. Collez des chemins puis cliquez sur « Analyser les chemins »."))
 
     # --- Tâches cochées mais fichier de tâches illisible ---
     if any(s.selected_task_ids for s in sources) and not tasks_loaded:
