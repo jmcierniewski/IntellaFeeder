@@ -1,6 +1,8 @@
 """Fenêtre principale à onglets (Import / Export des sources / Journal)."""
 
 import os
+import subprocess
+import sys
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
@@ -136,10 +138,41 @@ class MainWindow:
         # cette langue (les widgets déjà construits, eux, ne se retraduisent
         # qu'au redémarrage — cf. limite tkinter documentée dans i18n.py).
         i18n.load(code)
-        messagebox.showinfo(
-            i18n.t("topbar.language", "Langue"),
-            i18n.t("topbar.language_restart",
-                   "La langue choisie sera appliquée au prochain démarrage de l'application."))
+        title = i18n.t("topbar.language", "Langue")
+        if messagebox.askyesno(title, i18n.t(
+                "topbar.language_restart_ask",
+                "La langue choisie ne s'applique qu'au démarrage de l'application "
+                "(les fenêtres déjà ouvertes gardent leurs textes).\n\n"
+                "Redémarrer IntellaFeeder maintenant ?")):
+            self._restart()
+        else:
+            messagebox.showinfo(title, i18n.t(
+                "topbar.language_restart",
+                "La langue choisie sera appliquée au prochain démarrage de l'application."))
+
+    def _restart(self):
+        """Relance l'application puis ferme l'instance courante.
+
+        Mode « frozen » (exe PyInstaller) : ``sys.executable`` EST l'application.
+        En mode script, il pointe sur python.exe et il faut lui repasser le
+        script. Les paramètres sont enregistrés avant, comme à une fermeture
+        normale.
+        """
+        try:
+            self.save_settings()
+            if getattr(sys, "frozen", False):
+                cmd = [sys.executable] + sys.argv[1:]
+            else:
+                cmd = [sys.executable, os.path.abspath(sys.argv[0])] + sys.argv[1:]
+            subprocess.Popen(cmd, cwd=os.getcwd())
+        except OSError as exc:
+            messagebox.showerror(
+                i18n.t("topbar.language", "Langue"),
+                i18n.t("topbar.restart_failed",
+                       "Redémarrage impossible :\n{e}\n\nFermez puis rouvrez "
+                       "l'application pour appliquer la langue.", e=exc))
+            return
+        self.root.destroy()
 
     def _build_topbar(self):
         bar = ttk.LabelFrame(self.root, text=i18n.t("topbar.title", "Paramètres communs"))

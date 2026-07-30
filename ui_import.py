@@ -1489,7 +1489,7 @@ class ImportTab(ttk.Frame):
             else:
                 self.app.log.log(i18n.t("import.validate_other", "  • {n} : {m}", n=name, m=lg['message']))
         self._persist_measured_sizes(confirmed_paths)
-        self._show_validation(inventory, logs, rows, run_dir)
+        self._show_validation(inventory, logs, rows, run_dir, confirmed_paths)
 
     def _persist_measured_sizes(self, confirmed_paths):
         """Écrit dans IF_<cas>.info les tailles des sources CONFIRMÉES dans le cas.
@@ -1514,7 +1514,7 @@ class ImportTab(ttk.Frame):
                 "{n} taille(s) mémorisée(s) dans IF_<cas>.info (sources confirmées dans le cas).",
                 n=len(to_persist)))
 
-    def _show_validation(self, inventory, logs, rows, run_dir=None):
+    def _show_validation(self, inventory, logs, rows, run_dir=None, confirmed_paths=None):
         win = tk.Toplevel(self)
         win.title(i18n.t("import.validate", "Valider les opérations"))
         win.geometry("900x460")
@@ -1577,6 +1577,39 @@ class ImportTab(ttk.Frame):
         make_button(bar, i18n.t("import.close", "Fermer"), win.destroy).pack(side="right", padx=8)
         make_button(bar, i18n.t("common.export_csv", "Exporter en CSV…"),
                     lambda: self._export_validation(export_rows)).pack(side="right")
+        # Boucle du workflow sous-cas : ce qui est confirmé dans le cas n'a plus
+        # rien à faire dans la liste d'import — ne reste que le reliquat à
+        # réimporter (sous-cas manuel, sources en échec…). Bouton et non popup
+        # automatique : c'est une modification de la liste, elle reste choisie.
+        if confirmed_paths and self.sources:
+            make_button(bar, i18n.t("import.drop_confirmed",
+                                    "Retirer les sources confirmées de la liste"),
+                        lambda: self._drop_confirmed(list(confirmed_paths), win),
+                        color=config.ACTION_COLOR).pack(side="left", padx=8)
+
+    def _drop_confirmed(self, confirmed_paths, win=None):
+        """Retire de la liste les sources confirmées présentes dans le cas."""
+        keys = {path_parser.normalize_path(p).lower() for p in confirmed_paths}
+        restantes = [s for s in self.sources
+                     if path_parser.normalize_path(s.path).lower() not in keys]
+        retirees = len(self.sources) - len(restantes)
+        if not retirees:
+            return
+        if not messagebox.askyesno(
+            i18n.t("import.validate", "Valider les opérations"),
+            i18n.t("import.drop_confirmed_ask",
+                   "Retirer {n} source(s) confirmée(s) dans le cas de la liste "
+                   "d'import ?\n\nIl restera {r} source(s) — celles à réimporter "
+                   "(sous-cas, échecs).", n=retirees, r=len(restantes))):
+            return
+        self.sources = restantes
+        self._sort_col = None
+        self._refresh_tree()
+        self.app.log.log(i18n.t(
+            "import.drop_confirmed_log",
+            "{n} source(s) confirmée(s) retirée(s) de la liste d'import.", n=retirees))
+        if win is not None:
+            win.destroy()
 
     def _export_validation(self, export_rows):
         """Exporte le résultat de la validation (Source / Dans le cas / Log) en CSV."""
