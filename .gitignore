@@ -25,3 +25,6 @@ intellafeeder.ini
 .idea/
 Thumbs.db
 .DS_Store
+
+# Archives PyPak (embarquent intellafeeder.ini = donnees locales)
+*.pypak
