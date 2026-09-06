@@ -1,0 +1,302 @@
+"""Outil `outils/squelette_cas.py` : anonymisation et parcours des sous-cas.
+
+Cet outil est testé comme le reste alors qu'il ne fait pas partie de
+l'application, parce qu'il porte une **garantie de confidentialité** : le
+squelette qu'il produit est destiné à être lu et diffusé librement. Une
+régression y serait silencieuse — le fichier resterait valide, simplement il
+contiendrait encore une valeur réelle.
+
+Deux contrats verrouillés ici :
+
+- l'anonymisation est **stable** (une même valeur donne toujours le même alias,
+  c'est ce qui garde le `<subcase>` du parent aligné sur le dossier du sous-cas) ;
+- elle préserve la **forme** — UNC contre lettre de lecteur, profondeur,
+  extension, tailles, options d'indexation — puisque c'est elle, et non les noms,
+  que les tests d'IntellaFeeder exercent.
+"""
+
+import io
+import json
+import os
+import sys
+
+import pytest
+
+OUTILS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "outils")
+if OUTILS not in sys.path:
+    sys.path.insert(0, OUTILS)
+
+import squelette_cas as sq  # noqa: E402
+
+B = "\\"
+
+
+# --------------------------------------------------------------------------- #
+class TestAnonymiseur:
+    def test_alias_stable(self):
+        a = sq.Anonymiseur()
+        assert a.cas("Affaire X") == a.cas("Affaire X") == "CAS_1"
+        assert a.cas("Affaire Y") == "CAS_2"
+        assert a.user("dupond") == "user1"
+
+    def test_inactif_rend_la_valeur_telle_quelle(self):
+        a = sq.Anonymiseur(actif=False)
+        assert a.cas("Affaire X") == "Affaire X"
+        assert a.chemin_preuve(B * 2 + "srv" + B + "part" + B + "img.E01") == \
+            B * 2 + "srv" + B + "part" + B + "img.E01"
+
+    def test_identifiant_garde_la_forme(self):
+        a = sq.Anonymiseur()
+        guid = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+        sortie = a.identifiant(guid)
+        assert sortie != guid
+        assert len(sortie) == len(guid)
+        assert [i for i, c in enumerate(sortie) if c == "-"] == \
+               [i for i, c in enumerate(guid) if c == "-"]
+
+    def test_identifiant_deterministe(self):
+        assert sq.Anonymiseur().identifiant("abc-def") == \
+               sq.Anonymiseur().identifiant("abc-def")
+
+
+class TestCheminPreuve:
+    """La forme du chemin est ce que l'outil doit conserver : elle est testée."""
+
+    def test_unc_reste_unc(self):
+        a = sq.Anonymiseur()
+        sortie = a.chemin_preuve(B * 2 + "NAS" + B + "part" + B + "dossier" + B + "img.E01")
+        assert sortie.startswith(B * 2 + "SERVEUR" + B + "PARTAGE")
+        assert sortie.endswith(".E01")
+
+    def test_lettre_de_lecteur_reste_locale(self):
+        sortie = sq.Anonymiseur().chemin_preuve("D:" + B + "Scelles" + B + "cle")
+        assert sortie.startswith("D:" + B + "Preuves")
+        assert not sortie.startswith(B * 2)
+
+    def test_profondeur_conservee(self):
+        a = sq.Anonymiseur()
+        court = a.chemin_preuve("D:" + B + "a" + B + "x.E01")
+        long_ = a.chemin_preuve("D:" + B + "a" + B + "b" + B + "c" + B + "x.E01")
+        assert long_.count(B) > court.count(B)
+
+    def test_extension_conservee(self):
+        a = sq.Anonymiseur()
+        assert a.chemin_preuve("D:" + B + "a" + B + "img.E01").endswith(".E01")
+        assert a.chemin_preuve("D:" + B + "a" + B + "dossier").endswith("_2")
+
+    def test_nom_de_fichier_nu_ne_devient_pas_un_chemin(self):
+        """``firstPartName`` est un nom, pas un chemin : le confondre fausserait le jeu."""
+        sortie = sq.Anonymiseur().nom_fichier("pc.E01")
+        assert B not in sortie and sortie.endswith(".E01")
+
+
+# --------------------------------------------------------------------------- #
+def ecrire(chemin, contenu):
+    os.makedirs(os.path.dirname(chemin), exist_ok=True)
+    with io.open(chemin, "w", encoding="utf-8") as f:
+        f.write(contenu)
+
+
+def faire_cas(dossier, nom, user="dupond", size=1000, subs=None):
+    bloc = ""
+    if subs is not None:
+        bloc = "  <subcases>\n" + "".join(
+            "    <subcase>{}</subcase>\n".format(p) for p in subs) + "  </subcases>\n"
+    ecrire(os.path.join(dossier, "case.xml"),
+           '<?xml version="1.0" encoding="UTF-8"?>\n'
+           '<case version="1.0" id="aaaa-bbbb"{}>\n'
+           '  <name>{}</name>\n  <description>affaire confidentielle</description>\n'
+           '  <timestamp>1750000000000</timestamp>\n  <lastOpened>1760000000000</lastOpened>\n'
+           '  <user>{}</user>\n  <size>{}</size>\n'
+           '  <originalVersion>3.0</originalVersion>\n  <caseVersion>4.4.0</caseVersion>\n'
+           '{}</case>\n'.format(' compound="true"' if subs is not None else "",
+                                nom, user, size, bloc))
+    ecrire(os.path.join(dossier, "prefs", "case.prefs"),
+           "InitialAuthorizedUsers={},martin\n".format(user))
+    return dossier
+
+
+class Options:
+    logs = "aucun"
+    nb_logs = 5
+    max_log_ko = 8
+
+
+@pytest.fixture
+def compound(tmp_path):
+    """Compound à 2 sous-cas, dont un déclaré mais absent du disque."""
+    s1 = faire_cas(str(tmp_path / "src" / "Alpha"), "Perquisition Alpha", size=500)
+    absent = str(tmp_path / "src" / "Disparu")
+    parent = faire_cas(str(tmp_path / "src" / "Parent"), "Dossier Racine",
+                       size=1500, subs=[s1, absent])
+    return parent, s1, str(tmp_path / "out")
+
+
+class TestParcours:
+    def test_descend_dans_les_sous_cas(self, compound):
+        parent, _s1, out = compound
+        ano = sq.Anonymiseur()
+        rapport = sq.copier_cas(parent, out, ano, Options())
+        assert rapport["compound"] is True
+        assert rapport["nom"] == "CAS_1"
+        assert [s["etat"] for s in rapport["sous_cas"]] == ["ok", "dossier introuvable"]
+
+    def test_sous_cas_absent_nest_pas_une_erreur(self, compound):
+        parent, _s1, out = compound
+        rapport = sq.copier_cas(parent, out, sq.Anonymiseur(), Options())
+        assert os.path.isfile(os.path.join(out, "CAS_1", "case.xml"))
+        assert os.path.isfile(os.path.join(out, "CAS_2", "case.xml"))
+
+    def test_alias_du_parent_et_du_dossier_concordent(self, compound):
+        """Le `<subcase>` écrit chez le parent doit pointer sur le dossier produit."""
+        parent, _s1, out = compound
+        sq.copier_cas(parent, out, sq.Anonymiseur(), Options())
+        with io.open(os.path.join(out, "CAS_1", "case.xml"), encoding="utf-8") as f:
+            contenu = f.read()
+        assert "CAS_2" in contenu
+        assert os.path.isdir(os.path.join(out, "CAS_2"))
+
+    def test_boucle_de_references_sarrete(self, tmp_path):
+        """Un compound qui se référence lui-même ne doit pas faire tourner l'outil."""
+        chemin = str(tmp_path / "Boucle")
+        faire_cas(chemin, "Boucle", subs=[chemin])
+        rapport = sq.copier_cas(chemin, str(tmp_path / "out"), sq.Anonymiseur(), Options())
+        assert rapport["sous_cas"][0]["etat"] == "deja vu ou trop profond"
+
+    def test_mode_brut_conserve_les_valeurs(self, compound):
+        parent, _s1, out = compound
+        sq.copier_cas(parent, out, sq.Anonymiseur(actif=False), Options())
+        with io.open(os.path.join(out, "Parent", "case.xml"), encoding="utf-8") as f:
+            assert "Dossier Racine" in f.read()
+
+
+class TestVerificationAnonymat:
+    def test_aucune_fuite_sur_un_squelette_normal(self, compound):
+        parent, _s1, out = compound
+        ano = sq.Anonymiseur()
+        sq.copier_cas(parent, out, ano, Options())
+        assert sq.verifier_anonymat(out, ano) == []
+
+    def test_une_valeur_oubliee_est_detectee(self, compound):
+        parent, _s1, out = compound
+        ano = sq.Anonymiseur()
+        sq.copier_cas(parent, out, ano, Options())
+        ecrire(os.path.join(out, "CAS_1", "oubli.txt"), "Dossier Racine")
+        fuites = sq.verifier_anonymat(out, ano)
+        assert len(fuites) == 1 and "oubli.txt" in fuites[0]
+
+    def test_un_nom_de_fichier_qui_trahit_est_detecte(self, compound):
+        """`IF_<cas>.info` a montré qu'un nom de fichier fuit aussi bien qu'un contenu."""
+        parent, _s1, out = compound
+        ano = sq.Anonymiseur()
+        sq.copier_cas(parent, out, ano, Options())
+        ecrire(os.path.join(out, "CAS_1", "IF_Dossier Racine.info"), "{}")
+        fuites = sq.verifier_anonymat(out, ano)
+        assert any("nom :" in f for f in fuites)
+
+
+class TestFichiersAnnexes:
+    def test_info_renomme_et_chemins_substitues(self, compound):
+        parent, s1, out = compound
+        ecrire(os.path.join(s1, "IF_Perquisition Alpha.info"), json.dumps(
+            {"folder_sizes": {"d:" + B + B + "scelles" + B + B + "cle": 42},
+             "skip_integrity_check": True}))
+        ano = sq.Anonymiseur()
+        sq.copier_cas(parent, out, ano, Options())
+        produit = os.path.join(out, "CAS_2", "IF_CAS_2.info")
+        assert os.path.isfile(produit)
+        with io.open(produit, encoding="utf-8") as f:
+            data = json.load(f)
+        assert data["skip_integrity_check"] is True
+        assert all("scelles" not in k for k in data["folder_sizes"])
+
+    def test_sources_xml_garde_tailles_et_options(self, compound):
+        parent, s1, out = compound
+        ecrire(os.path.join(s1, "sources.xml"),
+               '<?xml version="1.0" encoding="UTF-8"?>\n<sources>\n'
+               '  <caseName>Perquisition Alpha</caseName>\n'
+               '  <source>\n    <name>PC saisi</name>\n    <type>Disk Image</type>\n'
+               '    <size>1000</size>\n    <totalSize>4000</totalSize>\n'
+               '    <partsCount>4</partsCount>\n    <timeZone>UTC</timeZone>\n'
+               '    <firstPartName>pc.E01</firstPartName>\n'
+               '    <indexOptions><indexArchives>true</indexArchives></indexOptions>\n'
+               '    <path>D:' + B + 'Scelles' + B + 'pc.E01</path>\n'
+               '  </source>\n</sources>\n')
+        ano = sq.Anonymiseur()
+        sq.copier_cas(parent, out, ano, Options())
+        with io.open(os.path.join(out, "CAS_2", "sources.xml"), encoding="utf-8") as f:
+            contenu = f.read()
+        # La forme utile est conservee...
+        for garde in ("<totalSize>4000", "<partsCount>4", "<timeZone>UTC",
+                      "<indexArchives>true"):
+            assert garde in contenu
+        # ...les valeurs nominatives, non.
+        assert "PC saisi" not in contenu and "Perquisition Alpha" not in contenu
+        assert "SOURCE_1" in contenu
+
+    def test_tasks2_anonymise_les_noms_pas_la_structure(self, compound):
+        parent, s1, out = compound
+        ecrire(os.path.join(s1, "prefs", "tasks2.json"), json.dumps(
+            [{"id": "1111-2222", "name": "OCR affaire", "condition": "ALL_ITEMS_CONDITION"}]))
+        sq.copier_cas(parent, out, sq.Anonymiseur(), Options())
+        with io.open(os.path.join(out, "CAS_2", "prefs", "tasks2.json"), encoding="utf-8") as f:
+            taches = json.load(f)
+        assert taches[0]["name"] == "Tache 1"
+        assert taches[0]["condition"] == "ALL_ITEMS_CONDITION"
+
+
+class TestLogs:
+    def test_inventaire_ne_copie_rien(self, compound):
+        parent, s1, out = compound
+        ecrire(os.path.join(s1, "logs", "case-main-2026-09-01.log"), "ligne 1\nligne 2\n")
+        options = Options()
+        options.logs = "inventaire"
+        rapport = sq.copier_cas(parent, out, sq.Anonymiseur(), options)
+        releve = rapport["sous_cas"][0]["logs"]
+        assert releve and releve[0]["lignes"] == 2
+        assert not os.path.isdir(os.path.join(out, "CAS_2", "logs"))
+
+    def test_copie_tronquee(self, compound):
+        parent, s1, out = compound
+        ecrire(os.path.join(s1, "logs", "gros.log"), "x" * 50_000)
+        options = Options()
+        options.logs = "brut"
+        options.max_log_ko = 1
+        sq.copier_cas(parent, out, sq.Anonymiseur(actif=False), options)
+        produit = os.path.join(out, "Alpha", "logs", "gros.log")
+        assert os.path.getsize(produit) < 2 * 1024
+
+
+class TestLigneDeCommande:
+    def test_logs_brut_refuse_hors_mode_brut(self, compound, capsys):
+        parent, _s1, out = compound
+        code = sq.main([parent, out, "--logs", "brut"])
+        assert code == 2
+        assert "--brut" in capsys.readouterr().err
+
+    def test_refuse_un_dossier_qui_nest_pas_un_cas(self, tmp_path, capsys):
+        vide = tmp_path / "vide"
+        vide.mkdir()
+        assert sq.main([str(vide), str(tmp_path / "out")]) == 2
+        assert "case.xml" in capsys.readouterr().err
+
+    def test_refuse_une_sortie_non_vide_sans_force(self, compound, capsys):
+        parent, _s1, out = compound
+        os.makedirs(out, exist_ok=True)
+        ecrire(os.path.join(out, "deja_la.txt"), "x")
+        assert sq.main([parent, out]) == 2
+        assert "--force" in capsys.readouterr().err
+
+    def test_parcours_complet_ecrit_le_manifeste(self, compound):
+        parent, _s1, out = compound
+        assert sq.main([parent, out]) == 0
+        with io.open(os.path.join(out, sq.MANIFESTE), encoding="utf-8") as f:
+            manifeste = f.read()
+        assert "anonymisé" in manifeste
+        assert "Aucune valeur d'origine" in manifeste
+
+    def test_mode_brut_avertit_dans_le_manifeste(self, compound):
+        parent, _s1, out = compound
+        assert sq.main([parent, out, "--brut"]) == 0
+        with io.open(os.path.join(out, sq.MANIFESTE), encoding="utf-8") as f:
+            assert "données réelles" in f.read()
