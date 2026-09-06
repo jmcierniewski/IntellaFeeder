@@ -36,6 +36,12 @@ CSV_COLUMNS = [
 # l'affichage (redondant avec « Taille ») mais reste présent dans les `rows`
 # pour le CSV. Conserve l'ordre du CSV en filtrant « Octets ».
 DISPLAY_COLUMNS = [c for c in CSV_COLUMNS if c != "Octets"]
+# Cas compound : les sources proviennent des sous-cas, une colonne dit lequel.
+# Placée en tête (c'est la clé de lecture du tableau), aussi bien à l'écran
+# qu'au CSV — d'où les listes dérivées plutôt qu'une modification des constantes.
+SUBCASE_COLUMN = "Sous-cas"
+CSV_COLUMNS_COMPOUND = [SUBCASE_COLUMN] + CSV_COLUMNS
+DISPLAY_COLUMNS_COMPOUND = [SUBCASE_COLUMN] + DISPLAY_COLUMNS
 
 _TYPE_MAP = {
     "Disk Image": config.SOURCE_TYPE_DISK_IMAGE,
@@ -113,6 +119,106 @@ def run_export_source_list(exe: str, user: str, case_loc: str, log,
     log(f"{len(parsed['sources'])} source(s) lue(s) dans le cas "
         f"« {parsed['case'].get('name', '?')} ». XML : {xml_path}")
     return rows, columns, inventory
+
+
+def run_export_subcases(exe: str, user: str, subcases: list, log,
+                        extra_args: str = "", timeout_min: int = 30,
+                        case_name: str = "", case_path: str = ""):
+    """Inventaire d'un cas COMPOUND : un ``-exportSourceList`` par sous-cas.
+
+    Un compound ne porte aucune source en propre — il référence des sous-cas
+    (cf. ``case_meta``). On interroge donc chaque sous-cas accessible, puis on
+    concatène les résultats en ajoutant la colonne « Sous-cas ».
+
+    ``subcases`` : sortie de ``case_meta.read_subcases`` (les entrées dont
+    ``exists`` est faux sont reportées sans être interrogées).
+
+    **Un sous-cas en échec n'interrompt pas les autres** : chacun a sa ligne dans
+    ``inventory["subcase_reports"]`` (``ok`` / ``error``). ``RuntimeError`` n'est
+    levée que si AUCUN sous-cas n'a pu être lu — sinon l'inventaire partiel est
+    plus utile que rien, à condition que l'appelant affiche les échecs.
+
+    Retourne ``(rows, columns, inventory)``, comme ``run_export_source_list``.
+    """
+    rows: list = []
+    reports: list = []
+    xml_paths: list = []
+    existing_paths: set = set()
+    folder_unknown: list = []
+    sources_detail: list = []
+    case_tasks: list = []
+    seen_task_sigs: set = set()
+    known_bytes = 0
+    ok_count = 0
+
+    for sc in subcases:
+        name, path = sc.get("name", ""), sc.get("path", "")
+        report = {"name": name, "path": path, "ok": False, "error": "",
+                  "source_count": 0, "bytes": 0}
+        if not sc.get("exists"):
+            report["error"] = sc.get("error", "") or "inaccessible"
+            log(f"Sous-cas ignoré « {name} » : {report['error']}")
+            reports.append(report)
+            continue
+        try:
+            sub_rows, _cols, sub_inv = run_export_source_list(
+                exe, user, path, log, extra_args=extra_args, timeout_min=timeout_min)
+        except Exception as exc:  # noqa: BLE001 — un sous-cas KO n'arrête pas les autres
+            report["error"] = str(exc)
+            log(f"Échec de lecture du sous-cas « {name} » : {exc}")
+            reports.append(report)
+            continue
+
+        ok_count += 1
+        for r in sub_rows:
+            merged = {SUBCASE_COLUMN: name}
+            merged.update(r)
+            rows.append(merged)
+        for d in sub_inv.get("sources_detail", []):
+            d["subcase"] = name
+            d["subcase_path"] = path
+            sources_detail.append(d)
+        existing_paths |= sub_inv.get("existing_paths", set())
+        folder_unknown += sub_inv.get("folder_unknown", [])
+        known_bytes += sub_inv.get("known_bytes", 0) or 0
+        # Tâches : même déduplication par signature qu'au sein d'un cas simple,
+        # poursuivie d'un sous-cas à l'autre (les UUID diffèrent par source).
+        for obj in sub_inv.get("case_tasks", []):
+            sig = _task_signature(obj)
+            if sig not in seen_task_sigs:
+                seen_task_sigs.add(sig)
+                case_tasks.append(obj)
+        if sub_inv.get("xml_path"):
+            xml_paths.append(sub_inv["xml_path"])
+        report.update({"ok": True, "source_count": len(sub_rows),
+                       "bytes": sub_inv.get("known_bytes", 0) or 0})
+        reports.append(report)
+
+    if subcases and not ok_count:
+        raise RuntimeError(
+            "Aucun sous-cas n'a pu être lu (voir le journal). Vérifiez que les "
+            "emplacements des sous-cas sont accessibles depuis ce poste."
+        )
+
+    inventory = {
+        "case_name": case_name,
+        "case_path": case_path,
+        "case_path_key": _norm(case_path),
+        "existing_paths": existing_paths,
+        "known_bytes": known_bytes,
+        "folder_unknown": folder_unknown,
+        "source_count": len(rows),
+        "case_tasks": case_tasks,
+        "sources_detail": sources_detail,
+        # Un XML par sous-cas lu ; ``xml_path`` garde le premier pour les
+        # appelants qui n'attendent qu'un fichier.
+        "xml_paths": xml_paths,
+        "xml_path": xml_paths[0] if xml_paths else "",
+        "is_compound": True,
+        "subcase_reports": reports,
+    }
+    log(f"Cas compound : {len(rows)} source(s) sur {ok_count}/{len(subcases)} sous-cas lu(s).")
+    return rows, list(DISPLAY_COLUMNS_COMPOUND), inventory
 
 
 # --------------------------------------------------------------------------- #

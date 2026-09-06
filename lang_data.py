@@ -62,6 +62,7 @@ BUILTIN = {
             "col.segments": "Segments",
             "col.path": "Chemin",
             "col.tasks": "Tâches",
+            "col.subcase": "Sous-cas",
             "inventory.case_frame": "Cas à inventorier",
             "inventory.case_folder": "Dossier du cas",
             "inventory.autolicense": "Sélection auto de licence (-autoSelectFullProcessingLicense)",
@@ -120,6 +121,18 @@ BUILTIN = {
             "inventory.export_tasks_msg": "{n} tâche(s) dédupliquée(s) exportée(s) :\n{p}\n\n1 objet = 1 tâche logique (UUID par source fusionnés par signature).",
             "inventory.export_csv_none": "Lisez d'abord les sources d'un cas.",
             "inventory.export_csv_log": "Inventaire exporté en CSV : {p}",
+            "inventory.compound_case_summary": "Cas COMPOUND « {n} » — {c} source(s) sur {k}/{t} sous-cas — total {s}",
+            "inventory.compound_log": "Cas compound : {c} sous-cas déclaré(s), {m} inaccessible(s).",
+            "inventory.compound_missing": "{n} sous-cas inaccessible(s) depuis ce poste",
+            "inventory.compound_partial": "Inventaire PARTIEL : les sources des sous-cas non lus manquent.",
+            "inventory.compound_read": "{n} source(s) lue(s) sur {k}/{t} sous-cas.",
+            "inventory.compound_sub_ko": "{n} : non lu — {e}",
+            "inventory.compound_sub_ok": "{n} : {c} source(s)",
+            "inventory.compound_summary": "Cas COMPOUND « {n} » — {c} sous-cas, {s} au total. Aucune source en propre : l'onglet Import est désactivé (ajoutez les sources dans un sous-cas).",
+            "inventory.export_xml_compound_failed": "Échecs :\n{e}",
+            "inventory.export_xml_compound_log": "XML des sous-cas exportés : {n} fichier(s) dans {d}.",
+            "inventory.export_xml_compound_msg": "{n} XML exporté(s) dans :\n{d}",
+            "inventory.export_xml_dir": "Dossier où déposer les XML des sous-cas",
             "common.save": "Enregistrer",
             "common.delete": "Supprimer",
             "group.mail": "Messagerie & e-mails",
@@ -224,6 +237,16 @@ BUILTIN = {
             "detail.export_tasks2_none": "Ce cas ne déclare aucune tâche post-indexation (tasks2.json absent).",
             "detail.export_tasks2_log": "Tâches post-indexation exportées : {p}",
             "detail.export_tasks2_msg": "Tâches exportées :\n{p}\n\nDésignez ce fichier comme « fichier de tâches » dans l'onglet « Import » pour les exécuter pendant l'indexation.",
+            "detail.authorized_users_sub": "Utilisateurs autorisés (sous-cas uniquement)",
+            "detail.h1_subcases": "Sous-cas référencés",
+            "detail.kind": "Type de cas",
+            "detail.kind_compound": "COMPOUND — référence {c} sous-cas, aucune source en propre (import impossible ; visez un sous-cas)",
+            "detail.no_subcase": "Cas déclaré compound mais ne référençant aucun sous-cas.",
+            "detail.size_total": "Taille totale (tous sous-cas)",
+            "detail.subcase_ko": "{n} — non joignable : {e}",
+            "detail.subcase_ok": "{n} — {s}",
+            "detail.subcases_recap": "{t} sous-cas — {k} lisible(s) totalisant {b} ; la taille du compound ci-dessus ({c}) fait foi.",
+            "detail.subcases_recap_missing": "{n} sous-cas non joignable(s) : l'inventaire des sources sera partiel.",
             "import.already_used": "déjà {s} occupé(s)",
             "import.and_n_more": "… et {n} autre(s).",
             "import.auto_removed_log": "{n} source(s) déjà indexée(s) retirée(s) automatiquement.",
@@ -359,6 +382,8 @@ BUILTIN = {
             "import.warnings_title": "Avertissements",
             "import.write_title": "Écriture",
             "import.zero_sources": "0 source",
+            "import.compound_body": "« {n} » est un cas COMPOUND : il ne fait que référencer des sous-cas et n'accepte aucune source.\n\nAjoutez les sources dans l'un de ses sous-cas (sélectionnez-le comme cas dans l'onglet « 1. Inventaire du cas »).",
+            "import.compound_title": "Cas compound",
             "type.folder": "Dossier",
             "type.image": "Image",
             "validation.case_location_required": "L'emplacement du cas est obligatoire.",
@@ -381,6 +406,9 @@ BUILTIN = {
             "task_builder.err_not_array": "Les tâches doivent être un tableau JSON (format exporté par Intella).",
             "task_builder.default_task_name": "Tâche {n}",
             "case_meta.err_no_case_xml": "case.xml introuvable à cet emplacement. Vérifiez que vous pointez bien sur le dossier d'un cas Intella.",
+            "case_meta.subcase_missing_dir": "Dossier introuvable depuis ce poste.",
+            "case_meta.subcase_no_case_xml": "Dossier présent mais case.xml absent.",
+            "case_meta.subcase_unreadable": "case.xml illisible : {e}",
             "op_validation.log_unreadable": "Log illisible : {e}",
             "op_validation.added_but": "Ajout OK mais : {m}",
             "op_validation.no_confirmation": "Aucune confirmation d'ajout dans le log."
@@ -604,6 +632,30 @@ BUILTIN = {
             ],
             [
                 "h1",
+                "Cas compound (cas qui en regroupent d'autres)"
+            ],
+            [
+                "p",
+                "Un cas « compound » ne contient aucune source lui-même : il regroupe plusieurs sous-cas et affiche leur volume total. Intella n'autorise pas l'ajout de sources à un cas de ce type."
+            ],
+            [
+                "b",
+                "Dès que vous sélectionnez un cas compound, l'onglet « Import » se grise : il n'y a rien à y importer. Pour ajouter des sources, prenez plutôt l'un de ses sous-cas comme cas de travail."
+            ],
+            [
+                "b",
+                "L'onglet « Inventaire du cas » interroge chaque sous-cas à tour de rôle : le tableau gagne une colonne « Sous-cas » qui indique d'où vient chaque source. L'export CSV la reprend, et « Exporter le XML » dépose un fichier par sous-cas."
+            ],
+            [
+                "b",
+                "L'onglet « Détail du cas » liste les sous-cas référencés (nom, volume) et les utilisateurs qui ont des droits, ceux du compound comme ceux des sous-cas."
+            ],
+            [
+                "p",
+                "Si un sous-cas n'est pas joignable depuis votre poste (dossier sur un serveur non connecté, cas recopié sans ses sous-cas), il est affiché et signalé : l'inventaire des sources est alors incomplet, et l'outil vous le dit plutôt que de laisser croire à une liste complète."
+            ],
+            [
+                "h1",
                 "Fichiers de langue"
             ],
             [
@@ -656,6 +708,7 @@ BUILTIN = {
             "col.segments": "Segments",
             "col.path": "Path",
             "col.tasks": "Tasks",
+            "col.subcase": "Sub-case",
             "inventory.case_frame": "Case to inventory",
             "inventory.case_folder": "Case folder",
             "inventory.autolicense": "Auto-select license (-autoSelectFullProcessingLicense)",
@@ -714,6 +767,18 @@ BUILTIN = {
             "inventory.export_tasks_msg": "{n} deduplicated task(s) exported:\n{p}\n\n1 object = 1 logical task (per-source UUIDs merged by signature).",
             "inventory.export_csv_none": "First read a case's sources.",
             "inventory.export_csv_log": "Inventory exported as CSV: {p}",
+            "inventory.compound_case_summary": "COMPOUND case “{n}” — {c} source(s) across {k}/{t} sub-cases — total {s}",
+            "inventory.compound_log": "Compound case: {c} sub-case(s) declared, {m} unreachable.",
+            "inventory.compound_missing": "{n} sub-case(s) unreachable from this workstation",
+            "inventory.compound_partial": "PARTIAL inventory: sources of the unread sub-cases are missing.",
+            "inventory.compound_read": "{n} source(s) read across {k}/{t} sub-cases.",
+            "inventory.compound_sub_ko": "{n}: not read — {e}",
+            "inventory.compound_sub_ok": "{n}: {c} source(s)",
+            "inventory.compound_summary": "COMPOUND case “{n}” — {c} sub-case(s), {s} in total. No source of its own: the Import tab is disabled (add the sources to a sub-case).",
+            "inventory.export_xml_compound_failed": "Failures:\n{e}",
+            "inventory.export_xml_compound_log": "Sub-case XML files exported: {n} file(s) in {d}.",
+            "inventory.export_xml_compound_msg": "{n} XML file(s) exported to:\n{d}",
+            "inventory.export_xml_dir": "Folder where the sub-case XML files go",
             "common.save": "Save",
             "common.delete": "Delete",
             "group.mail": "Mail & e-mails",
@@ -818,6 +883,16 @@ BUILTIN = {
             "detail.export_tasks2_none": "This case declares no post-indexing task (tasks2.json missing).",
             "detail.export_tasks2_log": "Post-indexing tasks exported: {p}",
             "detail.export_tasks2_msg": "Tasks exported:\n{p}\n\nSelect this file as the « task file » in the « Import » tab to run them during indexing.",
+            "detail.authorized_users_sub": "Authorized users (sub-cases only)",
+            "detail.h1_subcases": "Referenced sub-cases",
+            "detail.kind": "Case type",
+            "detail.kind_compound": "COMPOUND — references {c} sub-case(s), holds no source of its own (import impossible; target a sub-case)",
+            "detail.no_subcase": "Case declared compound but referencing no sub-case.",
+            "detail.size_total": "Total size (all sub-cases)",
+            "detail.subcase_ko": "{n} — not reachable: {e}",
+            "detail.subcase_ok": "{n} — {s}",
+            "detail.subcases_recap": "{t} sub-case(s) — {k} readable totalling {b}; the compound size above ({c}) prevails.",
+            "detail.subcases_recap_missing": "{n} sub-case(s) not reachable: the source inventory will be partial.",
             "import.already_used": "already {s} used",
             "import.and_n_more": "… and {n} more.",
             "import.auto_removed_log": "{n} source(s) already indexed, removed automatically.",
@@ -953,6 +1028,8 @@ BUILTIN = {
             "import.warnings_title": "Warnings",
             "import.write_title": "Writing",
             "import.zero_sources": "0 source",
+            "import.compound_body": "“{n}” is a COMPOUND case: it only references sub-cases and accepts no source.\n\nAdd the sources to one of its sub-cases (select it as the case in the “1. Case inventory” tab).",
+            "import.compound_title": "Compound case",
             "type.folder": "Folder",
             "type.image": "Image",
             "validation.case_location_required": "The case location is required.",
@@ -975,6 +1052,9 @@ BUILTIN = {
             "task_builder.err_not_array": "Tasks must be a JSON array (format exported by Intella).",
             "task_builder.default_task_name": "Task {n}",
             "case_meta.err_no_case_xml": "case.xml not found at this location. Make sure you are pointing to an Intella case folder.",
+            "case_meta.subcase_missing_dir": "Folder not reachable from this workstation.",
+            "case_meta.subcase_no_case_xml": "Folder found but case.xml is missing.",
+            "case_meta.subcase_unreadable": "case.xml unreadable: {e}",
             "op_validation.log_unreadable": "Unreadable log: {e}",
             "op_validation.added_but": "Added OK but: {m}",
             "op_validation.no_confirmation": "No confirmation of addition in the log."
@@ -1195,6 +1275,30 @@ BUILTIN = {
             [
                 "p",
                 "Note: the volume of « folder » sources is not always known from the inventory; in that case the displayed total is marked « partial » and the decision may be optimistic. Check these folders if you are close to the limit."
+            ],
+            [
+                "h1",
+                "Compound cases (cases that group other cases)"
+            ],
+            [
+                "p",
+                "A “compound” case holds no source of its own: it groups several sub-cases and shows their combined volume. Intella does not allow sources to be added to such a case."
+            ],
+            [
+                "b",
+                "As soon as you select a compound case, the “Import” tab is greyed out: there is nothing to import there. To add sources, pick one of its sub-cases as the working case instead."
+            ],
+            [
+                "b",
+                "The “Case inventory” tab queries each sub-case in turn: the table gains a “Sub-case” column showing where each source comes from. The CSV export includes it, and “Export the XML” writes one file per sub-case."
+            ],
+            [
+                "b",
+                "The “Case details” tab lists the referenced sub-cases (name, volume) and the users who have rights, both those of the compound and those of the sub-cases."
+            ],
+            [
+                "p",
+                "If a sub-case cannot be reached from your workstation (folder on a server that is not connected, case copied without its sub-cases), it is still shown and flagged: the source inventory is then incomplete, and the tool says so rather than letting you believe the list is complete."
             ],
             [
                 "h1",

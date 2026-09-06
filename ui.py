@@ -87,6 +87,11 @@ class MainWindow:
         nb.add(self.help_tab, text=" " + i18n.t("tabs.help", "Aide"),
                image=self._tab_imgs[5], compound="left")
 
+        # Le cas memorise au .ini est detecte par ExportTab pendant sa
+        # construction, quand les autres onglets n'existent pas encore : on
+        # applique son type maintenant que le Notebook est complet.
+        self._apply_case_kind()
+
         root.protocol("WM_DELETE_WINDOW", self._on_close)
         self.log.log(f"{config.APP_NAME} {config.APP_VERSION} démarré.")
         if not self.var_exe.get():
@@ -213,10 +218,39 @@ class MainWindow:
         """Enregistre les métadonnées du cas détecté et propage aux onglets."""
         self.case_meta = meta
         self.var_user.set(meta.get("user", ""))
+        self._apply_case_kind()
         if hasattr(self, "detail_tab"):
             self.detail_tab.refresh()
         if hasattr(self, "import_tab"):
             self.import_tab.apply_case_meta()
+
+    def is_compound_case(self) -> bool:
+        """Le cas sélectionné est-il un cas compound (import impossible) ?"""
+        return bool(self.case_meta and self.case_meta.get("is_compound"))
+
+    def _apply_case_kind(self):
+        """Grise l'onglet Import sur un cas compound, le rétablit sinon.
+
+        Un compound ne fait que référencer des sous-cas : IntellaCmd refuse d'y
+        ajouter une source (il faut viser un sous-cas). Seuls « Inventaire du
+        cas » et « Détail du cas » ont un sens. Le grisage prévient l'utilisateur
+        avant qu'il ne remplisse une liste inutilisable ; ``ImportTab`` refuse en
+        plus les actions (double garde, comme pour le verrou de mesure).
+        """
+        # ExportTab detecte le cas memorise des sa construction, donc AVANT que
+        # les onglets suivants existent : sans cette garde, tout demarrage avec
+        # un `last_case` au .ini planterait.
+        if not hasattr(self, "import_tab"):
+            return
+        compound = self.is_compound_case()
+        try:
+            self.notebook.tab(self.import_tab, state="disabled" if compound else "normal")
+        except tk.TclError:
+            return
+        # Un onglet désactivé alors qu'il est affiché reste à l'écran : on
+        # ramène l'utilisateur sur l'Inventaire, d'où vient la sélection du cas.
+        if compound and self.notebook.select() == str(self.import_tab):
+            self.notebook.select(self.export_tab)
 
     def open_profiles_with(self, values, suggested_name=""):
         """Bascule sur l'onglet Profils et pré-remplit le formulaire (Info Profil)."""
@@ -225,6 +259,7 @@ class MainWindow:
 
     def clear_case_meta(self):
         self.case_meta = None
+        self._apply_case_kind()
         if hasattr(self, "detail_tab"):
             self.detail_tab.refresh()
         if hasattr(self, "import_tab"):

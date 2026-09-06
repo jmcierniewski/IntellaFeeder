@@ -2,6 +2,10 @@
 
 Lit ``app.case_meta`` (rempli par l'onglet Inventaire dès qu'un ``case.xml`` est
 détecté) et l'affiche en clair. Lecture seule, informatif.
+
+Cas **compound** : une section « Sous-cas » liste les cas référencés (nom, taille,
+accessibilité) et les utilisateurs autorisés sont consolidés compound + sous-cas —
+c'est ici, avec l'Inventaire, que se lit un compound, l'Import lui étant fermé.
 """
 
 import os
@@ -68,6 +72,11 @@ class DetailTab(ttk.Frame):
         self._h1(i18n.t("detail.h1_case", "Cas"))
         self._kv(i18n.t("detail.name", "Nom"), xml["name"])
         self._kv(i18n.t("detail.folder", "Dossier"), meta["folder"])
+        if meta.get("is_compound"):
+            self._kv(i18n.t("detail.kind", "Type de cas"), i18n.t(
+                "detail.kind_compound",
+                "COMPOUND — référence {c} sous-cas, aucune source en propre "
+                "(import impossible ; visez un sous-cas)", c=len(meta.get("subcases", []))))
         if xml["description"]:
             self._kv(i18n.t("detail.description", "Description"), xml["description"])
         self._kv(i18n.t("detail.id", "Identifiant"), xml["id"])
@@ -75,7 +84,8 @@ class DetailTab(ttk.Frame):
         self._kv(i18n.t("detail.last_opened", "Dernière ouverture"),
                  config.epoch_ms_to_str(xml["lastOpened"]))
         self._kv(i18n.t("detail.created_by", "Créé par"), xml["user"])
-        self._kv(i18n.t("detail.size", "Taille occupée"),
+        self._kv(i18n.t("detail.size_total", "Taille totale (tous sous-cas)")
+                 if meta.get("is_compound") else i18n.t("detail.size", "Taille occupée"),
                  i18n.t("detail.size_value", "{h}  ({b:,} octets)",
                         h=config.human_size(xml["size"]), b=xml["size"]))
         self._kv(i18n.t("detail.version", "Version (origine / actuelle)"),
@@ -84,10 +94,21 @@ class DetailTab(ttk.Frame):
         self._h1(i18n.t("detail.h1_prefs", "Préférences du cas"))
         opt = prefs.get("OptimizationFolderPath", "")
         self._kv(i18n.t("detail.optim_folder", "Dossier d'optimisation"), opt or "—")
-        users = prefs.get("InitialAuthorizedUsers", "")
-        if users:
+        # Utilisateurs autorisés : ceux du cas, plus ceux des sous-cas pour un
+        # compound (les droits y sont portés par chaque sous-cas).
+        users = list(meta.get("authorized_users", []))
+        extra = []
+        for sc in meta.get("subcases", []):
+            for u in sc.get("authorized_users", []):
+                if u not in users and u not in extra:
+                    extra.append(u)
+        if users or extra:
             self._kv(i18n.t("detail.authorized_users", "Utilisateurs autorisés"),
-                     ", ".join(u for u in users.split(",") if u))
+                     ", ".join(users) or "—")
+        if extra:
+            self._kv(i18n.t("detail.authorized_users_sub",
+                            "Utilisateurs autorisés (sous-cas uniquement)"),
+                     ", ".join(extra))
         self._kv(i18n.t("detail.email_threading", "Email Threading effectué"),
                  _yesno(prefs.get("TasksEmailThreadsAnalysisDone")))
         self._kv(i18n.t("detail.saved_searches", "Recherches enregistrées effectuées"),
@@ -95,6 +116,9 @@ class DetailTab(ttk.Frame):
         algo = prefs.get("MessageHashingAlgorithm")
         if algo:
             self._kv(i18n.t("detail.hash_algo", "Hachage des messages"), algo)
+
+        if meta.get("is_compound"):
+            self._subcases_section(meta)
 
         tasks2 = meta.get("tasks2", [])
         self._h1(i18n.t("detail.h1_tasks2", "Tâches post-indexation (tasks2.json)"))
@@ -119,6 +143,46 @@ class DetailTab(ttk.Frame):
                 "muted")
 
         self.text.configure(state="disabled")
+
+    def _subcases_section(self, meta):
+        """Liste les sous-cas d'un compound : nom, taille, chemin, accessibilité.
+
+        Un sous-cas peut être déclaré sans être joignable depuis ce poste (chemin
+        absolu vers un partage démonté, compound recopié sans ses sous-cas) : on
+        l'affiche quand même, marqué, car sa seule déclaration est une
+        information — et son absence explique un inventaire incomplet.
+        """
+        subs = meta.get("subcases", [])
+        self._h1(i18n.t("detail.h1_subcases", "Sous-cas référencés"))
+        if not subs:
+            self.text.insert("end", i18n.t(
+                "detail.no_subcase",
+                "Cas déclaré compound mais ne référençant aucun sous-cas.") + "\n", "muted")
+            return
+        known = sum(sc["size"] for sc in subs if sc["exists"])
+        for sc in subs:
+            if sc["exists"]:
+                line = i18n.t("detail.subcase_ok", "{n} — {s}",
+                              n=sc["name"], s=config.human_size(sc["size"]))
+                self.text.insert("end", "•  " + line + "\n", "v")
+            else:
+                line = i18n.t("detail.subcase_ko", "{n} — non joignable : {e}",
+                              n=sc["name"], e=sc["error"])
+                self.text.insert("end", "✕  " + line + "\n", "v")
+            self.text.insert("end", "     " + sc["path"] + "\n", "muted")
+        missing = [sc for sc in subs if not sc["exists"]]
+        recap = i18n.t(
+            "detail.subcases_recap",
+            "{t} sous-cas — {k} lisible(s) totalisant {b} ; la taille du compound "
+            "ci-dessus ({c}) fait foi.",
+            t=len(subs), k=len(subs) - len(missing), b=config.human_size(known),
+            c=config.human_size(meta["size"]))
+        if missing:
+            recap += " " + i18n.t(
+                "detail.subcases_recap_missing",
+                "{n} sous-cas non joignable(s) : l'inventaire des sources sera partiel.",
+                n=len(missing))
+        self.text.insert("end", recap + "\n", "muted")
 
     # ------------------------------------------------------------------ #
     def _export_tasks2(self):

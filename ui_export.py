@@ -35,6 +35,7 @@ _COLUMN_LABEL_KEYS = {
     "Nom": "col.name", "Type": "col.type", "Fuseau": "col.timezone",
     "Taille": "col.size", "Octets": "col.bytes", "Segments": "col.segments",
     "Chemin": "col.path", "Tâches": "col.tasks",
+    "Sous-cas": "col.subcase",
 }
 
 
@@ -48,6 +49,8 @@ class ExportTab(ttk.Frame):
         self.app = app
         self.rows: list[dict] = []
         self.columns: list[str] = []
+        # Colonnes du CSV : suivent le type de cas lu (cf. _done).
+        self.csv_columns: list[str] = list(case_export.CSV_COLUMNS)
         self._scan_running = False   # scan des dossiers à 0 en cours
         self._scan_cancel = False    # annulation demandée (lue par le worker)
 
@@ -175,10 +178,38 @@ class ExportTab(ttk.Frame):
             "inventory.case_detected_log",
             "Cas détecté : « {n} » — créé par {u}, {s} occupé(s).",
             n=meta['name'], u=meta['user'], s=config.human_size(meta['size'])))
+        if meta.get("is_compound"):
+            self._announce_compound(meta)
+            return
         self.lbl_summary.config(text=i18n.t(
             "inventory.case_detected_summary",
             "Cas « {n} » — {s} occupé(s). « Lire les sources » pour le dédoublonnage.",
             n=meta['name'], s=config.human_size(meta['size'])))
+
+    def _announce_compound(self, meta):
+        """Cas compound : dire ce qu'il est et pourquoi l'Import est fermé.
+
+        Le compound ne contient aucune source en propre ; il référence des
+        sous-cas et porte la taille TOTALE de l'ensemble. Les sources se lisent
+        sous-cas par sous-cas (« Lire les sources » s'en charge).
+        """
+        subs = meta.get("subcases", [])
+        missing = [sc for sc in subs if not sc.get("exists")]
+        txt = i18n.t(
+            "inventory.compound_summary",
+            "Cas COMPOUND « {n} » — {c} sous-cas, {s} au total. Aucune source en propre : "
+            "l'onglet Import est désactivé (ajoutez les sources dans un sous-cas).",
+            n=meta['name'], c=len(subs), s=config.human_size(meta['size']))
+        if missing:
+            txt += "  •  " + i18n.t(
+                "inventory.compound_missing",
+                "{n} sous-cas inaccessible(s) depuis ce poste", n=len(missing))
+        self.lbl_summary.config(text=txt)
+        self.app.log.log(i18n.t(
+            "inventory.compound_log",
+            "Cas compound : {c} sous-cas déclaré(s), {m} inaccessible(s).",
+            c=len(subs), m=len(missing)),
+            level="WARN" if missing else "INFO")
 
     # ------------------------------------------------------------------ #
     def _extra_args(self) -> str:
@@ -216,9 +247,19 @@ class ExportTab(ttk.Frame):
 
     def _worker(self, exe, user, case):
         try:
-            rows, columns, inventory = case_export.run_export_source_list(
-                exe, user, case, self.app.log.log, extra_args=self._extra_args()
-            )
+            meta = self.app.case_meta or {}
+            if meta.get("is_compound"):
+                # Un compound n'a pas de source en propre : on interroge chacun
+                # de ses sous-cas et on concatène (colonne « Sous-cas »).
+                rows, columns, inventory = case_export.run_export_subcases(
+                    exe, user, meta.get("subcases", []), self.app.log.log,
+                    extra_args=self._extra_args(),
+                    case_name=meta.get("name", ""), case_path=case,
+                )
+            else:
+                rows, columns, inventory = case_export.run_export_source_list(
+                    exe, user, case, self.app.log.log, extra_args=self._extra_args()
+                )
             self.after(0, self._done, rows, columns, inventory)
         except Exception as exc:  # FileNotFound, RuntimeError, parse…
             self.after(0, self._error, str(exc))
@@ -232,6 +273,9 @@ class ExportTab(ttk.Frame):
     def _done(self, rows, columns, inventory):
         self.btn_run.config(state="normal")
         self.rows, self.columns = rows, columns
+        self.csv_columns = list(case_export.CSV_COLUMNS_COMPOUND
+                                if inventory.get("is_compound")
+                                else case_export.CSV_COLUMNS)
         self.app.inventory = inventory
         # Réutilise les tailles de dossiers déjà mesurées (fichier IF_<cas>.info) :
         # on ne re-scannera que les éventuels NOUVEAUX dossiers à 0.
@@ -246,6 +290,8 @@ class ExportTab(ttk.Frame):
         # Bouton de scan en vert s'il reste des dossiers à taille 0.
         self._set_scan_alert(bool(unk))
         msg = i18n.t("inventory.n_sources_read", "{n} source(s) lue(s) dans le cas.", n=n)
+        if inventory.get("is_compound"):
+            msg = self._compound_report(inventory, n)
         if cached:
             info_name = os.path.basename(
                 case_info.info_path(self.app.case_meta["folder"], self.app.case_meta["name"]))
@@ -260,6 +306,34 @@ class ExportTab(ttk.Frame):
         messagebox.showinfo(i18n.t("inventory.sources_title", "Inventaire des sources"), msg)
         # Consigne1 : cohérence taille du cas (case.xml) vs somme des sources.
         self._check_size_consistency()
+
+    def _compound_report(self, inventory, n_sources) -> str:
+        """Résumé « Lire les sources » d'un cas compound : une ligne par sous-cas.
+
+        Les sous-cas en échec (dossier hors du poste, IntellaCmd en erreur) sont
+        listés explicitement : l'inventaire est alors PARTIEL et il ne faut pas
+        laisser croire qu'il est complet.
+        """
+        reports = inventory.get("subcase_reports", [])
+        ok = [r for r in reports if r["ok"]]
+        msg = i18n.t(
+            "inventory.compound_read",
+            "{n} source(s) lue(s) sur {k}/{t} sous-cas.",
+            n=n_sources, k=len(ok), t=len(reports))
+        for r in reports:
+            if r["ok"]:
+                msg += "\n  • " + i18n.t(
+                    "inventory.compound_sub_ok", "{n} : {c} source(s)",
+                    n=r["name"], c=r["source_count"])
+            else:
+                msg += "\n  ✕ " + i18n.t(
+                    "inventory.compound_sub_ko", "{n} : non lu — {e}",
+                    n=r["name"], e=r["error"])
+        if len(ok) < len(reports):
+            msg += "\n\n" + i18n.t(
+                "inventory.compound_partial",
+                "Inventaire PARTIEL : les sources des sous-cas non lus manquent.")
+        return msg
 
     def _apply_cached_folder_sizes(self, inventory) -> int:
         """Applique les tailles de dossiers déjà mémorisées (IF_<cas>.info).
@@ -345,6 +419,14 @@ class ExportTab(ttk.Frame):
     def _update_summary(self, inv):
         meta = self.app.case_meta
         size_txt = config.human_size(meta["size"]) if meta else "?"
+        if inv.get("is_compound"):
+            reports = inv.get("subcase_reports", [])
+            ok = sum(1 for r in reports if r["ok"])
+            self.lbl_summary.config(text=i18n.t(
+                "inventory.compound_case_summary",
+                "Cas COMPOUND « {n} » — {c} source(s) sur {k}/{t} sous-cas — total {s}",
+                n=inv['case_name'], c=inv['source_count'], k=ok, t=len(reports), s=size_txt))
+            return
         if inv["source_count"] == 0:
             self.lbl_summary.config(text=i18n.t(
                 "inventory.case_empty", "Cas « {n} » — vide (aucune source indexée).",
@@ -362,7 +444,8 @@ class ExportTab(ttk.Frame):
         self.tree.delete(*self.tree.get_children())
         self.tree["columns"] = self.columns
         widths = {"Nom": 240, "Type": 110, "Fuseau": 70, "Taille": 90,
-                  "Octets": 110, "Segments": 70, "Chemin": 360, "Tâches": 360}
+                  "Octets": 110, "Segments": 70, "Chemin": 360, "Tâches": 360,
+                  "Sous-cas": 200}
         for c in self.columns:
             label = i18n.t(_COLUMN_LABEL_KEYS.get(c, ""), c) if c in _COLUMN_LABEL_KEYS else c
             self.tree.heading(c, text=label)
@@ -540,6 +623,11 @@ class ExportTab(ttk.Frame):
         inv = self.app.inventory or {}
         xml_path = inv.get("xml_path")
         title = i18n.t("inventory.export_xml", "Exporter le XML…")
+        # Cas compound : un XML par sous-cas lu → on exporte le lot dans un
+        # dossier, sinon on n'en enregistrerait qu'un sur N sans le dire.
+        if inv.get("is_compound") and len(inv.get("xml_paths") or []) > 1:
+            self._export_xml_compound(inv, title)
+            return
         if not xml_path or not os.path.isfile(xml_path):
             messagebox.showinfo(
                 title, i18n.t("inventory.export_xml_none",
@@ -559,6 +647,47 @@ class ExportTab(ttk.Frame):
             messagebox.showinfo(title, i18n.t("common.exported_to", "Exporté :\n{p}", p=path))
         except OSError as exc:
             messagebox.showerror(title, i18n.t("common.export_failed", "Échec :\n{e}", e=exc))
+
+    def _export_xml_compound(self, inv, title):
+        """Copie les XML de tous les sous-cas lus dans un dossier choisi.
+
+        Un fichier par sous-cas, nommé d'après lui : le lot reste exploitable
+        source par source (« Info Profil » travaille, lui, sur l'inventaire en
+        mémoire, pas sur ces copies).
+        """
+        paths = [p for p in inv.get("xml_paths", []) if os.path.isfile(p)]
+        if not paths:
+            messagebox.showinfo(
+                title, i18n.t("inventory.export_xml_none",
+                              "Aucun XML disponible.\nLancez d'abord « Lire les sources »."))
+            return
+        dest = filedialog.askdirectory(title=i18n.t(
+            "inventory.export_xml_dir", "Dossier où déposer les XML des sous-cas"))
+        if not dest:
+            return
+        # Les XML sont dans l'ordre des sous-cas LUS (les autres n'en ont pas).
+        names = [r["name"] for r in inv.get("subcase_reports", []) if r["ok"]]
+        stamp = config.now_compact()
+        written, failed = [], []
+        for i, src in enumerate(paths):
+            label = config.sanitize_filename(names[i] if i < len(names) else f"souscas_{i + 1}")
+            out = os.path.join(dest, f"sources_{label}_{stamp}.xml")
+            try:
+                shutil.copyfile(src, out)
+                written.append(out)
+            except OSError as exc:
+                failed.append(f"{label} : {exc}")
+        self.app.log.log(i18n.t(
+            "inventory.export_xml_compound_log",
+            "XML des sous-cas exportés : {n} fichier(s) dans {d}.", n=len(written), d=dest))
+        msg = i18n.t("inventory.export_xml_compound_msg",
+                     "{n} XML exporté(s) dans :\n{d}", n=len(written), d=dest)
+        if failed:
+            msg += "\n\n" + i18n.t("inventory.export_xml_compound_failed",
+                                    "Échecs :\n{e}", e="\n".join(failed))
+            messagebox.showwarning(title, msg)
+        else:
+            messagebox.showinfo(title, msg)
 
     def _export_case_tasks(self):
         """Exporte les tâches dédupliquées de l'inventaire du cas (JSON).
@@ -615,7 +744,7 @@ class ExportTab(ttk.Frame):
         if not path:
             return
         try:
-            case_export.export_csv(self.rows, case_export.CSV_COLUMNS, path)
+            case_export.export_csv(self.rows, self.csv_columns, path)
             self.app.log.log(i18n.t("inventory.export_csv_log", "Inventaire exporté en CSV : {p}", p=path))
             messagebox.showinfo(title, i18n.t("common.exported_to", "Exporté :\n{p}", p=path))
         except OSError as exc:

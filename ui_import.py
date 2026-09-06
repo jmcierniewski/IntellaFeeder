@@ -241,6 +241,27 @@ class ImportTab(ttk.Frame):
         self.lbl_inventory = ttk.Label(frame, text="", foreground="#64748b")
         self.lbl_inventory.pack(anchor="w", padx=6, pady=(0, 4))
 
+    def _compound_blocked(self) -> bool:
+        """Vrai (+ message) si le cas sélectionné est un compound.
+
+        Un compound ne fait que référencer des sous-cas : IntellaCmd refuse d'y
+        ajouter une source. ``MainWindow`` grise déjà l'onglet ; cette garde
+        protège la fonction elle-même (appels internes venus de l'Inventaire,
+        évolution future de l'UI) — même logique de double garde que
+        ``_busy_measuring``.
+        """
+        if not (self.app.case_meta or {}).get("is_compound"):
+            return False
+        messagebox.showwarning(
+            i18n.t("import.compound_title", "Cas compound"),
+            i18n.t("import.compound_body",
+                   "« {n} » est un cas COMPOUND : il ne fait que référencer des "
+                   "sous-cas et n'accepte aucune source.\n\nAjoutez les sources "
+                   "dans l'un de ses sous-cas (sélectionnez-le comme cas dans "
+                   "l'onglet « 1. Inventaire du cas »).",
+                   n=self.app.case_meta.get("name", "")))
+        return True
+
     def _busy_measuring(self) -> bool:
         """Vrai (+ message) si une mesure est en cours : la liste ne doit pas bouger.
 
@@ -294,7 +315,14 @@ class ImportTab(ttk.Frame):
     def apply_case_meta(self):
         """Renseigne le cas cible (verrouillé) depuis ``app.case_meta``."""
         meta = self.app.case_meta
-        if meta:
+        if meta and meta.get("is_compound"):
+            # Compound : aucun cas cible exploitable (les sources vont dans les
+            # sous-cas). On laisse les champs vides plutôt que d'afficher un cas
+            # sur lequel « Générer » ne pourra jamais aboutir.
+            self.var_case.set("")
+            self.var_casename.set("")
+            self.var_skip_integrity.set(True)
+        elif meta:
             self.var_case.set(meta["folder"])
             self.var_casename.set(meta["name"])
             # Réglage d'intégrité mémorisé pour ce cas (IF_<cas>.info).
@@ -477,7 +505,7 @@ class ImportTab(ttk.Frame):
     # Récapitulatif                                                      #
     # ------------------------------------------------------------------ #
     def recapituler(self):
-        if self._busy_measuring():
+        if self._compound_blocked() or self._busy_measuring():
             return
         prev = {s.path.lower(): s for s in self.sources}
         parsed = []
@@ -589,7 +617,11 @@ class ImportTab(ttk.Frame):
         """Appelé quand l'inventaire (liste des sources) vient d'être lu.
 
         Retire automatiquement les sources déjà indexées du récapitulatif.
+        Sans objet sur un cas compound (aucun import possible) : l'inventaire y
+        décrit les sources des sous-cas, pas celles d'un cas cible.
         """
+        if (self.app.case_meta or {}).get("is_compound"):
+            return
         removed = self._drop_indexed()
         self._refresh_tree()
         if removed:
@@ -1117,6 +1149,8 @@ class ImportTab(ttk.Frame):
         return text
 
     def generer(self):
+        if self._compound_blocked():
+            return
         params = self._params()
         if not self.app.case_meta:
             messagebox.showerror(
@@ -1307,6 +1341,8 @@ class ImportTab(ttk.Frame):
         return single if os.path.isfile(single) else None
 
     def importer(self):
+        if self._compound_blocked():
+            return
         title = i18n.t("import.run_import", "Importer (lancer le .bat)")
         if not self.app.case_meta:
             messagebox.showinfo(title, i18n.t(
@@ -1391,6 +1427,8 @@ class ImportTab(ttk.Frame):
     # Validation des opérations (re-scan du cas + analyse des logs)      #
     # ------------------------------------------------------------------ #
     def valider_operations(self):
+        if self._compound_blocked():
+            return
         title = i18n.t("import.validate", "Valider les opérations")
         meta = self.app.case_meta
         if not meta:
