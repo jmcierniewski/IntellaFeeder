@@ -11,9 +11,16 @@ La présence de ``case.xml`` sert à valider qu'on pointe bien sur un dossier de
 et à récupérer automatiquement le nom du cas, l'utilisateur et la taille occupée.
 
 **Cas compound** : la racine porte ``compound="true"`` et un bloc ``<subcases>``
-listant un ``<subcase>`` par sous-cas (chemin ABSOLU du dossier du sous-cas). Un
-compound ne contient aucune source en propre : il référence ses sous-cas, porte
-la taille TOTALE de l'ensemble et la liste des utilisateurs autorisés.
+listant un ``<subcase>`` par sous-cas. Un compound ne contient **aucune source
+en propre** : il ne référence que des sous-cas — lesquels portent les sources —
+et il n'y a **pas de sous-cas de sous-cas**. Il porte la taille TOTALE de
+l'ensemble et la liste des utilisateurs autorisés.
+
+Les ``<subcase>`` observés sont **absolus**, mais un chemin **relatif** y est
+accepté et résolu depuis le dossier du compound (un compound recopié avec ses
+sous-cas reste alors lisible). Ce que fait Intella d'un ``<subcase>`` relatif
+n'est pas documenté : le manuel (§25.5) ne parle que des paramètres de
+``IntellaCmd.exe``, qui doivent être absolus.
 ``IntellaCmd -addSourcesFromJson`` ne peut donc PAS y ajouter de source (il faut
 viser un sous-cas) → l'onglet Import est neutralisé pour ce type de cas.
 Les chemins de sous-cas peuvent pointer hors du poste courant (partage réseau
@@ -152,7 +159,12 @@ def read_subcases(folder: str, paths: list[str] | None = None) -> list[dict]:
 
     out: list[dict] = []
     for raw in paths:
-        path = os.path.normpath(raw)
+        # Un `<subcase>` relatif se lit depuis le dossier du COMPOUND, jamais
+        # depuis le repertoire courant : resolu autrement, un compound portable
+        # (ou recopie ailleurs avec ses sous-cas) serait declare introuvable
+        # selon l'endroit d'ou l'application a ete lancee.
+        path = os.path.normpath(raw if os.path.isabs(raw)
+                                else os.path.join(folder, raw))
         entry = {
             "path": path,
             "exists": False,

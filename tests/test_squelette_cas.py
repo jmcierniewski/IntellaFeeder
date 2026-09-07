@@ -252,6 +252,45 @@ class TestNommageGDH:
         assert b.compound is False and b.cas("Perquisition Alpha") == RACINE
 
 
+class TestSqueletteUtilisable:
+    """Le squelette doit servir de banc d'essai, pas seulement exister.
+
+    Regression verrouillee : les `<subcase>` etaient ecrits vers un chemin
+    fictif absolu (`D:` + antislash + `SquelettesTest`), si bien que TOUS les sous-cas du
+    squelette etaient injoignables — le banc d'essai ne pouvait exercer que le
+    chemin degrade, jamais le nominal.
+    """
+
+    def test_les_sous_cas_du_squelette_sont_joignables(self, compound):
+        parent, _s1, out = compound
+        sq.fabriquer(sq.Options(cas=parent, sortie=out, logs="aucun", gdh=GDH))
+        import case_meta
+        meta = case_meta.read_case(os.path.join(out, RACINE_CP))
+        assert meta["is_compound"] is True
+        etats = [sc["exists"] for sc in meta["subcases"]]
+        # Le 1er existait a l'origine, le 2e non : le squelette reproduit les deux.
+        assert etats == [True, False]
+
+    def test_subcases_ecrits_en_relatif(self, compound):
+        parent, _s1, out = compound
+        sq.fabriquer(sq.Options(cas=parent, sortie=out, logs="aucun", gdh=GDH))
+        with io.open(os.path.join(out, RACINE_CP, "case.xml"), encoding="utf-8") as f:
+            contenu = f.read()
+        assert SOUS(1) in contenu
+        assert "SquelettesTest" not in contenu
+
+    def test_squelette_portable(self, compound, tmp_path):
+        """Deplace ailleurs, le squelette reste lisible."""
+        import shutil
+        import case_meta
+        parent, _s1, out = compound
+        sq.fabriquer(sq.Options(cas=parent, sortie=out, logs="aucun", gdh=GDH))
+        ailleurs = str(tmp_path / "ailleurs")
+        shutil.copytree(out, ailleurs)
+        meta = case_meta.read_case(os.path.join(ailleurs, RACINE_CP))
+        assert meta["subcases"][0]["exists"] is True
+
+
 class TestVerificationAnonymat:
     def test_aucune_fuite_sur_un_squelette_normal(self, compound):
         parent, _s1, out = compound

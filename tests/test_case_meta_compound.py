@@ -141,6 +141,43 @@ class TestReadSubcases:
         entries = case_meta.read_subcases(parent)
         assert [e["exists"] for e in entries] == [True, False]
 
+    def test_subcase_relatif_resolu_depuis_le_compound(self, tmp_path, monkeypatch):
+        """Un `<subcase>` relatif se lit depuis le dossier du COMPOUND.
+
+        Le resoudre depuis le repertoire courant rendrait le resultat dependant
+        de l'endroit d'ou l'application a ete lancee — un compound portable
+        serait declare introuvable une fois sur deux.
+        """
+        racine = tmp_path / "lot"
+        write_case(str(racine / "sub"), name="Volet 1", size=42)
+        parent = write_case(str(racine / "comp"), compound=True,
+                            subcases=[os.path.join("..", "sub")])
+        monkeypatch.chdir(tmp_path.parent)      # cwd volontairement ailleurs
+
+        (entry,) = case_meta.read_subcases(parent)
+        assert entry["exists"] is True
+        assert entry["name"] == "Volet 1" and entry["size"] == 42
+
+    def test_compound_portable_apres_deplacement(self, tmp_path):
+        """Des `<subcase>` relatifs survivent a une recopie du lot ailleurs."""
+        import shutil
+        lot = tmp_path / "lot"
+        write_case(str(lot / "sub"), name="Volet 1")
+        write_case(str(lot / "comp"), compound=True,
+                   subcases=[os.path.join("..", "sub")])
+        ailleurs = tmp_path / "autre" / "lot"
+        shutil.copytree(str(lot), str(ailleurs))
+
+        (entry,) = case_meta.read_subcases(str(ailleurs / "comp"))
+        assert entry["exists"] is True
+
+    def test_subcase_absolu_reste_absolu(self, tmp_path):
+        """Le cas courant (chemins absolus) ne doit pas changer de comportement."""
+        sub = write_case(str(tmp_path / "sub"), name="Volet abs")
+        parent = write_case(str(tmp_path / "comp"), compound=True, subcases=[sub])
+        (entry,) = case_meta.read_subcases(parent)
+        assert entry["exists"] is True and os.path.isabs(entry["path"])
+
     def test_read_case_peuple_les_sous_cas(self, tmp_path):
         sub = write_case(str(tmp_path / "sub"), name="S1", size=7)
         parent = write_case(str(tmp_path / "comp"), compound=True, subcases=[sub], size=7)

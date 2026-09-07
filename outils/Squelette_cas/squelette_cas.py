@@ -51,9 +51,11 @@ TASKS2_JSON = "tasks2.json"
 LOGS_DIR = "logs"
 MANIFESTE = "MANIFESTE.md"
 
-# Profondeur maximale de descente dans les sous-cas : un compound référençant
-# (par erreur ou par boucle) un cas déjà vu doit s'arrêter, pas tourner.
-MAX_PROFONDEUR = 5
+# Un compound ne reference QUE des sous-cas, et il n'existe pas de sous-cas de
+# sous-cas : la hierarchie legitime s'arrete a un niveau (racine = 0, sous-cas
+# = 1). Cette borne n'est donc pas un reglage mais un garde-fou contre un
+# case.xml incoherent ou une boucle de references, qui ferait tourner l'outil.
+MAX_PROFONDEUR = 1
 
 # Nommage des cas anonymises. Le GDH (groupe date-heure) est le meme pour TOUS
 # les elements d'un compound : c'est lui qui rattache un sous-cas a la
@@ -188,8 +190,8 @@ class Anonymiseur:
         _base, ext = os.path.splitext(nom)
         return self._alias("fichier", nom, "fichier_{n}") + ext
 
-    def chemin_cas(self, chemin: str) -> str:
-        """Chemin d'un dossier de cas → emplacement fictif portant son alias.
+    def alias_dossier(self, chemin: str) -> str:
+        """Alias du cas situé à ``chemin`` — le nom que portera son dossier.
 
         L'alias vient du ``<name>`` du ``case.xml`` quand le dossier est
         joignable, du nom de dossier sinon. C'est ce qui garantit qu'un
@@ -206,7 +208,17 @@ class Anonymiseur:
             except (ET.ParseError, OSError):
                 cle = ""
         cle = cle or os.path.basename(chemin.rstrip(SEPARATEURS)) or chemin
-        return os.path.join(DOSSIER_FICTIF, self.cas(cle))
+        return self.cas(cle)
+
+    def chemin_cas(self, chemin: str) -> str:
+        """Chemin d'un dossier de cas → emplacement fictif portant son alias.
+
+        Sert à l'affichage et à ``casePath`` ; les ``<subcase>``, eux, sont
+        écrits en **relatif** (cf. ``traiter_case_xml``).
+        """
+        if not self.actif or not chemin:
+            return chemin
+        return os.path.join(DOSSIER_FICTIF, self.alias_dossier(chemin))
 
     def chemin_preuve(self, chemin: str) -> str:
         """Chemin d'évidence : garde la FORME (UNC ou lettre, profondeur, extension).
@@ -277,8 +289,14 @@ def traiter_case_xml(src: str, dst: str, ano: Anonymiseur) -> dict:
             if valeur:
                 _pose(racine, champ, ano.identifiant(valeur))
         if bloc is not None:
+            # RELATIF, et non un chemin fictif absolu : les sous-cas du squelette
+            # sont des dossiers FRERES de celui du compound. Avec un absolu
+            # invente, ils etaient tous injoignables et le banc d'essai ne
+            # pouvait exercer que le chemin degrade. `case_meta.read_subcases`
+            # resout un relatif depuis le dossier du compound.
             for el in bloc.findall("subcase"):
-                el.text = ano.chemin_cas((el.text or "").strip())
+                alias = ano.alias_dossier((el.text or "").strip())
+                el.text = os.path.join("..", alias)
 
     os.makedirs(os.path.dirname(dst), exist_ok=True)
     arbre.write(dst, encoding="UTF-8", xml_declaration=True)
@@ -477,6 +495,10 @@ def copier_cas(src: str, racine_dst: str, ano: Anonymiseur, options,
     Un sous-cas injoignable n'interrompt rien : il est reporté. C'est le cas
     courant hors du réseau du laboratoire, et c'est précisément un scénario que
     le squelette doit savoir représenter.
+
+    La descente s'arrête à un niveau (cf. ``MAX_PROFONDEUR``) : un compound ne
+    référence que des sous-cas, qui portent les sources et n'en référencent pas
+    à leur tour.
     """
     vus = vus if vus is not None else set()
     if profondeur == 0:
