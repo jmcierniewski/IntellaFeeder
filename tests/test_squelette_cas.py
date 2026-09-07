@@ -116,10 +116,11 @@ def faire_cas(dossier, nom, user="dupond", size=1000, subs=None):
     return dossier
 
 
-class Options:
-    logs = "aucun"
-    nb_logs = 5
-    max_log_ko = 8
+def options(**kw):
+    """`sq.Options` du module (partagée CLI/UI), logs coupés sauf mention."""
+    kw.setdefault("logs", "aucun")
+    kw.setdefault("max_log_ko", 8)
+    return sq.Options(**kw)
 
 
 @pytest.fixture
@@ -136,21 +137,21 @@ class TestParcours:
     def test_descend_dans_les_sous_cas(self, compound):
         parent, _s1, out = compound
         ano = sq.Anonymiseur()
-        rapport = sq.copier_cas(parent, out, ano, Options())
+        rapport = sq.copier_cas(parent, out, ano, options())
         assert rapport["compound"] is True
         assert rapport["nom"] == "CAS_1"
         assert [s["etat"] for s in rapport["sous_cas"]] == ["ok", "dossier introuvable"]
 
     def test_sous_cas_absent_nest_pas_une_erreur(self, compound):
         parent, _s1, out = compound
-        rapport = sq.copier_cas(parent, out, sq.Anonymiseur(), Options())
+        rapport = sq.copier_cas(parent, out, sq.Anonymiseur(), options())
         assert os.path.isfile(os.path.join(out, "CAS_1", "case.xml"))
         assert os.path.isfile(os.path.join(out, "CAS_2", "case.xml"))
 
     def test_alias_du_parent_et_du_dossier_concordent(self, compound):
         """Le `<subcase>` écrit chez le parent doit pointer sur le dossier produit."""
         parent, _s1, out = compound
-        sq.copier_cas(parent, out, sq.Anonymiseur(), Options())
+        sq.copier_cas(parent, out, sq.Anonymiseur(), options())
         with io.open(os.path.join(out, "CAS_1", "case.xml"), encoding="utf-8") as f:
             contenu = f.read()
         assert "CAS_2" in contenu
@@ -160,12 +161,12 @@ class TestParcours:
         """Un compound qui se référence lui-même ne doit pas faire tourner l'outil."""
         chemin = str(tmp_path / "Boucle")
         faire_cas(chemin, "Boucle", subs=[chemin])
-        rapport = sq.copier_cas(chemin, str(tmp_path / "out"), sq.Anonymiseur(), Options())
+        rapport = sq.copier_cas(chemin, str(tmp_path / "out"), sq.Anonymiseur(), options())
         assert rapport["sous_cas"][0]["etat"] == "deja vu ou trop profond"
 
     def test_mode_brut_conserve_les_valeurs(self, compound):
         parent, _s1, out = compound
-        sq.copier_cas(parent, out, sq.Anonymiseur(actif=False), Options())
+        sq.copier_cas(parent, out, sq.Anonymiseur(actif=False), options())
         with io.open(os.path.join(out, "Parent", "case.xml"), encoding="utf-8") as f:
             assert "Dossier Racine" in f.read()
 
@@ -174,13 +175,13 @@ class TestVerificationAnonymat:
     def test_aucune_fuite_sur_un_squelette_normal(self, compound):
         parent, _s1, out = compound
         ano = sq.Anonymiseur()
-        sq.copier_cas(parent, out, ano, Options())
+        sq.copier_cas(parent, out, ano, options())
         assert sq.verifier_anonymat(out, ano) == []
 
     def test_une_valeur_oubliee_est_detectee(self, compound):
         parent, _s1, out = compound
         ano = sq.Anonymiseur()
-        sq.copier_cas(parent, out, ano, Options())
+        sq.copier_cas(parent, out, ano, options())
         ecrire(os.path.join(out, "CAS_1", "oubli.txt"), "Dossier Racine")
         fuites = sq.verifier_anonymat(out, ano)
         assert len(fuites) == 1 and "oubli.txt" in fuites[0]
@@ -189,7 +190,7 @@ class TestVerificationAnonymat:
         """`IF_<cas>.info` a montré qu'un nom de fichier fuit aussi bien qu'un contenu."""
         parent, _s1, out = compound
         ano = sq.Anonymiseur()
-        sq.copier_cas(parent, out, ano, Options())
+        sq.copier_cas(parent, out, ano, options())
         ecrire(os.path.join(out, "CAS_1", "IF_Dossier Racine.info"), "{}")
         fuites = sq.verifier_anonymat(out, ano)
         assert any("nom :" in f for f in fuites)
@@ -202,7 +203,7 @@ class TestFichiersAnnexes:
             {"folder_sizes": {"d:" + B + B + "scelles" + B + B + "cle": 42},
              "skip_integrity_check": True}))
         ano = sq.Anonymiseur()
-        sq.copier_cas(parent, out, ano, Options())
+        sq.copier_cas(parent, out, ano, options())
         produit = os.path.join(out, "CAS_2", "IF_CAS_2.info")
         assert os.path.isfile(produit)
         with io.open(produit, encoding="utf-8") as f:
@@ -223,7 +224,7 @@ class TestFichiersAnnexes:
                '    <path>D:' + B + 'Scelles' + B + 'pc.E01</path>\n'
                '  </source>\n</sources>\n')
         ano = sq.Anonymiseur()
-        sq.copier_cas(parent, out, ano, Options())
+        sq.copier_cas(parent, out, ano, options())
         with io.open(os.path.join(out, "CAS_2", "sources.xml"), encoding="utf-8") as f:
             contenu = f.read()
         # La forme utile est conservee...
@@ -238,7 +239,7 @@ class TestFichiersAnnexes:
         parent, s1, out = compound
         ecrire(os.path.join(s1, "prefs", "tasks2.json"), json.dumps(
             [{"id": "1111-2222", "name": "OCR affaire", "condition": "ALL_ITEMS_CONDITION"}]))
-        sq.copier_cas(parent, out, sq.Anonymiseur(), Options())
+        sq.copier_cas(parent, out, sq.Anonymiseur(), options())
         with io.open(os.path.join(out, "CAS_2", "prefs", "tasks2.json"), encoding="utf-8") as f:
             taches = json.load(f)
         assert taches[0]["name"] == "Tache 1"
@@ -249,9 +250,7 @@ class TestLogs:
     def test_inventaire_ne_copie_rien(self, compound):
         parent, s1, out = compound
         ecrire(os.path.join(s1, "logs", "case-main-2026-09-01.log"), "ligne 1\nligne 2\n")
-        options = Options()
-        options.logs = "inventaire"
-        rapport = sq.copier_cas(parent, out, sq.Anonymiseur(), options)
+        rapport = sq.copier_cas(parent, out, sq.Anonymiseur(), options(logs="inventaire"))
         releve = rapport["sous_cas"][0]["logs"]
         assert releve and releve[0]["lignes"] == 2
         assert not os.path.isdir(os.path.join(out, "CAS_2", "logs"))
@@ -259,12 +258,58 @@ class TestLogs:
     def test_copie_tronquee(self, compound):
         parent, s1, out = compound
         ecrire(os.path.join(s1, "logs", "gros.log"), "x" * 50_000)
-        options = Options()
-        options.logs = "brut"
-        options.max_log_ko = 1
-        sq.copier_cas(parent, out, sq.Anonymiseur(actif=False), options)
+        sq.copier_cas(parent, out, sq.Anonymiseur(actif=False),
+                      options(logs="brut", max_log_ko=1))
         produit = os.path.join(out, "Alpha", "logs", "gros.log")
         assert os.path.getsize(produit) < 2 * 1024
+
+
+class TestGardeFousPartages:
+    """`valider` et `fabriquer` sont le seul chemin des DEUX interfaces.
+
+    C'est ce qui interdit a l'UI de desserrer un controle que le CLI applique :
+    si ces tests passent, les deux se comportent pareil par construction.
+    """
+
+    def test_logs_brut_refuse_sans_mode_brut(self, compound):
+        parent, _s1, out = compound
+        refus = sq.valider(sq.Options(cas=parent, sortie=out, logs="brut"))
+        assert refus and "brut" in refus.lower()
+
+    def test_logs_brut_accepte_avec_mode_brut(self, compound):
+        parent, _s1, out = compound
+        assert sq.valider(sq.Options(cas=parent, sortie=out, logs="brut",
+                                     brut=True)) == ""
+
+    def test_refuse_un_dossier_sans_case_xml(self, tmp_path):
+        vide = tmp_path / "vide"
+        vide.mkdir()
+        refus = sq.valider(sq.Options(cas=str(vide), sortie=str(tmp_path / "o")))
+        assert "case.xml" in refus
+
+    def test_refuse_une_sortie_non_vide(self, compound):
+        parent, _s1, out = compound
+        os.makedirs(out, exist_ok=True)
+        ecrire(os.path.join(out, "x.txt"), "x")
+        assert "non vide" in sq.valider(sq.Options(cas=parent, sortie=out))
+        assert sq.valider(sq.Options(cas=parent, sortie=out, force=True)) == ""
+
+    def test_refuse_une_sortie_vide_de_nom(self, compound):
+        parent, _s1, _out = compound
+        assert sq.valider(sq.Options(cas=parent, sortie="")) != ""
+
+    def test_fabriquer_verifie_toujours_l_anonymat(self, compound):
+        """La verification ne doit pas pouvoir etre sautee par un appelant."""
+        parent, _s1, out = compound
+        rapport, fuites = sq.fabriquer(sq.Options(cas=parent, sortie=out, logs="aucun"))
+        assert rapport["nom"] == "CAS_1" and fuites == []
+        assert os.path.isfile(os.path.join(out, sq.MANIFESTE))
+
+    def test_fabriquer_en_brut_ne_verifie_pas(self, compound):
+        parent, _s1, out = compound
+        rapport, fuites = sq.fabriquer(
+            sq.Options(cas=parent, sortie=out, brut=True, logs="aucun"))
+        assert fuites == [] and rapport["nom"] == "Dossier Racine"
 
 
 class TestLigneDeCommande:
@@ -272,7 +317,7 @@ class TestLigneDeCommande:
         parent, _s1, out = compound
         code = sq.main([parent, out, "--logs", "brut"])
         assert code == 2
-        assert "--brut" in capsys.readouterr().err
+        assert "brut" in capsys.readouterr().err.lower()
 
     def test_refuse_un_dossier_qui_nest_pas_un_cas(self, tmp_path, capsys):
         vide = tmp_path / "vide"

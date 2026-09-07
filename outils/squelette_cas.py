@@ -582,6 +582,62 @@ def ecrire_manifeste(dossier: str, rapport: dict, ano: Anonymiseur,
 
 
 # --------------------------------------------------------------------------- #
+class Options:
+    """Réglages d'une fabrication, hors ligne de commande.
+
+    Même jeu de champs que le ``Namespace`` d'argparse : l'interface graphique
+    et le CLI passent par ``valider`` puis ``fabriquer`` avec le même objet, ce
+    qui interdit à l'un de desserrer un garde-fou que l'autre applique.
+    """
+
+    def __init__(self, cas="", sortie="", brut=False, logs="inventaire",
+                 nb_logs=5, max_log_ko=256, force=False):
+        self.cas = cas
+        self.sortie = sortie
+        self.brut = brut
+        self.logs = logs
+        self.nb_logs = nb_logs
+        self.max_log_ko = max_log_ko
+        self.force = force
+
+
+def valider(options) -> str:
+    """Contrôles préalables. Renvoie le motif du refus, ou "" si tout va bien.
+
+    Le premier contrôle n'est pas une commodité : copier des logs revient à
+    copier du texte libre non anonymisable, ce qui doit rester un choix explicite
+    et non l'effet de bord d'une case cochée.
+    """
+    if options.logs == "brut" and not options.brut:
+        return ("Copier les logs revient a copier du texte libre, qui ne "
+                "s'anonymise pas de facon fiable : cochez aussi le mode brut "
+                "pour l'assumer explicitement.")
+    if not os.path.isdir(options.cas):
+        return "Dossier de cas introuvable : {}".format(options.cas)
+    if not os.path.isfile(os.path.join(options.cas, CASE_XML)):
+        return "Pas un dossier de cas Intella (case.xml absent) : {}".format(options.cas)
+    if not options.sortie:
+        return "Indiquez un dossier de sortie."
+    if (os.path.isdir(options.sortie) and os.listdir(options.sortie)
+            and not options.force):
+        return "Dossier de sortie non vide : {}".format(options.sortie)
+    return ""
+
+
+def fabriquer(options):
+    """Enchaînement complet : copie, vérification d'anonymat, manifeste.
+
+    Point d'entrée unique des deux interfaces — la vérification d'anonymat ne
+    doit pas pouvoir être sautée par l'une d'elles.
+    """
+    os.makedirs(options.sortie, exist_ok=True)
+    ano = Anonymiseur(actif=not options.brut)
+    rapport = copier_cas(options.cas, options.sortie, ano, options)
+    fuites = verifier_anonymat(options.sortie, ano) if ano.actif else []
+    ecrire_manifeste(options.sortie, rapport, ano, options, fuites)
+    return rapport, fuites
+
+
 def main(argv=None) -> int:
     # Alias et chemins peuvent sortir du cp1252 de la console Windows : on force
     # UTF-8 plutot que de laisser un UnicodeEncodeError tuer un traitement reussi.
@@ -607,27 +663,15 @@ def main(argv=None) -> int:
                          help="écraser un dossier de sortie non vide")
     options = parseur.parse_args(argv)
 
-    if options.logs == "brut" and not options.brut:
-        print("--logs brut copie du texte libre non anonymisable : ajoutez --brut "
-              "pour l'assumer explicitement.", file=sys.stderr)
-        return 2
-    if not os.path.isdir(options.cas):
-        print("Dossier de cas introuvable : {}".format(options.cas), file=sys.stderr)
-        return 2
-    if not os.path.isfile(os.path.join(options.cas, CASE_XML)):
-        print("Pas un dossier de cas Intella (case.xml absent) : {}".format(options.cas),
-              file=sys.stderr)
-        return 2
-    if os.path.isdir(options.sortie) and os.listdir(options.sortie) and not options.force:
-        print("Dossier de sortie non vide : {} (--force pour écraser)".format(options.sortie),
-              file=sys.stderr)
+    refus = valider(options)
+    if refus:
+        complement = ""
+        if refus.startswith("Dossier de sortie non vide"):
+            complement = " (--force pour écraser)"
+        print(refus + complement, file=sys.stderr)
         return 2
 
-    os.makedirs(options.sortie, exist_ok=True)
-    ano = Anonymiseur(actif=not options.brut)
-    rapport = copier_cas(options.cas, options.sortie, ano, options)
-    fuites = verifier_anonymat(options.sortie, ano) if ano.actif else []
-    ecrire_manifeste(options.sortie, rapport, ano, options, fuites)
+    rapport, fuites = fabriquer(options)
 
     print("\n".join(_lignes_rapport(rapport)))
     print("\nSquelette écrit dans : {}".format(os.path.abspath(options.sortie)))
