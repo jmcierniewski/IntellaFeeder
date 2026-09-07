@@ -53,6 +53,8 @@ class ExportTab(ttk.Frame):
         self.csv_columns: list[str] = list(case_export.CSV_COLUMNS)
         self._scan_running = False   # scan des dossiers à 0 en cours
         self._scan_cancel = False    # annulation demandée (lue par le worker)
+        self._scan_owners: dict = {}     # chemin mesuré -> (dossier, nom) du cas propriétaire
+        self._cache_info_names: list = []  # fichiers .info d'où viennent les tailles reprises
 
         top = ttk.LabelFrame(self, text=i18n.t("inventory.case_frame", "Cas à inventorier"))
         top.pack(fill="x", padx=8, pady=8)
@@ -293,11 +295,12 @@ class ExportTab(ttk.Frame):
         if inventory.get("is_compound"):
             msg = self._compound_report(inventory, n)
         if cached:
-            info_name = os.path.basename(
-                case_info.info_path(self.app.case_meta["folder"], self.app.case_meta["name"]))
+            # Compound : un fichier .info par sous-cas concerné, jamais un seul
+            # au niveau du compound (cf. `_cache_scope`).
             msg += "\n" + i18n.t(
                 "inventory.n_cached_folders",
-                "{n} dossier(s) déjà mesuré(s) repris du fichier {f}.", n=cached, f=info_name)
+                "{n} dossier(s) déjà mesuré(s) repris du fichier {f}.",
+                n=cached, f=", ".join(self._cache_info_names))
         if unk:
             msg += "\n" + i18n.t(
                 "inventory.n_unknown_folders",
@@ -335,21 +338,45 @@ class ExportTab(ttk.Frame):
                 "Inventaire PARTIEL : les sources des sous-cas non lus manquent.")
         return msg
 
+    def _cache_scope(self, folder_entry) -> tuple:
+        """Cas propriétaire du cache de tailles pour un dossier à 0.
+
+        Compound : **le sous-cas d'où vient la source**, jamais le compound —
+        un sous-cas peut être retiré du lot ou recevoir de nouvelles sources, et
+        son `IF_<cas>.info` doit le suivre. Il est d'ailleurs le même fichier que
+        celui lu si l'utilisateur ouvre ce sous-cas comme cas courant.
+        Cas simple : le cas lui-même.
+        """
+        meta = self.app.case_meta or {}
+        if folder_entry.get("subcase_path"):
+            return (folder_entry["subcase_path"],
+                    folder_entry.get("case_name") or folder_entry.get("subcase") or "")
+        return meta.get("folder", ""), meta.get("name", "")
+
     def _apply_cached_folder_sizes(self, inventory) -> int:
         """Applique les tailles de dossiers déjà mémorisées (IF_<cas>.info).
 
-        Pour chaque dossier à 0 dont la taille est connue du cache : renseigne la
-        ligne, l'intègre à ``known_bytes`` et le retire de ``folder_unknown``.
-        Retourne le nombre de dossiers résolus par le cache.
+        Pour chaque dossier à 0 dont la taille est connue du cache de SON cas
+        (cf. ``_cache_scope``) : renseigne la ligne, l'intègre à ``known_bytes``
+        et le retire de ``folder_unknown``. Retourne le nombre de dossiers
+        résolus ; les fichiers utilisés sont mémorisés dans ``_cache_info_names``.
         """
         meta = self.app.case_meta
+        self._cache_info_names = []
         if not meta:
             return 0
-        cache = case_info.get_folder_sizes(meta["folder"], meta["name"])
-        if not cache:
-            return 0
-        applied, extra, still_unknown = 0, 0, []
+        caches: dict = {}
+
+        def cache_of(scope):
+            if scope not in caches:
+                caches[scope] = (case_info.get_folder_sizes(*scope)
+                                 if scope[0] and scope[1] else {})
+            return caches[scope]
+
+        applied, extra, still_unknown, used = 0, 0, [], []
         for f in inventory.get("folder_unknown", []):
+            scope = self._cache_scope(f)
+            cache = cache_of(scope)
             key = path_parser.normalize_path(f["path"]).lower()
             if key in cache:
                 b = int(cache[key])
@@ -359,16 +386,19 @@ class ExportTab(ttk.Frame):
                         r["Octets"] = str(b)
                 extra += b
                 applied += 1
+                name = os.path.basename(case_info.info_path(*scope))
+                if name not in used:
+                    used.append(name)
             else:
                 still_unknown.append(f)
+        self._cache_info_names = used
         if applied:
             inventory["folder_unknown"] = still_unknown
             inventory["known_bytes"] = (inventory.get("known_bytes", 0) or 0) + extra
-            info_name = os.path.basename(case_info.info_path(meta["folder"], meta["name"]))
             self.app.log.log(i18n.t(
                 "inventory.cache_applied_log",
                 "{n} dossier(s) à 0 repris du cache {f} (total {t}).",
-                n=applied, f=info_name, t=config.human_size(extra)))
+                n=applied, f=", ".join(used), t=config.human_size(extra)))
         return applied
 
     def _set_scan_alert(self, on: bool):
@@ -475,6 +505,9 @@ class ExportTab(ttk.Frame):
         if self._scan_running:
             return
         folders = list(inv["folder_unknown"])
+        # Propriétaire du cache figé AVANT la mesure : `folder_unknown` est
+        # rectifié en fin de scan, la correspondance chemin → cas doit survivre.
+        self._scan_owners = {f["path"]: self._cache_scope(f) for f in folders}
         self._scan_running = True
         self._scan_cancel = False
         self.btn_scan.config(state="disabled")
@@ -555,12 +588,31 @@ class ExportTab(ttk.Frame):
         # Persistance IMMÉDIATE (contrairement à l'onglet Import) : ces sources
         # sont déjà indexées dans le cas, leur contenu ne bougera plus — même les
         # mesures d'un scan interrompu sont bonnes à garder.
+        # Compound : une écriture PAR SOUS-CAS concerné (aucun .info déposé au
+        # niveau du compound — la composition du lot peut changer).
         meta = self.app.case_meta
         if meta and results:
-            if case_info.update_folder_sizes(meta["folder"], meta["name"], dict(results)):
-                info_name = os.path.basename(case_info.info_path(meta['folder'], meta['name']))
+            by_scope: dict = {}
+            fallback = (meta.get("folder", ""), meta.get("name", ""))
+            for p, b in results:
+                scope = self._scan_owners.get(p) or fallback
+                by_scope.setdefault(scope, {})[p] = b
+            saved, failed = [], []
+            for scope, measured in by_scope.items():
+                if not (scope[0] and scope[1]):
+                    continue
+                name = os.path.basename(case_info.info_path(*scope))
+                (saved if case_info.update_folder_sizes(*scope, measured)
+                 else failed).append(name)
+            if saved:
                 self.app.log.log(i18n.t(
-                    "inventory.sizes_saved_log", "Tailles mémorisées dans {f}.", f=info_name))
+                    "inventory.sizes_saved_log", "Tailles mémorisées dans {f}.",
+                    f=", ".join(saved)))
+            if failed:
+                self.app.log.log(i18n.t(
+                    "inventory.sizes_save_failed_log",
+                    "Écriture impossible dans {f} (droits ?) : tailles non mémorisées.",
+                    f=", ".join(failed)), level="WARN")
         self.app.log.log(i18n.t(
             "inventory.folders_measured_log", "Dossiers mesurés : {n} — total {t}.",
             n=len(results), t=config.human_size(total)))

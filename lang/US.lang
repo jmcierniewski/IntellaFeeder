@@ -86,6 +86,7 @@
     "inventory.measuring_progress": "Measuring folders… {i}/{n}",
     "inventory.measuring_progress_named": "Measuring folders… {i}/{n}: {f}",
     "inventory.sizes_saved_log": "Sizes saved in {f}.",
+    "inventory.sizes_save_failed_log": "Cannot write {f} (permissions?): sizes not saved.",
     "inventory.folders_measured_log": "Folders measured: {n} — total {t}.",
     "inventory.folders_measured_summary": "{n} folder(s) measured — total {t} (added to the inventory sum).",
     "inventory.default_profile_name": "profile",

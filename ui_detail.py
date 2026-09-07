@@ -3,9 +3,11 @@
 Lit ``app.case_meta`` (rempli par l'onglet Inventaire dès qu'un ``case.xml`` est
 détecté) et l'affiche en clair. Lecture seule, informatif.
 
-Cas **compound** : une section « Sous-cas » liste les cas référencés (nom, taille,
-accessibilité) et les utilisateurs autorisés sont consolidés compound + sous-cas —
-c'est ici, avec l'Inventaire, que se lit un compound, l'Import lui étant fermé.
+Cas **compound** : une section « Sous-cas référencés », placée juste après
+l'identité du cas, donne pour chacun nom, taille, chemin, accessibilité et
+**utilisateurs autorisés** (les droits sont portés par le sous-cas, pas par le
+compound) — c'est ici, avec l'Inventaire, que se lit un compound, l'Import lui
+étant fermé.
 """
 
 import os
@@ -20,6 +22,9 @@ from ui_widgets import make_button
 
 
 class DetailTab(ttk.Frame):
+    # Abscisse (px) de la colonne des valeurs — cf. `tabs` plus bas.
+    LABEL_COL = 250
+
     def __init__(self, parent, app):
         super().__init__(parent)
         self.app = app
@@ -41,13 +46,32 @@ class DetailTab(ttk.Frame):
         self.text.pack(side="left", fill="both", expand=True)
         vsb.pack(side="right", fill="y")
 
-        self.text.tag_configure("h1", font=("Segoe UI", 13, "bold"),
-                                foreground="#1e40af", spacing1=12, spacing3=6)
+        # Valeurs alignées sur une colonne fixe : un « clé : valeur » libre
+        # redémarre à une abscisse différente à chaque ligne, ce qui donne le
+        # sentiment de fouillis même quand le contenu est court. Le 2e taquet
+        # évite qu'un libellé plus large que la colonne ne colle sa valeur.
+        self.text.configure(tabs=(self.LABEL_COL, self.LABEL_COL + 16))
+        self.text.tag_configure("h1", font=("Segoe UI", 12, "bold"),
+                                foreground="#1e40af", spacing1=16, spacing3=8)
         self.text.tag_configure("k", font=("Segoe UI", 10, "bold"),
                                 lmargin1=8, lmargin2=8)
-        self.text.tag_configure("v", font=("Segoe UI", 10), lmargin1=8, lmargin2=180)
-        self.text.tag_configure("muted", font=("Segoe UI", 10, "italic"),
-                                foreground="#64748b")
+        self.text.tag_configure("v", font=("Segoe UI", 10), lmargin1=8,
+                                lmargin2=self.LABEL_COL, spacing3=2)
+        self.text.tag_configure("muted", font=("Segoe UI", 9, "italic"),
+                                foreground="#64748b", lmargin1=8, lmargin2=8,
+                                spacing1=4)
+        # Sous-cas : un bloc par cas référencé (titre puis lignes de détail).
+        self.text.tag_configure("sub", font=("Segoe UI", 10, "bold"),
+                                lmargin1=16, lmargin2=36, spacing1=6)
+        self.text.tag_configure("sub_ko", font=("Segoe UI", 10, "bold"),
+                                foreground="#b91c1c", lmargin1=16, lmargin2=36,
+                                spacing1=6)
+        self.text.tag_configure("sub_kv", font=("Segoe UI", 9), foreground="#334155",
+                                lmargin1=36, lmargin2=36)
+        self.text.tag_configure("sub_path", font=("Segoe UI", 9), foreground="#64748b",
+                                lmargin1=36, lmargin2=36)
+        self.text.tag_configure("bullet", font=("Segoe UI", 10),
+                                lmargin1=16, lmargin2=32)
 
         self.refresh()
 
@@ -91,24 +115,22 @@ class DetailTab(ttk.Frame):
         self._kv(i18n.t("detail.version", "Version (origine / actuelle)"),
                  f"{xml['originalVersion'] or '—'} / {xml['caseVersion'] or '—'}")
 
+        # Compound : les sous-cas AVANT les préférences — c'est l'information
+        # structurante du cas, et elle porte maintenant les droits de chacun.
+        if meta.get("is_compound"):
+            self._subcases_section(meta)
+
         self._h1(i18n.t("detail.h1_prefs", "Préférences du cas"))
         opt = prefs.get("OptimizationFolderPath", "")
         self._kv(i18n.t("detail.optim_folder", "Dossier d'optimisation"), opt or "—")
-        # Utilisateurs autorisés : ceux du cas, plus ceux des sous-cas pour un
-        # compound (les droits y sont portés par chaque sous-cas).
+        # Utilisateurs autorisés du cas lui-même. Pour un compound, ceux des
+        # sous-cas sont donnés sous-cas par sous-cas (section ci-dessus) plutôt
+        # qu'en une ligne consolidée : c'est le détail qui sert à savoir qui
+        # ouvrira quoi, la liste fusionnée ne disait rien d'actionnable.
         users = list(meta.get("authorized_users", []))
-        extra = []
-        for sc in meta.get("subcases", []):
-            for u in sc.get("authorized_users", []):
-                if u not in users and u not in extra:
-                    extra.append(u)
-        if users or extra:
+        if users:
             self._kv(i18n.t("detail.authorized_users", "Utilisateurs autorisés"),
-                     ", ".join(users) or "—")
-        if extra:
-            self._kv(i18n.t("detail.authorized_users_sub",
-                            "Utilisateurs autorisés (sous-cas uniquement)"),
-                     ", ".join(extra))
+                     ", ".join(users))
         self._kv(i18n.t("detail.email_threading", "Email Threading effectué"),
                  _yesno(prefs.get("TasksEmailThreadsAnalysisDone")))
         self._kv(i18n.t("detail.saved_searches", "Recherches enregistrées effectuées"),
@@ -117,14 +139,11 @@ class DetailTab(ttk.Frame):
         if algo:
             self._kv(i18n.t("detail.hash_algo", "Hachage des messages"), algo)
 
-        if meta.get("is_compound"):
-            self._subcases_section(meta)
-
         tasks2 = meta.get("tasks2", [])
         self._h1(i18n.t("detail.h1_tasks2", "Tâches post-indexation (tasks2.json)"))
         if tasks2:
             for name in tasks2:
-                self.text.insert("end", "•  " + name + "\n", "v")
+                self.text.insert("end", "•  " + name + "\n", "bullet")
             # Le fichier est un tableau JSON de tâches : réutilisable tel quel
             # comme « fichier de tâches » de l'onglet Import (après export).
             self.text.insert(
@@ -145,7 +164,7 @@ class DetailTab(ttk.Frame):
         self.text.configure(state="disabled")
 
     def _subcases_section(self, meta):
-        """Liste les sous-cas d'un compound : nom, taille, chemin, accessibilité.
+        """Liste les sous-cas : nom, taille, chemin, droits, accessibilité.
 
         Un sous-cas peut être déclaré sans être joignable depuis ce poste (chemin
         absolu vers un partage démonté, compound recopié sans ses sous-cas) : on
@@ -160,16 +179,24 @@ class DetailTab(ttk.Frame):
                 "Cas déclaré compound mais ne référençant aucun sous-cas.") + "\n", "muted")
             return
         known = sum(sc["size"] for sc in subs if sc["exists"])
-        for sc in subs:
+        users_label = i18n.t("detail.authorized_users", "Utilisateurs autorisés")
+        for num, sc in enumerate(subs, 1):
             if sc["exists"]:
                 line = i18n.t("detail.subcase_ok", "{n} — {s}",
                               n=sc["name"], s=config.human_size(sc["size"]))
-                self.text.insert("end", "•  " + line + "\n", "v")
+                self.text.insert("end", f"{num}.  " + line + "\n", "sub")
             else:
                 line = i18n.t("detail.subcase_ko", "{n} — non joignable : {e}",
                               n=sc["name"], e=sc["error"])
-                self.text.insert("end", "✕  " + line + "\n", "v")
-            self.text.insert("end", "     " + sc["path"] + "\n", "muted")
+                self.text.insert("end", f"{num}.  ✕ " + line + "\n", "sub_ko")
+            self.text.insert("end", sc["path"] + "\n", "sub_path")
+            # Droits PAR SOUS-CAS : c'est le sous-cas qui les porte, et deux
+            # sous-cas d'un même lot n'ouvrent pas forcément aux mêmes personnes.
+            if sc["exists"]:
+                self.text.insert(
+                    "end",
+                    users_label + " : " + (", ".join(sc.get("authorized_users", [])) or "—")
+                    + "\n", "sub_kv")
         missing = [sc for sc in subs if not sc["exists"]]
         recap = i18n.t(
             "detail.subcases_recap",
@@ -221,7 +248,7 @@ class DetailTab(ttk.Frame):
         self.text.insert("end", title + "\n", "h1")
 
     def _kv(self, key, value):
-        self.text.insert("end", key + " : ", "k")
+        self.text.insert("end", key + " :\t", "k")
         self.text.insert("end", str(value) + "\n", "v")
 
 

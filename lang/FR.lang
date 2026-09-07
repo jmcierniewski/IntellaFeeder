@@ -86,6 +86,7 @@
     "inventory.measuring_progress": "Mesure des dossiers… {i}/{n}",
     "inventory.measuring_progress_named": "Mesure des dossiers… {i}/{n} : {f}",
     "inventory.sizes_saved_log": "Tailles mémorisées dans {f}.",
+    "inventory.sizes_save_failed_log": "Écriture impossible dans {f} (droits ?) : tailles non mémorisées.",
     "inventory.folders_measured_log": "Dossiers mesurés : {n} — total {t}.",
     "inventory.folders_measured_summary": "{n} dossier(s) mesuré(s) — total {t} (intégré à la somme inventaire).",
     "inventory.default_profile_name": "profil",

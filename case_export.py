@@ -64,6 +64,37 @@ def _split_args(extra: str) -> list[str]:
         return extra.split()
 
 
+def diagnose_no_xml(stdout: str, stderr: str) -> str:
+    """Motif probable d'un ``-exportSourceList`` qui n'écrit aucun XML.
+
+    IntellaCmd **renvoie 0 même en échec** : seul le contenu des flux dit ce qui
+    s'est passé. Sans ce tri, tout échec était imputé à la licence — ce qui a
+    envoyé chercher au mauvais endroit un refus d'écriture sur un partage
+    (07/09/2026, cas compound dont les sous-cas sont déclarés par IP).
+    """
+    blob = (stdout or "") + "\n" + (stderr or "")
+    if "AccessDeniedException" in blob and ".lock" in blob:
+        return (
+            "Accès refusé au verrou « case.xml.lock » : IntellaCmd doit pouvoir "
+            "ÉCRIRE dans le dossier du cas, pas seulement le lire. À vérifier : "
+            "droits d'écriture sur le partage (une connexion par ADRESSE IP peut "
+            "être plus restreinte que par nom de serveur), attribut « lecture "
+            "seule » sur le dossier, ou cas déjà ouvert ailleurs."
+        )
+    if "AccessDeniedException" in blob or "NoSuchFileException" in blob:
+        return ("Accès refusé ou fichier introuvable côté IntellaCmd "
+                "(voir la trace Java dans le journal).")
+    # « Using license: … » figure aussi dans les exécutions RÉUSSIES : ne conclure
+    # à la licence que sur un marqueur d'absence ou de sélection interactive.
+    low = blob.lower()
+    for marker in ("no license", "no valid license", "select a license",
+                   "licenses available: 0", "aucune licence"):
+        if marker in low:
+            return ("Aucune licence utilisable n'a été sélectionnée (argument "
+                    "-autoSelectFullProcessingLicense).")
+    return ""
+
+
 def run_export_source_list(exe: str, user: str, case_loc: str, log,
                            extra_args: str = "", timeout_min: int = 30):
     """Lance IntellaCmd -exportSourceList et retourne ``(rows, columns, inventory)``.
@@ -106,9 +137,11 @@ def run_export_source_list(exe: str, user: str, case_loc: str, log,
             f"IntellaCmd a renvoyé le code {proc.returncode}. Voir le journal."
         )
     if not os.path.isfile(xml_path) or os.path.getsize(xml_path) == 0:
+        detail = diagnose_no_xml(proc.stdout, proc.stderr)
         raise RuntimeError(
-            "Aucun fichier XML produit par IntellaCmd. Vérifiez la licence "
-            "(argument -autoSelectFullProcessingLicense) et le journal."
+            "Aucun fichier XML produit par IntellaCmd. "
+            + (detail or "Vérifiez la licence (argument "
+                         "-autoSelectFullProcessingLicense) et le journal.")
         )
 
     parsed = parse_source_list_xml(xml_path)
@@ -160,12 +193,35 @@ def run_export_subcases(exe: str, user: str, subcases: list, log,
             log(f"Sous-cas ignoré « {name} » : {report['error']}")
             reports.append(report)
             continue
-        try:
-            sub_rows, _cols, sub_inv = run_export_source_list(
-                exe, user, path, log, extra_args=extra_args, timeout_min=timeout_min)
-        except Exception as exc:  # noqa: BLE001 — un sous-cas KO n'arrête pas les autres
-            report["error"] = str(exc)
-            log(f"Échec de lecture du sous-cas « {name} » : {exc}")
+        # Deux écritures possibles du même sous-cas quand le compound et son
+        # `<subcase>` ne nomment pas le serveur pareil (nom NetBIOS vs IP) :
+        # `case_meta.read_subcases` a mis en tête celle du compound, on garde
+        # l'autre en repli — une session SMB peut réussir là où l'autre échoue.
+        candidates = [path]
+        declared = sc.get("declared_path", "")
+        if declared and declared != path:
+            log(f"Sous-cas « {name} » : lu via {path} "
+                f"(déclaré {declared} dans le case.xml du compound).")
+            if os.path.isdir(declared):
+                candidates.append(declared)
+
+        sub_rows = sub_inv = None
+        for attempt, cand in enumerate(candidates):
+            if attempt:
+                log(f"Nouvel essai du sous-cas « {name} » via {cand}")
+            try:
+                sub_rows, _cols, sub_inv = run_export_source_list(
+                    exe, user, cand, log, extra_args=extra_args,
+                    timeout_min=timeout_min)
+            except Exception as exc:  # noqa: BLE001 — un sous-cas KO n'arrête pas les autres
+                report["error"] = str(exc)
+                log(f"Échec de lecture du sous-cas « {name} » : {exc}")
+                sub_rows = sub_inv = None
+                continue
+            report["error"] = ""
+            path = report["path"] = cand
+            break
+        if sub_inv is None:
             reports.append(report)
             continue
 
@@ -179,7 +235,15 @@ def run_export_subcases(exe: str, user: str, subcases: list, log,
             d["subcase_path"] = path
             sources_detail.append(d)
         existing_paths |= sub_inv.get("existing_paths", set())
-        folder_unknown += sub_inv.get("folder_unknown", [])
+        # Chaque dossier à 0 porte SON sous-cas : c'est là (et pas au niveau du
+        # compound) que se lit et s'écrit le cache de tailles `IF_<cas>.info` —
+        # un sous-cas peut être retiré du lot, ou recevoir de nouvelles sources,
+        # sans que le reste de l'ensemble ait à en souffrir.
+        for f in sub_inv.get("folder_unknown", []):
+            f["subcase"] = name
+            f["subcase_path"] = path
+            f["case_name"] = sub_inv.get("case_name", "") or name
+            folder_unknown.append(f)
         known_bytes += sub_inv.get("known_bytes", 0) or 0
         # Tâches : même déduplication par signature qu'au sein d'un cas simple,
         # poursuivie d'un sous-cas à l'autre (les UUID diffèrent par source).

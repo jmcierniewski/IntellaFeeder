@@ -33,6 +33,7 @@ import os
 import xml.etree.ElementTree as ET
 
 import i18n
+import path_parser
 
 CASE_XML = "case.xml"
 PREFS_DIR = "prefs"
@@ -145,8 +146,11 @@ def read_subcases(folder: str, paths: list[str] | None = None) -> list[dict]:
     ``paths`` évite une relecture du ``case.xml`` parent quand l'appelant les a
     déjà (``xml["subcase_paths"]``).
 
-    Chaque entrée : ``path`` (chemin déclaré), ``exists`` (dossier + ``case.xml``
-    lisibles), ``name``, ``user``, ``size``, ``authorized_users`` et ``error``
+    Chaque entrée : ``path`` (chemin à utiliser — hôte UNC aligné sur celui du
+    compound si le partage est le même, cf. ``path_parser.align_unc_host``),
+    ``declared_path`` (chemin tel qu'écrit dans le ``case.xml``), ``exists``
+    (dossier + ``case.xml`` lisibles), ``name``, ``user``, ``size``,
+    ``authorized_users`` et ``error``
     (motif de l'échec, sinon ""). Ne lève jamais : un sous-cas hors du poste
     (partage démonté, cas recopié seul) reste une ligne d'inventaire signalée,
     pas une erreur bloquante.
@@ -165,8 +169,20 @@ def read_subcases(folder: str, paths: list[str] | None = None) -> list[dict]:
         # selon l'endroit d'ou l'application a ete lancee.
         path = os.path.normpath(raw if os.path.isabs(raw)
                                 else os.path.join(folder, raw))
+        declared = path
+        # Même partage, hôte différent (IP vs nom NetBIOS) : Windows y voit deux
+        # serveurs, donc deux sessions SMB aux droits possiblement différents. On
+        # préfère l'hôte par lequel le compound est DÉJÀ ouvert — l'autre peut
+        # être lisible mais refusé en écriture, ce qui fait échouer
+        # `-exportSourceList` sur le verrou case.xml.lock (07/09/2026).
+        aligned = path_parser.align_unc_host(path, folder)
+        if aligned != path and os.path.isdir(aligned):
+            path = aligned
         entry = {
             "path": path,
+            # Chemin tel qu'écrit dans le case.xml du compound : conservé pour
+            # l'affichage et comme repli si l'hôte aligné se révèle mauvais.
+            "declared_path": declared,
             "exists": False,
             # Repli d'affichage tant que le case.xml n'est pas lisible : le nom
             # du dossier, presque toujours celui du sous-cas.

@@ -38,6 +38,58 @@ class TestDeriveName:
         assert path_parser.derive_name(path) == expected
 
 
+class TestUncParts:
+    @pytest.mark.parametrize("path,expected", [
+        ("\\\\NAS\\partage\\Cas\\sous", ("NAS", "partage", "Cas\\sous")),
+        ("\\\\192.168.0.174\\partage\\Cas", ("192.168.0.174", "partage", "Cas")),
+        ("\\\\NAS\\partage", ("NAS", "partage", "")),
+        ("//NAS/partage/Cas", ("NAS", "partage", "Cas")),      # séparateurs unix
+    ])
+    def test_decoupage(self, path, expected):
+        assert path_parser.unc_parts(path) == expected
+
+    @pytest.mark.parametrize("path", [
+        "D:\\Cas", "Cas\\sous", "", "\\\\NAS", "\\\\NAS\\", "\\\\?\\C:\\Cas",
+    ])
+    def test_non_unc(self, path):
+        assert path_parser.unc_parts(path) is None
+
+
+class TestAlignUncHost:
+    """Aligner l'hôte d'un sous-cas sur celui du compound (bug du 07/09/2026).
+
+    Un compound ouvert par ``\\\\NAS\\part`` déclarait ses sous-cas par IP :
+    lisibles, mais refusés en écriture → ``-exportSourceList`` échouait sur
+    ``case.xml.lock``. Windows ouvrant une session SMB par NOM de serveur, la
+    seule parade côté outil est de réécrire l'hôte quand le partage est le même.
+    """
+    COMPOUND = "\\\\NAS_LABO_4\\partage\\CAS CP"
+
+    def test_ip_remplacee_par_le_nom_du_compound(self):
+        out = path_parser.align_unc_host("\\\\192.168.0.174\\partage\\CAS (2)",
+                                         self.COMPOUND)
+        assert out == "\\\\NAS_LABO_4\\partage\\CAS (2)"
+
+    def test_partage_different_laisse_intact(self):
+        sub = "\\\\192.168.0.174\\autre_partage\\CAS (2)"
+        assert path_parser.align_unc_host(sub, self.COMPOUND) == sub
+
+    def test_meme_hote_casse_ignoree(self):
+        sub = "\\\\nas_labo_4\\PARTAGE\\CAS (2)"
+        assert path_parser.align_unc_host(sub, self.COMPOUND) == sub
+
+    @pytest.mark.parametrize("sub,ref", [
+        ("D:\\Cas\\sous", COMPOUND),                    # sous-cas local
+        ("\\\\NAS\\partage\\sous", "D:\\Cas\\CP"),      # compound local
+    ])
+    def test_hors_unc_laisse_intact(self, sub, ref):
+        assert path_parser.align_unc_host(sub, ref) == sub
+
+    def test_racine_de_partage(self):
+        assert (path_parser.align_unc_host("\\\\10.0.0.1\\partage", self.COMPOUND)
+                == "\\\\NAS_LABO_4\\partage")
+
+
 class TestIsNonFirstSegment:
     @pytest.mark.parametrize("path", [
         "D:\\img.E02", "D:\\img.e15", "D:\\img.002", "D:\\img.s02", "D:\\img.ad2", "D:\\img.ad28",

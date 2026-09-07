@@ -178,9 +178,57 @@ class TestReadSubcases:
         (entry,) = case_meta.read_subcases(parent)
         assert entry["exists"] is True and os.path.isabs(entry["path"])
 
+    def test_declared_path_conserve(self, tmp_path):
+        """Le chemin écrit dans le case.xml reste disponible (repli, affichage)."""
+        sub = write_case(str(tmp_path / "sub"), name="S1")
+        parent = write_case(str(tmp_path / "comp"), compound=True, subcases=[sub])
+        (entry,) = case_meta.read_subcases(parent)
+        assert entry["declared_path"] == entry["path"] == os.path.normpath(sub)
+
     def test_read_case_peuple_les_sous_cas(self, tmp_path):
         sub = write_case(str(tmp_path / "sub"), name="S1", size=7)
         parent = write_case(str(tmp_path / "comp"), compound=True, subcases=[sub], size=7)
         meta = case_meta.read_case(parent)
         assert meta["is_compound"] is True
         assert [e["name"] for e in meta["subcases"]] == ["S1"]
+
+
+class TestHoteUncDesSousCas:
+    """Sous-cas déclaré par IP alors que le compound est ouvert par son nom.
+
+    Constaté le 07/09/2026 : les deux écritures désignent le même dossier, mais
+    Windows en fait deux sessions SMB. Celle de l'IP était lisible et refusée en
+    écriture → ``-exportSourceList`` échouait sur ``case.xml.lock``. On préfère
+    donc l'hôte du compound, à condition qu'il désigne bien un dossier.
+    """
+    COMPOUND = "\\\\NAS_LABO_4\\partage\\CAS CP"
+    DECLARE = "\\\\192.168.0.174\\partage\\CAS (2)"
+    ALIGNE = "\\\\NAS_LABO_4\\partage\\CAS (2)"
+
+    def _isdir(self, monkeypatch, presents):
+        """Faux système de fichiers : ces UNC n'existent nulle part.
+
+        ``has_case_xml`` est neutralisé avec ``isdir`` — sans cela, la recherche
+        de ``case.xml`` partirait interroger un hôte inexistant sur le réseau
+        (~10 s de timeout par chemin), ce que la suite s'interdit.
+        """
+        monkeypatch.setattr(case_meta.os.path, "isdir", lambda p: p in presents)
+        monkeypatch.setattr(case_meta, "has_case_xml", lambda p: False)
+
+    def test_hote_du_compound_prefere(self, monkeypatch):
+        self._isdir(monkeypatch, {self.COMPOUND, self.DECLARE, self.ALIGNE})
+        (entry,) = case_meta.read_subcases(self.COMPOUND, [self.DECLARE])
+        assert entry["path"] == self.ALIGNE
+        assert entry["declared_path"] == self.DECLARE
+
+    def test_hote_aligne_inexistant_on_garde_le_declare(self, monkeypatch):
+        self._isdir(monkeypatch, {self.COMPOUND, self.DECLARE})
+        (entry,) = case_meta.read_subcases(self.COMPOUND, [self.DECLARE])
+        assert entry["path"] == self.DECLARE
+
+    def test_partage_different_non_realigne(self, monkeypatch):
+        autre = "\\\\192.168.0.174\\autre\\CAS (2)"
+        self._isdir(monkeypatch, {self.COMPOUND, autre,
+                                  "\\\\NAS_LABO_4\\autre\\CAS (2)"})
+        (entry,) = case_meta.read_subcases(self.COMPOUND, [autre])
+        assert entry["path"] == autre
