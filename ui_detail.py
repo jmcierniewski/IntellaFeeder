@@ -72,6 +72,12 @@ class DetailTab(ttk.Frame):
                                 lmargin1=36, lmargin2=36)
         self.text.tag_configure("bullet", font=("Segoe UI", 10),
                                 lmargin1=16, lmargin2=32)
+        # Nom du cas : c'est LA donnée qu'on vient vérifier en ouvrant l'onglet.
+        self.text.tag_configure("v_strong", font=("Segoe UI", 11, "bold"),
+                                lmargin1=8, lmargin2=self.LABEL_COL)
+        self.text.tag_configure("warn", font=("Segoe UI", 9, "bold"),
+                                foreground="#b45309", lmargin1=8, lmargin2=8,
+                                spacing1=4)
 
         self.refresh()
 
@@ -94,7 +100,7 @@ class DetailTab(ttk.Frame):
         prefs = meta.get("prefs", {})
 
         self._h1(i18n.t("detail.h1_case", "Cas"))
-        self._kv(i18n.t("detail.name", "Nom"), xml["name"])
+        self._kv(i18n.t("detail.name", "Nom"), xml["name"], tag="v_strong")
         self._kv(i18n.t("detail.folder", "Dossier"), meta["folder"])
         if meta.get("is_compound"):
             self._kv(i18n.t("detail.kind", "Type de cas"), i18n.t(
@@ -180,6 +186,7 @@ class DetailTab(ttk.Frame):
             return
         known = sum(sc["size"] for sc in subs if sc["exists"])
         users_label = i18n.t("detail.authorized_users", "Utilisateurs autorisés")
+        optim_label = i18n.t("detail.optim_folder", "Dossier d'optimisation")
         for num, sc in enumerate(subs, 1):
             if sc["exists"]:
                 line = i18n.t("detail.subcase_ok", "{n} — {s}",
@@ -190,13 +197,19 @@ class DetailTab(ttk.Frame):
                               n=sc["name"], e=sc["error"])
                 self.text.insert("end", f"{num}.  ✕ " + line + "\n", "sub_ko")
             self.text.insert("end", sc["path"] + "\n", "sub_path")
-            # Droits PAR SOUS-CAS : c'est le sous-cas qui les porte, et deux
-            # sous-cas d'un même lot n'ouvrent pas forcément aux mêmes personnes.
+            # Droits et dossier d'optimisation PAR SOUS-CAS : c'est le sous-cas
+            # qui les porte, et deux sous-cas d'un même lot ne s'accordent pas
+            # forcément — ni sur les personnes, ni sur l'emplacement.
             if sc["exists"]:
                 self.text.insert(
                     "end",
                     users_label + " : " + (", ".join(sc.get("authorized_users", [])) or "—")
                     + "\n", "sub_kv")
+                self.text.insert(
+                    "end", optim_label + " : " + (sc.get("optimization") or "—") + "\n",
+                    "sub_kv")
+        self._optimization_warning(meta, subs)
+        self._users_warning(subs)
         missing = [sc for sc in subs if not sc["exists"]]
         recap = i18n.t(
             "detail.subcases_recap",
@@ -210,6 +223,49 @@ class DetailTab(ttk.Frame):
                 "{n} sous-cas non joignable(s) : l'inventaire des sources sera partiel.",
                 n=len(missing))
         self.text.insert("end", recap + "\n", "muted")
+
+    def _optimization_warning(self, meta, subs):
+        """Alerte si les cas du lot ne pointent pas au même dossier d'optimisation.
+
+        Un seul dossier par cas, mais rien n'oblige deux sous-cas à partager le
+        même : l'écart se paie en performances d'indexation, et il ne se voit
+        nulle part ailleurs qu'ici. Les sous-cas non joignables sont exclus de
+        la comparaison — on ne sait pas ce qu'ils déclarent.
+        """
+        valeurs = {}
+        for nom, opt in ([(meta.get("name", ""), meta.get("optimization", ""))]
+                         + [(sc["name"], sc.get("optimization", ""))
+                            for sc in subs if sc["exists"]]):
+            valeurs.setdefault((opt or "").strip().lower(), []).append(nom)
+        if len(valeurs) < 2:
+            return
+        detail = " / ".join(f"« {opt or '—'} » : {', '.join(noms)}"
+                            for opt, noms in valeurs.items())
+        self.text.insert("end", i18n.t(
+            "detail.optim_diverge",
+            "⚠ Dossiers d'optimisation différents dans ce lot — {d}", d=detail) + "\n",
+            "warn")
+
+    def _users_warning(self, subs):
+        """Alerte si les sous-cas n'ouvrent pas aux mêmes personnes.
+
+        Volontairement BRÈVE (demande du 07/09/2026) : la liste de chacun est
+        déjà donnée sous son bloc, on ne redit ici que les noms qui manquent
+        quelque part — c'est la seule information qui ne se lit pas d'un coup
+        d'œil quand il y a plusieurs sous-cas.
+        """
+        lisibles = [sc for sc in subs if sc["exists"]]
+        if len(lisibles) < 2:
+            return
+        listes = [set(sc.get("authorized_users", [])) for sc in lisibles]
+        partout = set.intersection(*listes)
+        partiels = sorted(set.union(*listes) - partout)
+        if not partiels:
+            return
+        self.text.insert("end", i18n.t(
+            "detail.users_diverge",
+            "⚠ Droits inégaux entre sous-cas — pas partout : {u}",
+            u=", ".join(partiels)) + "\n", "warn")
 
     # ------------------------------------------------------------------ #
     def _export_tasks2(self):
@@ -247,9 +303,9 @@ class DetailTab(ttk.Frame):
     def _h1(self, title):
         self.text.insert("end", title + "\n", "h1")
 
-    def _kv(self, key, value):
+    def _kv(self, key, value, tag: str = "v"):
         self.text.insert("end", key + " :\t", "k")
-        self.text.insert("end", str(value) + "\n", "v")
+        self.text.insert("end", str(value) + "\n", tag)
 
 
 def _yesno(raw) -> str:

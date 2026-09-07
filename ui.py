@@ -162,15 +162,30 @@ class MainWindow:
         En mode script, il pointe sur python.exe et il faut lui repasser le
         script. Les paramètres sont enregistrés avant, comme à une fermeture
         normale.
+
+        🐞 **Le répertoire courant n'est PAS transmis au nouveau processus**
+        (bug du 07/09/2026, exe onefile) : le 1er redémarrage passait, le 2e
+        échouait sur « interpréteur Python introuvable ». En onefile, le
+        processus s'exécute depuis un dossier temporaire ``_MEIxxxx`` que le
+        bootloader **supprime en sortant** ; hériter de ce répertoire faisait
+        démarrer le processus suivant dans un dossier en train de disparaître.
+        On démarre donc dans ``config.base_dir()`` — le dossier de l'exe (ou du
+        script), qui existe toujours.
         """
+        cmd = []
         try:
             self.save_settings()
             if getattr(sys, "frozen", False):
                 cmd = [sys.executable] + sys.argv[1:]
             else:
                 cmd = [sys.executable, os.path.abspath(sys.argv[0])] + sys.argv[1:]
-            subprocess.Popen(cmd, cwd=os.getcwd())
-        except OSError as exc:
+            depart = config.base_dir()
+            if not os.path.isdir(depart):
+                depart = None            # laisse Windows choisir plutôt qu'échouer
+            self.log.log(i18n.t("topbar.restart_log", "Redémarrage : {c}",
+                                c=subprocess.list2cmdline(cmd)))
+            subprocess.Popen(cmd, cwd=depart)
+        except (OSError, ValueError) as exc:
             messagebox.showerror(
                 i18n.t("topbar.language", "Langue"),
                 i18n.t("topbar.restart_failed",

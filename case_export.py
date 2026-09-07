@@ -47,6 +47,11 @@ _TYPE_MAP = {
     "Disk Image": config.SOURCE_TYPE_DISK_IMAGE,
     "File or Folder": config.SOURCE_TYPE_FOLDER,
 }
+# Libellé de la colonne « Taille » quand Intella ne reporte rien (source
+# « dossier »). Partagé avec l'UI, qui doit distinguer « pas encore mesuré » de
+# « mesuré et vraiment vide » — deux choses très différentes à l'import.
+SIZE_UNKNOWN_LABEL = "à mesurer"
+
 _TYPE_LABEL = {
     config.SOURCE_TYPE_DISK_IMAGE: "Image",
     config.SOURCE_TYPE_FOLDER: "Dossier/Fichier",
@@ -432,7 +437,7 @@ def to_display_rows(parsed: dict):
     rows = []
     for s in parsed["sources"]:
         if s["size_unknown"]:
-            taille = "à mesurer"
+            taille = SIZE_UNKNOWN_LABEL
         else:
             taille = config.human_size(s["bytes"])
         rows.append({

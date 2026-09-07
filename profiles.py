@@ -97,6 +97,40 @@ def get_comment(name: str) -> str:
     return _all().get(name, {}).get("comment", "")
 
 
+def display_name(name: str) -> str:
+    """Libellé affiché d'un profil. L'identifiant technique, lui, ne bouge pas.
+
+    ``DEFAULT_NAME`` est la clé de correspondance entre les onglets et le nom
+    écrit dans les listes exportées : le renommer casserait ces liens. Seul son
+    **affichage** devient « Défaut Intella » (demande du 07/09/2026), qui dit ce
+    qu'il est vraiment — les réglages par défaut d'Intella, options omises.
+    """
+    return (i18n.t("profiles.default_display", "Défaut Intella")
+            if name == DEFAULT_NAME else name)
+
+
+def internal_name(label: str) -> str:
+    """Inverse de ``display_name`` : du libellé affiché vers l'identifiant."""
+    return DEFAULT_NAME if label == display_name(DEFAULT_NAME) else label
+
+
+def duplicate_profile(source: str, target: str) -> None:
+    """Copie ``source`` (valeurs + commentaire) sous le nom ``target``.
+
+    Dupliquer « Défaut Intella » est permis et utile : on obtient un profil
+    modifiable qui part des réglages d'Intella. Les contrôles de nom de
+    ``save_profile`` s'appliquent (vide, réservé, collision de fichiers).
+    """
+    target = (target or "").strip()
+    if not exists(source):
+        raise ValueError(i18n.t("profiles.err_unknown_source",
+                                "Profil introuvable : {n}", n=source))
+    if exists(target):
+        raise ValueError(i18n.t("profiles.err_exists",
+                                "Un profil « {n} » existe déjà.", n=target))
+    save_profile(target, get_values(source), get_comment(source))
+
+
 def save_profile(name: str, values: dict, comment: str = "") -> None:
     """Crée ou met à jour un profil (1 fichier). Lève ``ValueError`` si nom vide
     ou « défaut »."""

@@ -6,8 +6,8 @@ Première étape du workflow :
    et verrouille le cas dans l'onglet Import).
 2. « Lire les sources » → ``-exportSourceList`` (IntellaCmd) : liste des sources
    déjà indexées (dédoublonnage) ; publié sur ``app.inventory``.
-3. « Scanner les dossiers à 0 » → mesure facultative des sources « dossier » dont
-   la taille n'est pas reportée par Intella.
+3. « Scanner les dossiers à mesurer » → mesure facultative des sources
+   « dossier » dont la taille n'est pas reportée par Intella.
 """
 
 import json
@@ -55,6 +55,9 @@ class ExportTab(ttk.Frame):
         self._scan_cancel = False    # annulation demandée (lue par le worker)
         self._scan_owners: dict = {}     # chemin mesuré -> (dossier, nom) du cas propriétaire
         self._cache_info_names: list = []  # fichiers .info d'où viennent les tailles reprises
+        self._view: list[int] = []       # indices de `rows` affichés (filtre + tri)
+        self._sort_col: str = ""         # colonne de tri courante ("" = ordre du XML)
+        self._sort_desc = False
 
         top = ttk.LabelFrame(self, text=i18n.t("inventory.case_frame", "Cas à inventorier"))
         top.pack(fill="x", padx=8, pady=8)
@@ -84,14 +87,14 @@ class ExportTab(ttk.Frame):
             row=2, column=0, sticky="w", padx=6, pady=4)
         ttk.Entry(top, textvariable=self.var_extra).grid(row=2, column=1, sticky="ew", padx=6, pady=4)
 
-        # Tous les boutons d'action ont la même apparence (tk.Button classique,
-        # comme « Scanner les dossiers à 0 ») ; seule la couleur peut différer.
+        # Tous les boutons d'action ont la même apparence (tk.Button classique) ;
+        # seule la couleur peut différer.
         actions = ttk.Frame(top)
         actions.grid(row=3, column=1, columnspan=2, sticky="w", padx=6, pady=4)
         self.btn_run = self._mk_btn(actions, i18n.t("inventory.run", "Lire les sources (IntellaCmd)"),
                                     self._run)
         self.btn_run.pack(side="left")
-        self.btn_scan = self._mk_btn(actions, i18n.t("inventory.scan", "Scanner les dossiers à 0"),
+        self.btn_scan = self._mk_btn(actions, i18n.t("inventory.scan", "Scanner les dossiers à mesurer"),
                                      self._scan_zero)
         self.btn_scan.pack(side="left", padx=6)
         self._scan_btn_default = {
@@ -120,9 +123,26 @@ class ExportTab(ttk.Frame):
         self.lbl_summary = ttk.Label(self, text=i18n.t("inventory.no_case", "Aucun cas sélectionné."))
         self.lbl_summary.pack(anchor="w", padx=12, pady=(0, 4))
 
+        # Filtre : un cas réel dépasse la quarantaine de sources ; retrouver
+        # celles d'un scellé se fait plus vite en tapant trois lettres qu'en
+        # faisant défiler.
+        filtre = ttk.Frame(self)
+        filtre.pack(fill="x", padx=12, pady=(0, 4))
+        ttk.Label(filtre, text=i18n.t("inventory.filter", "Filtrer")).pack(side="left")
+        self.var_filter = tk.StringVar()
+        self.var_filter.trace_add("write", lambda *_a: self._rebuild_view())
+        ttk.Entry(filtre, textvariable=self.var_filter, width=32).pack(side="left", padx=6)
+        self.lbl_filter = ttk.Label(filtre, text="", foreground="#64748b")
+        self.lbl_filter.pack(side="left")
+        ttk.Label(filtre, foreground="#64748b", text=i18n.t(
+            "inventory.table_hint",
+            "En-tête = tri · Ctrl+A tout sélectionner · Ctrl+C copier")).pack(side="right")
+
         holder = ttk.Frame(self)
         holder.pack(fill="both", expand=True, padx=8, pady=(0, 8))
-        self.tree = ttk.Treeview(holder, show="headings", selectmode="browse")
+        # « extended » : on copie souvent plusieurs lignes d'un coup vers un
+        # tableur ou un compte rendu.
+        self.tree = ttk.Treeview(holder, show="headings", selectmode="extended")
         vsb = ttk.Scrollbar(holder, orient="vertical", command=self.tree.yview)
         hsb = ttk.Scrollbar(holder, orient="horizontal", command=self.tree.xview)
         self.tree.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
@@ -131,6 +151,13 @@ class ExportTab(ttk.Frame):
         hsb.grid(row=1, column=0, sticky="ew")
         holder.rowconfigure(0, weight=1)
         holder.columnconfigure(0, weight=1)
+        # Source mesurée à 0 octet = vide pour de bon (≠ « à mesurer », ≠ « 0.0 Mo »
+        # qui pèse quelques Ko) : à voir avant l'import, pas après.
+        self.tree.tag_configure("empty", foreground="#b91c1c")
+        self.tree.bind("<Control-c>", self._copy_selection)
+        self.tree.bind("<Control-C>", self._copy_selection)
+        self.tree.bind("<Control-a>", self._select_all)
+        self.tree.bind("<Control-A>", self._select_all)
 
         if case_meta.has_case_xml(path_parser.clean_field(self.var_case.get())):
             self._detect_case()
@@ -282,7 +309,7 @@ class ExportTab(ttk.Frame):
         # Réutilise les tailles de dossiers déjà mesurées (fichier IF_<cas>.info) :
         # on ne re-scannera que les éventuels NOUVEAUX dossiers à 0.
         cached = self._apply_cached_folder_sizes(inventory)
-        self._fill_tree()
+        self._rebuild_view()
         self._update_summary(inventory)
         # Retrait automatique des sources déjà indexées côté Import.
         if hasattr(self.app, "import_tab"):
@@ -470,6 +497,62 @@ class ExportTab(ttk.Frame):
                 "inventory.n_scannable_folders", "{n} dossier(s) à 0 (scannables)", n=unk)
         self.lbl_summary.config(text=txt)
 
+    # ------------------------------------------------------------------ #
+    # Tableau : vue (filtre + tri), remplissage, copie                    #
+    # ------------------------------------------------------------------ #
+    @staticmethod
+    def _is_empty_source(row) -> bool:
+        """Source **mesurée** et vraiment vide (0 octet), à distinguer de
+        « pas encore mesurée » et de « 0.0 Mo » (quelques Ko, donc non vide)."""
+        return (row.get("Octets") == "0"
+                and row.get("Taille") != case_export.SIZE_UNKNOWN_LABEL)
+
+    def _sort_key(self, idx: int):
+        """Clé de tri : numérique sur les colonnes de nombres, texte sinon.
+
+        Trier « Taille » sur son libellé mettrait « 9.9 Mo » après « 10 Go » :
+        on trie sur les octets, qui sont dans la ligne même s'ils ne sont pas
+        affichés.
+        """
+        row = self.rows[idx]
+        col = self._sort_col
+        if col in ("Taille", "Octets", "Segments"):
+            brut = row.get("Octets" if col == "Taille" else col, "")
+            try:
+                return (0, float(brut))
+            except (TypeError, ValueError):
+                return (1, 0.0)          # non mesuré → toujours en fin de tri
+        return (0, str(row.get(col, "")).casefold())
+
+    def _rebuild_view(self):
+        """Recalcule les lignes affichées (filtre puis tri) et remplit l'arbre."""
+        motif = (self.var_filter.get() or "").strip().casefold()
+        vue = []
+        for i, r in enumerate(self.rows):
+            if motif and motif not in " ".join(
+                    str(r.get(c, "")) for c in self.columns).casefold():
+                continue
+            vue.append(i)
+        if self._sort_col:
+            vue.sort(key=self._sort_key, reverse=self._sort_desc)
+        self._view = vue
+        self._fill_tree()
+        self._update_filter_label()
+
+    def _sort_by(self, col: str):
+        """Un clic trie, un second inverse (flèche dans l'en-tête)."""
+        if self._sort_col == col:
+            self._sort_desc = not self._sort_desc
+        else:
+            self._sort_col, self._sort_desc = col, False
+        self._rebuild_view()
+
+    def _update_filter_label(self):
+        total, montre = len(self.rows), len(self._view)
+        self.lbl_filter.config(
+            text="" if montre == total else i18n.t(
+                "inventory.filter_count", "{m} / {t} ligne(s)", m=montre, t=total))
+
     def _fill_tree(self):
         self.tree.delete(*self.tree.get_children())
         self.tree["columns"] = self.columns
@@ -478,10 +561,40 @@ class ExportTab(ttk.Frame):
                   "Sous-cas": 200}
         for c in self.columns:
             label = i18n.t(_COLUMN_LABEL_KEYS.get(c, ""), c) if c in _COLUMN_LABEL_KEYS else c
-            self.tree.heading(c, text=label)
-            self.tree.column(c, width=widths.get(c, 150), anchor="w", stretch=False)
-        for r in self.rows:
-            self.tree.insert("", "end", values=[r.get(c, "") for c in self.columns])
+            if c == self._sort_col:
+                label += " ▼" if self._sort_desc else " ▲"
+            self.tree.heading(c, text=label, command=lambda col=c: self._sort_by(col))
+            # Les nombres se comparent à l'œil quand ils sont alignés à droite.
+            anchor = "e" if c in ("Taille", "Octets", "Segments") else "w"
+            self.tree.column(c, width=widths.get(c, 150), anchor=anchor, stretch=False)
+        # `iid` = index dans self.rows : la vue peut être triée ou filtrée, mais
+        # « Info Profil » doit retrouver la bonne source dans `sources_detail`.
+        # `_view` fait foi — il est recalculé par `_rebuild_view`, seul point
+        # d'entrée du remplissage.
+        for idx in self._view:
+            r = self.rows[idx]
+            self.tree.insert("", "end", iid=str(idx),
+                             values=[r.get(c, "") for c in self.columns],
+                             tags=("empty",) if self._is_empty_source(r) else ())
+
+    def _copy_selection(self, _event=None):
+        """Copie les lignes sélectionnées (TSV : collable dans un tableur)."""
+        sel = self.tree.selection()
+        if not sel:
+            return "break"
+        lignes = ["\t".join(self.columns)]
+        for iid in sel:
+            r = self.rows[int(iid)]
+            lignes.append("\t".join(str(r.get(c, "")) for c in self.columns))
+        self.clipboard_clear()
+        self.clipboard_append("\n".join(lignes))
+        self.app.log.log(i18n.t("inventory.copied_log",
+                                "{n} ligne(s) copiée(s) dans le presse-papiers.", n=len(sel)))
+        return "break"
+
+    def _select_all(self, _event=None):
+        self.tree.selection_set(self.tree.get_children())
+        return "break"
 
     # ------------------------------------------------------------------ #
     # Scan facultatif des dossiers à taille 0                            #
@@ -512,7 +625,7 @@ class ExportTab(ttk.Frame):
         self._scan_cancel = False
         self.btn_scan.config(state="disabled")
         self.scan_bar.start(len(folders), on_cancel=self._cancel_scan,
-                            cancel_text=i18n.t("common.cancel_btn", "✕ Annuler"))
+                            cancel_text=i18n.t("common.cancel_btn", "✕ Interrompre le scan"))
         self.scan_bar.set_step(1, len(folders), i18n.t(
             "inventory.measuring_progress", "Mesure des dossiers… {i}/{n}", i=1, n=len(folders)))
         self.app.log.log(i18n.t(
@@ -531,7 +644,7 @@ class ExportTab(ttk.Frame):
 
     def _cancel_scan(self):
         self._scan_cancel = True
-        self.scan_bar.cancelling(i18n.t("common.cancelling", "Annulation en cours…"))
+        self.scan_bar.cancelling(i18n.t("common.cancelling", "Interruption en cours…"))
         self.app.log.log(i18n.t("inventory.scan_cancel_log", "Scan des dossiers : annulation demandée."))
 
     def _poll_scan(self):
@@ -573,7 +686,7 @@ class ExportTab(ttk.Frame):
             if b is not None:
                 r["Taille"] = config.human_size(b) if b else "0"
                 r["Octets"] = str(b)
-        self._fill_tree()
+        self._rebuild_view()
         total = sum(b for _p, b in results)
         # Intègre les dossiers mesurés à la somme inventaire. Après une
         # interruption, les dossiers NON mesurés restent listés (l'alerte de scan
@@ -648,7 +761,10 @@ class ExportTab(ttk.Frame):
                 title, i18n.t("inventory.info_profile_no_selection",
                              "Sélectionnez une source dans le tableau."))
             return
-        idx = self.tree.index(sel[0])
+        # `iid` = index d'origine dans `rows` (et donc dans `sources_detail`) :
+        # `tree.index()` donnerait la position AFFICHÉE, fausse dès qu'on trie
+        # ou qu'on filtre.
+        idx = int(sel[0])
         if idx >= len(details):
             messagebox.showerror(
                 title, i18n.t("inventory.info_profile_not_found",
@@ -796,7 +912,8 @@ class ExportTab(ttk.Frame):
         if not path:
             return
         try:
-            case_export.export_csv(self.rows, self.csv_columns, path)
+            case_export.export_csv([self.rows[i] for i in self._view],
+                                   self.csv_columns, path)
             self.app.log.log(i18n.t("inventory.export_csv_log", "Inventaire exporté en CSV : {p}", p=path))
             messagebox.showinfo(title, i18n.t("common.exported_to", "Exporté :\n{p}", p=path))
         except OSError as exc:

@@ -83,10 +83,20 @@ class MeasureBar(ttk.Frame):
         self.lbl.config(text="")
         self._show()
 
-    def start_busy(self, text: str):
-        """Affiche le bandeau en mode indéterminé (attente de durée inconnue)."""
-        self._on_cancel = None
-        self.btn_cancel.pack_forget()
+    def start_busy(self, text: str, on_cancel=None, cancel_text: str = "✕ Annuler"):
+        """Affiche le bandeau en mode indéterminé (attente de durée inconnue).
+
+        ``on_cancel`` sert aux attentes longues dont on ignore le total mais
+        qu'on doit pouvoir interrompre — l'exploration d'un dossier de scellés
+        sur partage réseau, par exemple. Sans lui, pas de bouton (le re-scan de
+        « Valider les opérations » n'est pas interruptible).
+        """
+        self._on_cancel = on_cancel
+        if on_cancel:
+            self.btn_cancel.config(text=cancel_text, command=self._cancel, state="normal")
+            self.btn_cancel.pack(side="left", padx=4)
+        else:
+            self.btn_cancel.pack_forget()
         self.pb.config(mode="indeterminate")
         self.lbl.config(text=text)
         self._show()

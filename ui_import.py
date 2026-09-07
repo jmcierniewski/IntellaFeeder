@@ -13,12 +13,15 @@ import queue
 import re
 import subprocess
 import threading
+import time
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
 import case_export
 import case_info
 import config
+import dnd_windows
+import forensic_scan
 import generator
 import i18n
 import models
@@ -47,6 +50,8 @@ class ImportTab(ttk.Frame):
         self._sort_asc = True
         self._heading_base = {}    # colid -> texte d'en-tête de base
         self._size_running = False  # calcul de taille en cours (anti double-clic)
+        self._scan_running = False  # exploration d'un dossier d'images en cours
+        self._scan_cancel = False   # annulation demandée (lue par le worker)
         self._size_cancel = False   # annulation demandée (lue par le worker)
         self._size_by_key = {}      # chemin -> Source (retour du moteur de mesure)
         # Mesures d'un calcul INTERROMPU, réutilisées à la relance (reprise) puis
@@ -141,6 +146,60 @@ class ImportTab(ttk.Frame):
         right.grid(row=0, column=1, sticky="nsew", padx=(5, 0))
         self.txt_folders = self._build_paste_text(right)
 
+        # Les deux panneaux ne traitent PAS un dossier de la même façon : à
+        # gauche il est exploré, à droite il devient la source. C'est écrit sous
+        # chaque zone, sinon le même geste donne deux résultats sans prévenir.
+        # Descente dans les sous-dossiers : DÉCOCHÉE par défaut (07/09/2026).
+        # Un dossier de scellés voisine souvent avec d'autres cas ou des copies
+        # de travail ; y descendre d'office ramènerait des images étrangères.
+        self.var_recursive = tk.BooleanVar(value=False)
+        bar_images = self._panel_footer(left, i18n.t(
+            "import.drop_images_hint",
+            "Glissez ici des images ou des DOSSIERS : seules les images "
+            "forensiques (1er tronçon) sont ajoutées."),
+            self._pick_folder_for_images)
+        ttk.Checkbutton(
+            bar_images, variable=self.var_recursive,
+            text=i18n.t("import.recursive_chk", "Explorer les sous-dossiers"),
+        ).pack(side="left", padx=(8, 0))
+        self._panel_footer(right, i18n.t(
+            "import.drop_folders_hint",
+            "Glissez ici des dossiers ou des fichiers : ils sont ajoutés tels quels."),
+            self._pick_folder_for_folders)
+
+        # Bandeau d'exploration (masqué au repos) : un dossier de scellés sur
+        # partage réseau se parcourt en minutes et doit rester interruptible.
+        self.scan_bar = MeasureBar(self, pack_opts={"anchor": "w", "fill": "x",
+                                                    "padx": 12, "pady": (0, 4)})
+
+        # Interrupteur de secours : `enable_dnd = 0` dans intellafeeder.ini coupe
+        # le glisser-déposer sans recompiler. Il sous-classe la fenêtre du
+        # widget — si un poste s'en accommode mal, il faut pouvoir travailler
+        # quand même (collage et bouton « Ajouter un dossier… » suffisent).
+        if self.app.settings.get("enable_dnd", "1").strip() in ("0", "false", "non"):
+            self.app.log.log(i18n.t(
+                "import.dnd_disabled",
+                "Glisser-déposer désactivé par le fichier .ini (enable_dnd = 0)."))
+            return
+        for widget, handler in ((self.txt_images, self._drop_on_images),
+                                (self.txt_folders, self._drop_on_folders)):
+            if not dnd_windows.accept_files(widget, handler):
+                self.app.log.log(i18n.t(
+                    "import.dnd_unavailable",
+                    "Glisser-déposer indisponible sur ce poste : utilisez le bouton "
+                    "« Ajouter un dossier… » ou le collage."), level="WARN")
+                break
+
+    def _panel_footer(self, parent, hint: str, on_add):
+        """Ligne sous une zone de collage : bouton d'ajout + rappel du comportement."""
+        bar = ttk.Frame(parent)
+        bar.pack(fill="x", padx=4, pady=(0, 4))
+        make_button(bar, i18n.t("import.add_folder_btn", "Ajouter un dossier…"),
+                    on_add).pack(side="left")
+        ttk.Label(bar, text=hint, foreground="#64748b",
+                  wraplength=430, justify="left").pack(side="left", padx=8)
+        return bar
+
     @staticmethod
     def _build_paste_text(parent):
         """Zone de collage (1 chemin/ligne) avec défilement vertical ET horizontal."""
@@ -156,6 +215,203 @@ class ImportTab(ttk.Frame):
         holder.rowconfigure(0, weight=1)
         holder.columnconfigure(0, weight=1)
         return txt
+
+    # ------------------------------------------------------------------ #
+    # Alimentation des panneaux (glisser-déposer et bouton d'ajout)        #
+    # ------------------------------------------------------------------ #
+    def _append_paths(self, txt, paths) -> int:
+        """Ajoute des chemins à une zone de collage, sans doublon apparent.
+
+        `path_parser.parse_lines` dédoublonne déjà à l'analyse ; ce filtre-ci
+        évite seulement d'afficher deux fois la même ligne après deux dépôts.
+        """
+        existant = {path_parser.normalize_path(l).lower()
+                    for l in txt.get("1.0", "end").splitlines() if l.strip()}
+        nouveaux = []
+        for p in paths:
+            cle = path_parser.normalize_path(p).lower()
+            if cle and cle not in existant:
+                existant.add(cle)
+                nouveaux.append(p)
+        if not nouveaux:
+            return 0
+        courant = txt.get("1.0", "end").rstrip("\n")
+        prefixe = (courant + "\n") if courant.strip() else ""
+        txt.delete("1.0", "end")
+        txt.insert("1.0", prefixe + "\n".join(nouveaux) + "\n")
+        txt.see("end")
+        return len(nouveaux)
+
+    def _drop_on_folders(self, paths):
+        """Panneau « Dossiers standard » : ce qu'on lâche devient une source.
+
+        Aucune inspection, c'est le contrat : un dossier de travail hétérogène
+        s'indexe tel quel, et c'est à l'utilisateur de savoir ce qu'il y met.
+        """
+        if self._compound_blocked() or self._busy_measuring():
+            return
+        n = self._append_paths(self.txt_folders, paths)
+        self.app.log.log(i18n.t("import.dropped_folders_log",
+                                "{n} chemin(s) ajouté(s) au panneau « Dossiers standard ».", n=n))
+
+    def _drop_on_images(self, paths):
+        """Panneau « Images forensiques » : un dossier veut dire « explore-le ».
+
+        C'est ce panneau qui remplace l'outil externe de constitution des listes
+        (demande du 07/09/2026) : on y lâche l'arborescence d'un scellé et il en
+        sort une ligne par image, premier tronçon seulement.
+        """
+        if self._compound_blocked() or self._busy_measuring():
+            return
+        dossiers, images, refuses = forensic_scan.classify_paths(paths)
+        if images:
+            n = self._append_paths(self.txt_images, images)
+            self.app.log.log(i18n.t("import.dropped_images_log",
+                                    "{n} image(s) ajoutée(s) au panneau « Images forensiques ».", n=n))
+        if refuses:
+            self._report_rejected(refuses)
+        if dossiers:
+            self._scan_folders(dossiers)
+
+    @staticmethod
+    def _reason_label(raison: str) -> str:
+        """Traduit un motif de refus de `forensic_scan` (identifiants stables).
+
+        Le module de scan reste sans i18n — il est testé unitairement et ses
+        constantes servent de clés ; seule leur présentation est traduite ici.
+        """
+        return {
+            forensic_scan.REASON_UNKNOWN: i18n.t(
+                "import.reason_unknown", "extension non reconnue comme image forensique"),
+            forensic_scan.REASON_SEGMENT: i18n.t(
+                "import.reason_segment", "segment non initial — indiquez seulement le 1er"),
+            forensic_scan.REASON_VMDK_PART: i18n.t(
+                "import.reason_vmdk", "fichier annexe VMDK (pas un disque à ouvrir seul)"),
+        }.get(raison, raison)
+
+    def _report_rejected(self, refuses):
+        """Dit ce qui a été écarté et POURQUOI (jamais en silence)."""
+        refuses = [(c, self._reason_label(r)) for c, r in refuses]
+        for chemin, raison in refuses:
+            self.app.log.log(i18n.t("import.rejected_log", "Écarté — {r} : {p}",
+                                    r=raison, p=chemin), level="WARN")
+        apercu = "\n".join(f"• {os.path.basename(c)} — {r}" for c, r in refuses[:8])
+        if len(refuses) > 8:
+            apercu += "\n…"
+        messagebox.showinfo(
+            i18n.t("import.rejected_title", "Éléments écartés"),
+            i18n.t("import.rejected_body",
+                   "{n} élément(s) n'ont pas été ajoutés :\n\n{d}\n\n"
+                   "Le panneau « Images forensiques » n'accepte que les images "
+                   "connues, et seulement leur premier tronçon.",
+                   n=len(refuses), d=apercu))
+
+    def _pick_folder_for_images(self):
+        """Même traitement que le glisser-déposer, au clavier ou sans souris."""
+        if self._compound_blocked() or self._busy_measuring():
+            return
+        chemin = filedialog.askdirectory(
+            title=i18n.t("import.pick_scan_title", "Dossier à explorer (images forensiques)"),
+            mustexist=True)
+        if chemin:
+            self._scan_folders([os.path.normpath(chemin)])
+
+    def _pick_folder_for_folders(self):
+        if self._compound_blocked() or self._busy_measuring():
+            return
+        chemin = filedialog.askdirectory(
+            title=i18n.t("import.pick_folder_title", "Dossier à ajouter comme source"),
+            mustexist=True)
+        if chemin:
+            self._drop_on_folders([os.path.normpath(chemin)])
+
+    # -- exploration récursive (worker + file, comme la mesure de tailles) -- #
+    def _scan_folders(self, dossiers):
+        if self._scan_running:
+            return
+        self._scan_running = True
+        self._scan_cancel = False
+        self._scan_queue = queue.Queue()
+        self.scan_bar.start_busy(
+            i18n.t("import.scan_start", "Exploration de {d}…", d=dossiers[0]),
+            on_cancel=self._cancel_scan,
+            cancel_text=i18n.t("common.cancel_btn", "✕ Interrompre le scan"))
+        self.app.log.log(i18n.t("import.scan_start_log",
+                                "Exploration de {n} dossier(s) à la recherche d'images…",
+                                n=len(dossiers)))
+        threading.Thread(target=self._scan_worker,
+                         args=(list(dossiers), bool(self.var_recursive.get())),
+                         daemon=True).start()
+        self.after(150, self._poll_scan)
+
+    def _cancel_scan(self):
+        self._scan_cancel = True
+        self.scan_bar.cancelling(i18n.t("common.cancelling", "Interruption en cours…"))
+
+    def _scan_worker(self, dossiers, recursive):
+        """Thread : ne touche AUCUN widget, poste dans `_scan_queue` (cf. sizing)."""
+        trouves, counts = [], {}
+        dernier = [0.0]
+
+        def progress(vus, images, courant):
+            # Cadencé : un dossier de scellés a des milliers de sous-dossiers,
+            # une notification par dossier saturerait la file.
+            maintenant = time.monotonic()
+            if maintenant - dernier[0] >= sizing.PROGRESS_INTERVAL:
+                dernier[0] = maintenant
+                self._scan_queue.put(("progress", vus, len(trouves) + images, courant))
+
+        for dossier in dossiers:
+            if self._scan_cancel:
+                break
+            found, c = forensic_scan.scan_folder(
+                dossier, on_progress=progress, should_stop=lambda: self._scan_cancel,
+                recursive=recursive)
+            trouves += found
+            for ext, n in c.items():
+                counts[ext] = counts.get(ext, 0) + n
+        self._scan_queue.put(("done", trouves, counts, self._scan_cancel))
+
+    def _poll_scan(self):
+        try:
+            while True:
+                msg = self._scan_queue.get_nowait()
+                if msg[0] == "progress":
+                    _kind, vus, images, courant = msg
+                    self.scan_bar.set_text(i18n.t(
+                        "import.scan_progress",
+                        "Exploration… {d} dossier(s), {i} image(s) — {c}",
+                        d=vus, i=images, c=os.path.basename(courant) or courant))
+                else:
+                    self._scan_done(msg[1], msg[2], msg[3])
+                    return
+        except queue.Empty:
+            pass
+        self.after(150, self._poll_scan)
+
+    def _scan_done(self, trouves, counts, cancelled):
+        self._scan_running = False
+        self._scan_cancel = False
+        self.scan_bar.stop()
+        # Une exploration interrompue rend ce qu'elle a trouvé : le contraire
+        # obligerait à tout refaire pour une liste qu'on avait déjà.
+        n = self._append_paths(self.txt_images, trouves) if trouves else 0
+        resume = forensic_scan.summarize_counts(counts)
+        self.app.log.log(i18n.t("import.scan_done_log",
+                                "Exploration terminée : {n} image(s) ajoutée(s){s}.",
+                                n=n, s=(" — " + resume) if resume else ""))
+        titre = i18n.t("import.scan_title", "Images forensiques")
+        if not trouves:
+            messagebox.showinfo(titre, i18n.t(
+                "import.scan_none", "Aucune image forensique trouvée."))
+        elif cancelled:
+            messagebox.showinfo(titre, i18n.t(
+                "import.scan_cancelled",
+                "Exploration interrompue : {n} image(s) ajoutée(s) ({s}).\n\n"
+                "Relancez l'exploration pour parcourir le reste.", n=n, s=resume))
+        else:
+            messagebox.showinfo(titre, i18n.t(
+                "import.scan_added", "{n} image(s) ajoutée(s) : {s}.", n=n, s=resume))
 
     def _build_recap(self):
         frame = ttk.LabelFrame(self, text=i18n.t("import.recap_frame", "Sources à importer"))
@@ -185,11 +441,16 @@ class ImportTab(ttk.Frame):
                                            lambda: self._set_all_import(False))
         self.btn_uncheck_all.pack(side="left", padx=4)
         ttk.Separator(toolbar, orient="vertical").pack(side="left", fill="y", padx=8)
-        # Profil par défaut : choisir un profil l'applique à TOUTES les lignes.
+        # Profil par défaut : appliqué aux NOUVELLES sources et à toutes les
+        # lignes quand on en change. Mémorisé au .ini — « Défaut Intella » n'est
+        # plus imposé (07/09/2026), c'est l'utilisateur qui décide.
         ttk.Label(toolbar, text=i18n.t("import.default_profile_label", "Profil par défaut :")).pack(side="left")
         self.cb_default_profile = ttk.Combobox(toolbar, state="readonly", width=18,
                                                postcommand=self._refresh_default_profiles)
-        self.cb_default_profile.set(profiles.DEFAULT_NAME)
+        memorise = self.app.settings.get("default_profile", profiles.DEFAULT_NAME)
+        if not profiles.exists(memorise):
+            memorise = profiles.DEFAULT_NAME     # profil supprimé depuis
+        self.cb_default_profile.set(profiles.display_name(memorise))
         self.cb_default_profile.pack(side="left", padx=4)
         self.cb_default_profile.bind("<<ComboboxSelected>>", lambda _e: self._apply_profile_all())
 
@@ -524,6 +785,10 @@ class ImportTab(ttk.Frame):
                 s.name, s.size_bytes = old.name, old.size_bytes
                 s.import_selected = old.import_selected
                 s.profile = getattr(old, "profile", "défaut")
+            else:
+                # Source neuve : elle prend le profil par défaut CHOISI (combo
+                # mémorisé au .ini). Une source déjà listée garde le sien.
+                s.profile = self.default_profile()
             merged.append(s)
 
         self.sources = merged
@@ -541,7 +806,7 @@ class ImportTab(ttk.Frame):
     def _row_values(self, s):
         values = [config.glyph(s.import_selected), s.name,
                   config.type_label(s.source_type), self._size_text(s),
-                  getattr(s, "profile", "défaut") or "défaut"]
+                  profiles.display_name(getattr(s, "profile", "défaut") or "défaut")]
         for t in self.tasks:
             values.append(config.glyph(t["id"] in s.selected_task_ids))
         values.append(_DEL_GLYPH)
@@ -842,16 +1107,20 @@ class ImportTab(ttk.Frame):
             return
         x, y, w, h = bbox
         names = profiles.list_names()
-        cb = ttk.Combobox(self.tree, values=names, state="readonly")
+        cb = ttk.Combobox(self.tree, values=[profiles.display_name(n) for n in names],
+                          state="readonly")
         current = getattr(s, "profile", profiles.DEFAULT_NAME) or profiles.DEFAULT_NAME
-        cb.set(current if current in names else profiles.DEFAULT_NAME)
+        if current not in names:
+            current = profiles.DEFAULT_NAME
+        cb.set(profiles.display_name(current))
         cb.place(x=x, y=y, width=max(w, 140), height=h)
         cb.focus_set()
 
         def commit(_=None):
-            val = cb.get() or profiles.DEFAULT_NAME
+            # Le combo montre un libellé, la source garde l'identifiant.
+            val = profiles.internal_name(cb.get()) or profiles.DEFAULT_NAME
             s.profile = val
-            self.tree.set(row, "profile", val)
+            self.tree.set(row, "profile", profiles.display_name(val))
             cb.destroy()
 
         cb.bind("<<ComboboxSelected>>", commit)
@@ -860,17 +1129,28 @@ class ImportTab(ttk.Frame):
 
     def _refresh_default_profiles(self):
         """Alimente le combobox « Profil par défaut » avec les profils existants."""
-        self.cb_default_profile["values"] = profiles.list_names()
+        self.cb_default_profile["values"] = [profiles.display_name(n)
+                                             for n in profiles.list_names()]
+
+    def default_profile(self) -> str:
+        """Identifiant du profil à donner aux NOUVELLES sources."""
+        nom = profiles.internal_name(self.cb_default_profile.get())
+        return nom if nom and profiles.exists(nom) else profiles.DEFAULT_NAME
 
     def _apply_profile_all(self):
-        """Applique le profil choisi (combobox) à TOUTES les lignes du récap."""
-        prof = self.cb_default_profile.get() or profiles.DEFAULT_NAME
+        """Applique le profil choisi (combobox) à TOUTES les lignes du récap.
+
+        Le choix est mémorisé : il vaut aussi pour les sources analysées plus
+        tard, y compris au prochain démarrage.
+        """
+        prof = self.default_profile()
+        self.app.settings.set("default_profile", prof)
         for s in self.sources:
             s.profile = prof
         self._refresh_tree()
         self.app.log.log(i18n.t(
             "import.profile_applied_all_log", "Profil « {p} » appliqué à toutes les sources ({n}).",
-            p=prof, n=len(self.sources)))
+            p=profiles.display_name(prof), n=len(self.sources)))
 
     def _on_motion(self, event):
         if self.tree.identify("region", event.x, event.y) != "heading":
@@ -964,7 +1244,7 @@ class ImportTab(ttk.Frame):
         self.btn_size.config(state="disabled")
         self._set_busy(True)
         self.size_bar.start(len(checked), on_cancel=self._cancel_size,
-                            cancel_text=i18n.t("common.cancel_btn", "✕ Annuler"))
+                            cancel_text=i18n.t("common.cancel_btn", "✕ Interrompre le scan"))
         self.size_bar.set_step(1, len(checked), i18n.t(
             "import.size_progress", "Mesure {i}/{n} : {name}", i=1, n=len(checked), name="…"))
         # Les lignes en attente affichent « … » plutôt qu'une taille périmée.
@@ -994,7 +1274,7 @@ class ImportTab(ttk.Frame):
     def _cancel_size(self):
         """Demande l'arrêt : le worker s'arrête à la prochaine vérification."""
         self._size_cancel = True
-        self.size_bar.cancelling(i18n.t("common.cancelling", "Annulation en cours…"))
+        self.size_bar.cancelling(i18n.t("common.cancelling", "Interruption en cours…"))
         self.app.log.log(i18n.t("import.size_cancel_log", "Calcul des tailles : annulation demandée."))
 
     def _row_id_of(self, source):

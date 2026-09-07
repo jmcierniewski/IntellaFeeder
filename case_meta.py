@@ -150,7 +150,8 @@ def read_subcases(folder: str, paths: list[str] | None = None) -> list[dict]:
     compound si le partage est le même, cf. ``path_parser.align_unc_host``),
     ``declared_path`` (chemin tel qu'écrit dans le ``case.xml``), ``exists``
     (dossier + ``case.xml`` lisibles), ``name``, ``user``, ``size``,
-    ``authorized_users`` et ``error``
+    ``authorized_users``, ``optimization`` (dossier d'optimisation du sous-cas)
+    et ``error``
     (motif de l'échec, sinon ""). Ne lève jamais : un sous-cas hors du poste
     (partage démonté, cas recopié seul) reste une ligne d'inventaire signalée,
     pas une erreur bloquante.
@@ -190,6 +191,7 @@ def read_subcases(folder: str, paths: list[str] | None = None) -> list[dict]:
             "user": "",
             "size": 0,
             "authorized_users": [],
+            "optimization": "",
             "error": "",
         }
         if not os.path.isdir(path):
@@ -215,6 +217,10 @@ def read_subcases(folder: str, paths: list[str] | None = None) -> list[dict]:
                     "user": sub["user"],
                     "size": sub["size"],
                     "authorized_users": authorized_users(prefs),
+                    # Un sous-cas porte SON dossier d'optimisation : deux
+                    # sous-cas d'un même lot peuvent ne pas pointer au même
+                    # endroit, et l'écart se paie en performances d'indexation.
+                    "optimization": prefs.get("OptimizationFolderPath", ""),
                 })
         out.append(entry)
     return out

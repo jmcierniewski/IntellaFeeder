@@ -118,3 +118,50 @@ class TestCollisionDeNoms:
         with pytest.raises(ValueError):
             profiles.rename_profile("Autre", "a/b")
         assert profiles.exists("Autre")
+
+
+class TestLibelleAffiche:
+    """« défaut » reste l'IDENTIFIANT, « Défaut Intella » n'est que l'affichage.
+
+    Le renommer pour de bon casserait la correspondance entre onglets, les
+    listes de sources exportées et les fichiers `.ini` déjà écrits.
+    """
+    def test_defaut_saffiche_autrement(self):
+        assert profiles.display_name(profiles.DEFAULT_NAME) == "Défaut Intella"
+        assert profiles.DEFAULT_NAME == "défaut"
+
+    def test_les_autres_profils_gardent_leur_nom(self):
+        assert profiles.display_name("Rapide") == "Rapide"
+
+    def test_aller_retour(self):
+        for nom in (profiles.DEFAULT_NAME, "Rapide", "Défaut Intella maison"):
+            assert profiles.internal_name(profiles.display_name(nom)) == nom
+
+
+class TestDuplication:
+    def test_copie_valeurs_et_commentaire(self, profils):
+        profiles.save_profile("Source", _valeurs(indexArchives=False), "mon essai")
+        profiles.duplicate_profile("Source", "Copie")
+        assert profiles.exists("Copie")
+        assert profiles.get_comment("Copie") == "mon essai"
+        assert profiles.get_values("Copie")["indexArchives"] is False
+
+    def test_dupliquer_le_defaut_est_permis(self, profils):
+        """C'est le point de départ le plus courant : partir des réglages Intella."""
+        profiles.duplicate_profile(profiles.DEFAULT_NAME, "Depuis défaut")
+        assert profiles.exists("Depuis défaut")
+        assert profiles.get_values("Depuis défaut") == pc.default_values()
+
+    def test_nom_deja_pris_refuse(self, profils):
+        profiles.save_profile("Existant", _valeurs())
+        with pytest.raises(ValueError):
+            profiles.duplicate_profile("Existant", "Existant")
+
+    def test_source_inconnue_refusee(self, profils):
+        with pytest.raises(ValueError):
+            profiles.duplicate_profile("Fantôme", "Copie")
+
+    def test_nom_vide_refuse(self, profils):
+        profiles.save_profile("Source", _valeurs())
+        with pytest.raises(ValueError):
+            profiles.duplicate_profile("Source", "   ")

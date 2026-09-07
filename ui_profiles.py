@@ -34,6 +34,7 @@ class ProfilesTab(ttk.Frame):
         self.vars = {}            # clé option -> tk.Variable (widgets simples)
         self._widgets = {}        # clé option -> widget (pour activer/désactiver)
         self._text_widgets = {}   # clé option -> tk.Text (multi-ligne)
+        self._names = []          # identifiants des profils, dans l'ordre de la liste
         self.tooltip = Tooltip(self)
         self._build()
         self._refresh_list()
@@ -72,6 +73,8 @@ class ProfilesTab(ttk.Frame):
         btns = ttk.Frame(left)
         btns.pack(fill="x", padx=6, pady=(0, 6))
         make_button(btns, i18n.t("profiles.new", "Nouveau"), self._new).pack(fill="x", pady=1)
+        make_button(btns, i18n.t("profiles.duplicate", "Dupliquer…"),
+                    self._duplicate).pack(fill="x", pady=1)
         make_button(btns, i18n.t("common.save", "Enregistrer"), self._save,
                    color="#16a34a").pack(fill="x", pady=1)
         make_button(btns, i18n.t("profiles.rename", "Renommer…"), self._rename).pack(fill="x", pady=1)
@@ -180,19 +183,23 @@ class ProfilesTab(ttk.Frame):
     # Liste / sélection                                                  #
     # ------------------------------------------------------------------ #
     def _refresh_list(self, select: str = None):
-        names = profiles.list_names()
+        # `_names` garde les identifiants techniques dans l'ordre de la liste :
+        # ce qui est AFFICHÉ peut différer (« Défaut Intella »), mais tout le
+        # reste du code — .ini, listes exportées, colonne « Profil » — travaille
+        # sur l'identifiant.
+        self._names = profiles.list_names()
         self.listbox.delete(0, "end")
-        for n in names:
-            self.listbox.insert("end", n)
-        if select and select in names:
-            i = names.index(select)
+        for n in self._names:
+            self.listbox.insert("end", profiles.display_name(n))
+        if select and select in self._names:
+            i = self._names.index(select)
             self.listbox.selection_clear(0, "end")
             self.listbox.selection_set(i)
             self.listbox.see(i)
 
     def _selected_name(self):
         sel = self.listbox.curselection()
-        return self.listbox.get(sel[0]) if sel else None
+        return self._names[sel[0]] if sel and sel[0] < len(self._names) else None
 
     def _on_select(self):
         name = self._selected_name()
@@ -254,6 +261,39 @@ class ProfilesTab(ttk.Frame):
         self._load_values(profile_catalog.default_values())
         self._set_comment("")
         self._set_form_state(True)
+
+    def _duplicate(self):
+        """Copie le profil sélectionné sous un autre nom, puis l'ouvre.
+
+        Marche aussi depuis « Défaut Intella » : on obtient alors un profil
+        modifiable partant des réglages d'Intella — c'est le point de départ le
+        plus courant, et il n'existait pas.
+        """
+        titre = i18n.t("profiles.duplicate_title", "Dupliquer le profil")
+        source = self._selected_name()
+        if not source:
+            messagebox.showinfo(titre, i18n.t(
+                "profiles.select_first", "Sélectionnez d'abord un profil."))
+            return
+        propose = i18n.t("profiles.copy_suffix", "{n} (copie)",
+                         n=profiles.display_name(source))
+        cible = simpledialog.askstring(
+            titre, i18n.t("profiles.duplicate_prompt",
+                          "Nom du nouveau profil (copie de « {n} ») :",
+                          n=profiles.display_name(source)),
+            initialvalue=propose, parent=self)
+        if not cible:
+            return
+        try:
+            profiles.duplicate_profile(source, cible.strip())
+        except ValueError as exc:
+            messagebox.showerror(titre, str(exc))
+            return
+        self._refresh_list(select=cible.strip())
+        self._on_select()
+        self.app.log.log(i18n.t("profiles.duplicate_log",
+                                "Profil « {s} » dupliqué en « {n} ».",
+                                s=profiles.display_name(source), n=cible.strip()))
 
     def load_from_values(self, values: dict, suggested_name: str = ""):
         """Pré-remplit le formulaire avec ``values`` (fusionnés sur les défauts) en
