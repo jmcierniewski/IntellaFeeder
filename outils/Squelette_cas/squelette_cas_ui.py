@@ -8,6 +8,11 @@ données réelles) et le **verdict d'anonymat**.
 
     python squelette_cas_ui.py [dossier du cas] [dossier de sortie]
 
+Les noms de cas du squelette portent un **GDH** (groupe date-heure) commun à
+toute la fabrication : ``CAS_CP_<gdh>`` pour un compound, ``CAS_CP_<n>_<gdh>``
+pour ses sous-cas, ``CAS_<gdh>`` pour un cas simple. Il est rappelé dans le
+compte rendu et le manifeste.
+
 Les contrôles ne sont pas réimplémentés ici : la fenêtre passe par
 ``squelette_cas.valider`` puis ``squelette_cas.fabriquer``, exactement comme le
 CLI. Une interface qui referait ses propres tests finirait par en desserrer un.
@@ -297,6 +302,10 @@ class SqueletteUI:
         self.btn_ouvrir.configure(state="normal")
         for ligne in sq._lignes_rapport(rapport):
             self._ecrire(ligne + "\n", "ko" if "[X]" in ligne else None)
+        if rapport.get("gdh"):
+            # Le GDH est dans tous les noms de cas : l'afficher evite d'aller le
+            # relire dans le manifeste pour retrouver la fabrication.
+            self._ecrire("\nGDH des noms de cas : {}\n".format(rapport["gdh"]), "gris")
         self._ecrire("\nÉcrit dans : {}\n".format(self.dernier_dossier), "gras")
         self._ecrire("Manifeste : {}\n\n".format(
             os.path.join(self.dernier_dossier, sq.MANIFESTE)), "gris")

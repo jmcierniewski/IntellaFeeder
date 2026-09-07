@@ -1,4 +1,4 @@
-"""Outil `outils/squelette_cas.py` : anonymisation et parcours des sous-cas.
+"""Outil `outils/Squelette_cas/squelette_cas.py` : anonymisation et parcours des sous-cas.
 
 Cet outil est testé comme le reste alors qu'il ne fait pas partie de
 l'application, parce qu'il porte une **garantie de confidentialité** : le
@@ -22,7 +22,8 @@ import sys
 
 import pytest
 
-OUTILS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "outils")
+OUTILS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                      "outils", "Squelette_cas")
 if OUTILS not in sys.path:
     sys.path.insert(0, OUTILS)
 
@@ -30,23 +31,40 @@ import squelette_cas as sq  # noqa: E402
 
 B = "\\"
 
+# GDH figé : les noms de cas le portent, et un test qui dépendrait de la minute
+# d'exécution serait instable. `RACINE_CP` / `RACINE` / `SOUS(n)` disent la
+# convention (compound, cas simple, sous-cas) sans la réécrire à chaque assert.
+GDH = "20260101_0000"
+RACINE_CP = "CAS_CP_" + GDH
+RACINE = "CAS_" + GDH
+
+
+def SOUS(n):
+    return "CAS_CP_{}_{}".format(n, GDH)
+
+
+def ano(actif=True):
+    """Anonymiseur au GDH figé (le nommage des cas en dépend)."""
+    return sq.Anonymiseur(actif=actif, gdh=GDH)
+
 
 # --------------------------------------------------------------------------- #
 class TestAnonymiseur:
     def test_alias_stable(self):
-        a = sq.Anonymiseur()
-        assert a.cas("Affaire X") == a.cas("Affaire X") == "CAS_1"
-        assert a.cas("Affaire Y") == "CAS_2"
+        a = ano()
+        # Sans `preparer`, le premier cas vu tient lieu de racine (repli).
+        assert a.cas("Affaire X") == a.cas("Affaire X") == RACINE
+        assert a.cas("Affaire Y") == SOUS(1)
         assert a.user("dupond") == "user1"
 
     def test_inactif_rend_la_valeur_telle_quelle(self):
-        a = sq.Anonymiseur(actif=False)
+        a = ano(actif=False)
         assert a.cas("Affaire X") == "Affaire X"
         assert a.chemin_preuve(B * 2 + "srv" + B + "part" + B + "img.E01") == \
             B * 2 + "srv" + B + "part" + B + "img.E01"
 
     def test_identifiant_garde_la_forme(self):
-        a = sq.Anonymiseur()
+        a = ano()
         guid = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
         sortie = a.identifiant(guid)
         assert sortie != guid
@@ -55,38 +73,38 @@ class TestAnonymiseur:
                [i for i, c in enumerate(guid) if c == "-"]
 
     def test_identifiant_deterministe(self):
-        assert sq.Anonymiseur().identifiant("abc-def") == \
-               sq.Anonymiseur().identifiant("abc-def")
+        assert ano().identifiant("abc-def") == \
+               ano().identifiant("abc-def")
 
 
 class TestCheminPreuve:
     """La forme du chemin est ce que l'outil doit conserver : elle est testée."""
 
     def test_unc_reste_unc(self):
-        a = sq.Anonymiseur()
+        a = ano()
         sortie = a.chemin_preuve(B * 2 + "NAS" + B + "part" + B + "dossier" + B + "img.E01")
         assert sortie.startswith(B * 2 + "SERVEUR" + B + "PARTAGE")
         assert sortie.endswith(".E01")
 
     def test_lettre_de_lecteur_reste_locale(self):
-        sortie = sq.Anonymiseur().chemin_preuve("D:" + B + "Scelles" + B + "cle")
+        sortie = ano().chemin_preuve("D:" + B + "Scelles" + B + "cle")
         assert sortie.startswith("D:" + B + "Preuves")
         assert not sortie.startswith(B * 2)
 
     def test_profondeur_conservee(self):
-        a = sq.Anonymiseur()
+        a = ano()
         court = a.chemin_preuve("D:" + B + "a" + B + "x.E01")
         long_ = a.chemin_preuve("D:" + B + "a" + B + "b" + B + "c" + B + "x.E01")
         assert long_.count(B) > court.count(B)
 
     def test_extension_conservee(self):
-        a = sq.Anonymiseur()
+        a = ano()
         assert a.chemin_preuve("D:" + B + "a" + B + "img.E01").endswith(".E01")
         assert a.chemin_preuve("D:" + B + "a" + B + "dossier").endswith("_2")
 
     def test_nom_de_fichier_nu_ne_devient_pas_un_chemin(self):
         """``firstPartName`` est un nom, pas un chemin : le confondre fausserait le jeu."""
-        sortie = sq.Anonymiseur().nom_fichier("pc.E01")
+        sortie = ano().nom_fichier("pc.E01")
         assert B not in sortie and sortie.endswith(".E01")
 
 
@@ -120,6 +138,7 @@ def options(**kw):
     """`sq.Options` du module (partagée CLI/UI), logs coupés sauf mention."""
     kw.setdefault("logs", "aucun")
     kw.setdefault("max_log_ko", 8)
+    kw.setdefault("gdh", GDH)
     return sq.Options(**kw)
 
 
@@ -136,63 +155,125 @@ def compound(tmp_path):
 class TestParcours:
     def test_descend_dans_les_sous_cas(self, compound):
         parent, _s1, out = compound
-        ano = sq.Anonymiseur()
-        rapport = sq.copier_cas(parent, out, ano, options())
+        anon = ano()
+        rapport = sq.copier_cas(parent, out, anon, options())
         assert rapport["compound"] is True
-        assert rapport["nom"] == "CAS_1"
+        assert rapport["nom"] == RACINE_CP
         assert [s["etat"] for s in rapport["sous_cas"]] == ["ok", "dossier introuvable"]
 
     def test_sous_cas_absent_nest_pas_une_erreur(self, compound):
         parent, _s1, out = compound
-        rapport = sq.copier_cas(parent, out, sq.Anonymiseur(), options())
-        assert os.path.isfile(os.path.join(out, "CAS_1", "case.xml"))
-        assert os.path.isfile(os.path.join(out, "CAS_2", "case.xml"))
+        rapport = sq.copier_cas(parent, out, ano(), options())
+        assert os.path.isfile(os.path.join(out, RACINE_CP, "case.xml"))
+        assert os.path.isfile(os.path.join(out, SOUS(1), "case.xml"))
 
     def test_alias_du_parent_et_du_dossier_concordent(self, compound):
         """Le `<subcase>` écrit chez le parent doit pointer sur le dossier produit."""
         parent, _s1, out = compound
-        sq.copier_cas(parent, out, sq.Anonymiseur(), options())
-        with io.open(os.path.join(out, "CAS_1", "case.xml"), encoding="utf-8") as f:
+        sq.copier_cas(parent, out, ano(), options())
+        with io.open(os.path.join(out, RACINE_CP, "case.xml"), encoding="utf-8") as f:
             contenu = f.read()
-        assert "CAS_2" in contenu
-        assert os.path.isdir(os.path.join(out, "CAS_2"))
+        assert SOUS(1) in contenu
+        assert os.path.isdir(os.path.join(out, SOUS(1)))
 
     def test_boucle_de_references_sarrete(self, tmp_path):
         """Un compound qui se référence lui-même ne doit pas faire tourner l'outil."""
         chemin = str(tmp_path / "Boucle")
         faire_cas(chemin, "Boucle", subs=[chemin])
-        rapport = sq.copier_cas(chemin, str(tmp_path / "out"), sq.Anonymiseur(), options())
+        rapport = sq.copier_cas(chemin, str(tmp_path / "out"), ano(), options())
         assert rapport["sous_cas"][0]["etat"] == "deja vu ou trop profond"
 
     def test_mode_brut_conserve_les_valeurs(self, compound):
         parent, _s1, out = compound
-        sq.copier_cas(parent, out, sq.Anonymiseur(actif=False), options())
+        sq.copier_cas(parent, out, ano(actif=False), options())
         with io.open(os.path.join(out, "Parent", "case.xml"), encoding="utf-8") as f:
             assert "Dossier Racine" in f.read()
+
+
+class TestNommageGDH:
+    """Noms de cas : ``CAS_CP_<gdh>``, ``CAS_CP_<n>_<gdh>``, ``CAS_<gdh>``.
+
+    Le GDH est **le même pour tout un compound** : c'est ce qui rattache un
+    sous-cas à la fabrication dont il provient et distingue deux squelettes du
+    même cas. Le préfixe, lui, se lit sur la racine — d'où ``preparer``.
+    """
+
+    def test_compound_et_ses_sous_cas(self, compound):
+        parent, _s1, out = compound
+        rapport = sq.copier_cas(parent, out, ano(), options())
+        assert rapport["nom"] == RACINE_CP
+        # Le sous-cas joignable prend 1 ; l'absent est quand meme numerote (2),
+        # sinon le <subcase> du parent pointerait dans le vide.
+        assert rapport["sous_cas"][0]["nom"] == SOUS(1)
+        assert os.path.isdir(os.path.join(out, RACINE_CP))
+        assert os.path.isdir(os.path.join(out, SOUS(1)))
+
+    def test_cas_simple(self, tmp_path):
+        chemin = faire_cas(str(tmp_path / "seul"), "Cas isolé")
+        rapport = sq.copier_cas(chemin, str(tmp_path / "out"), ano(), options())
+        assert rapport["nom"] == RACINE          # CAS_<gdh>, sans CP
+
+    def test_gdh_identique_pour_tous_les_elements(self, compound):
+        parent, _s1, out = compound
+        rapport = sq.copier_cas(parent, out, ano(), options())
+        noms = [rapport["nom"]] + [s.get("nom", "") for s in rapport["sous_cas"]]
+        assert all(n.endswith(GDH) for n in noms if n)
+
+    def test_gdh_par_defaut_est_l_heure_locale(self):
+        """Heure locale (Romance Standard Time ici), jamais UTC."""
+        import datetime
+        attendu = datetime.datetime.now().strftime(sq.FORMAT_GDH)
+        # La minute peut tourner entre les deux appels : on compare le jour.
+        assert sq.Anonymiseur().gdh[:8] == attendu[:8]
+        assert len(sq.Anonymiseur().gdh) == len("AAAAMMJJ_HHMM")
+
+    def test_deux_fabrications_se_distinguent(self, compound):
+        """Deux squelettes du meme cas ne doivent pas porter les memes noms."""
+        parent, _s1, out = compound
+        r1 = sq.copier_cas(parent, os.path.join(out, "a"),
+                           sq.Anonymiseur(gdh="20260101_0000"), options())
+        r2 = sq.copier_cas(parent, os.path.join(out, "b"),
+                           sq.Anonymiseur(gdh="20260102_1200"), options())
+        assert r1["nom"] != r2["nom"]
+
+    def test_mode_brut_ignore_le_gdh(self, compound):
+        """En brut on garde les vrais noms : le GDH n'a rien a y faire."""
+        parent, _s1, out = compound
+        rapport = sq.copier_cas(parent, out, ano(actif=False), options())
+        assert rapport["nom"] == "Dossier Racine"
+
+    def test_preparer_lit_le_type_sur_la_racine(self, compound):
+        parent, s1, _out = compound
+        a = ano()
+        a.preparer(parent)
+        assert a.compound is True and a.cas("Dossier Racine") == RACINE_CP
+        b = ano()
+        b.preparer(s1)                            # un sous-cas pris pour racine
+        assert b.compound is False and b.cas("Perquisition Alpha") == RACINE
 
 
 class TestVerificationAnonymat:
     def test_aucune_fuite_sur_un_squelette_normal(self, compound):
         parent, _s1, out = compound
-        ano = sq.Anonymiseur()
-        sq.copier_cas(parent, out, ano, options())
-        assert sq.verifier_anonymat(out, ano) == []
+        anon = ano()
+        sq.copier_cas(parent, out, anon, options())
+        assert sq.verifier_anonymat(out, anon) == []
 
     def test_une_valeur_oubliee_est_detectee(self, compound):
         parent, _s1, out = compound
-        ano = sq.Anonymiseur()
-        sq.copier_cas(parent, out, ano, options())
-        ecrire(os.path.join(out, "CAS_1", "oubli.txt"), "Dossier Racine")
-        fuites = sq.verifier_anonymat(out, ano)
+        anon = ano()
+        sq.copier_cas(parent, out, anon, options())
+        ecrire(os.path.join(out, RACINE_CP, "oubli.txt"), "Dossier Racine")
+        fuites = sq.verifier_anonymat(out, anon)
         assert len(fuites) == 1 and "oubli.txt" in fuites[0]
 
     def test_un_nom_de_fichier_qui_trahit_est_detecte(self, compound):
         """`IF_<cas>.info` a montré qu'un nom de fichier fuit aussi bien qu'un contenu."""
         parent, _s1, out = compound
-        ano = sq.Anonymiseur()
-        sq.copier_cas(parent, out, ano, options())
-        ecrire(os.path.join(out, "CAS_1", "IF_Dossier Racine.info"), "{}")
-        fuites = sq.verifier_anonymat(out, ano)
+        anon = ano()
+        sq.copier_cas(parent, out, anon, options())
+        ecrire(os.path.join(out, RACINE_CP, "IF_Dossier Racine.info"), "{}")
+        fuites = sq.verifier_anonymat(out, anon)
         assert any("nom :" in f for f in fuites)
 
 
@@ -202,9 +283,9 @@ class TestFichiersAnnexes:
         ecrire(os.path.join(s1, "IF_Perquisition Alpha.info"), json.dumps(
             {"folder_sizes": {"d:" + B + B + "scelles" + B + B + "cle": 42},
              "skip_integrity_check": True}))
-        ano = sq.Anonymiseur()
-        sq.copier_cas(parent, out, ano, options())
-        produit = os.path.join(out, "CAS_2", "IF_CAS_2.info")
+        anon = ano()
+        sq.copier_cas(parent, out, anon, options())
+        produit = os.path.join(out, SOUS(1), "IF_{}.info".format(SOUS(1)))
         assert os.path.isfile(produit)
         with io.open(produit, encoding="utf-8") as f:
             data = json.load(f)
@@ -223,9 +304,9 @@ class TestFichiersAnnexes:
                '    <indexOptions><indexArchives>true</indexArchives></indexOptions>\n'
                '    <path>D:' + B + 'Scelles' + B + 'pc.E01</path>\n'
                '  </source>\n</sources>\n')
-        ano = sq.Anonymiseur()
-        sq.copier_cas(parent, out, ano, options())
-        with io.open(os.path.join(out, "CAS_2", "sources.xml"), encoding="utf-8") as f:
+        anon = ano()
+        sq.copier_cas(parent, out, anon, options())
+        with io.open(os.path.join(out, SOUS(1), "sources.xml"), encoding="utf-8") as f:
             contenu = f.read()
         # La forme utile est conservee...
         for garde in ("<totalSize>4000", "<partsCount>4", "<timeZone>UTC",
@@ -239,8 +320,8 @@ class TestFichiersAnnexes:
         parent, s1, out = compound
         ecrire(os.path.join(s1, "prefs", "tasks2.json"), json.dumps(
             [{"id": "1111-2222", "name": "OCR affaire", "condition": "ALL_ITEMS_CONDITION"}]))
-        sq.copier_cas(parent, out, sq.Anonymiseur(), options())
-        with io.open(os.path.join(out, "CAS_2", "prefs", "tasks2.json"), encoding="utf-8") as f:
+        sq.copier_cas(parent, out, ano(), options())
+        with io.open(os.path.join(out, SOUS(1), "prefs", "tasks2.json"), encoding="utf-8") as f:
             taches = json.load(f)
         assert taches[0]["name"] == "Tache 1"
         assert taches[0]["condition"] == "ALL_ITEMS_CONDITION"
@@ -250,15 +331,15 @@ class TestLogs:
     def test_inventaire_ne_copie_rien(self, compound):
         parent, s1, out = compound
         ecrire(os.path.join(s1, "logs", "case-main-2026-09-01.log"), "ligne 1\nligne 2\n")
-        rapport = sq.copier_cas(parent, out, sq.Anonymiseur(), options(logs="inventaire"))
+        rapport = sq.copier_cas(parent, out, ano(), options(logs="inventaire"))
         releve = rapport["sous_cas"][0]["logs"]
         assert releve and releve[0]["lignes"] == 2
-        assert not os.path.isdir(os.path.join(out, "CAS_2", "logs"))
+        assert not os.path.isdir(os.path.join(out, SOUS(1), "logs"))
 
     def test_copie_tronquee(self, compound):
         parent, s1, out = compound
         ecrire(os.path.join(s1, "logs", "gros.log"), "x" * 50_000)
-        sq.copier_cas(parent, out, sq.Anonymiseur(actif=False),
+        sq.copier_cas(parent, out, ano(actif=False),
                       options(logs="brut", max_log_ko=1))
         produit = os.path.join(out, "Alpha", "logs", "gros.log")
         assert os.path.getsize(produit) < 2 * 1024
@@ -301,14 +382,14 @@ class TestGardeFousPartages:
     def test_fabriquer_verifie_toujours_l_anonymat(self, compound):
         """La verification ne doit pas pouvoir etre sautee par un appelant."""
         parent, _s1, out = compound
-        rapport, fuites = sq.fabriquer(sq.Options(cas=parent, sortie=out, logs="aucun"))
-        assert rapport["nom"] == "CAS_1" and fuites == []
+        rapport, fuites = sq.fabriquer(sq.Options(cas=parent, sortie=out, logs="aucun", gdh=GDH))
+        assert rapport["nom"] == RACINE_CP and fuites == []
         assert os.path.isfile(os.path.join(out, sq.MANIFESTE))
 
     def test_fabriquer_en_brut_ne_verifie_pas(self, compound):
         parent, _s1, out = compound
         rapport, fuites = sq.fabriquer(
-            sq.Options(cas=parent, sortie=out, brut=True, logs="aucun"))
+            sq.Options(cas=parent, sortie=out, brut=True, logs="aucun", gdh=GDH))
         assert fuites == [] and rapport["nom"] == "Dossier Racine"
 
 

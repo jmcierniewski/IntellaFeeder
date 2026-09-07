@@ -8,6 +8,12 @@ on rejoue les scénarios compound sans le serveur ni le cas d'origine.
 
     python squelette_cas.py <dossier du cas> <dossier de sortie> [options]
 
+Les cas anonymisés sont nommés d'après un **GDH** (groupe date-heure) commun à
+toute la fabrication — ``CAS_CP_<gdh>`` pour un compound, ``CAS_CP_1_<gdh>``,
+``CAS_CP_2_<gdh>``… pour ses sous-cas, ``CAS_<gdh>`` pour un cas simple. Le GDH
+rattache un sous-cas à la fabrication dont il provient et distingue deux
+squelettes du même cas ; ``--gdh`` le force pour refabriquer aux mêmes noms.
+
 **Anonymisé par défaut.** Un cas réel porte des noms de cas, d'utilisateurs et
 des chemins qui n'ont rien à faire dans un jeu d'essai : le mode par défaut
 remplace ces valeurs par ``CAS_1``, ``user1``, ``D:\\Preuves\\…`` en conservant ce
@@ -28,6 +34,7 @@ IntellaCmd. À lancer depuis n'importe où.
 from __future__ import annotations
 
 import argparse
+import datetime
 import hashlib
 import io
 import json
@@ -48,6 +55,16 @@ MANIFESTE = "MANIFESTE.md"
 # (par erreur ou par boucle) un cas déjà vu doit s'arrêter, pas tourner.
 MAX_PROFONDEUR = 5
 
+# Nommage des cas anonymises. Le GDH (groupe date-heure) est le meme pour TOUS
+# les elements d'un compound : c'est lui qui rattache un sous-cas a la
+# fabrication dont il provient, et qui distingue deux squelettes du meme cas.
+#   compound        -> CAS_CP_<gdh>
+#   ses sous-cas    -> CAS_CP_1_<gdh>, CAS_CP_2_<gdh>, ...
+#   cas simple      -> CAS_<gdh>
+PREFIXE_COMPOUND = "CAS_CP"
+PREFIXE_SIMPLE = "CAS"
+FORMAT_GDH = "%Y%m%d_%H%M"
+
 # Emplacement fictif des cas dans un squelette anonymise.
 DOSSIER_FICTIF = "D:" + chr(92) + "SquelettesTest"
 SEPARATEURS = chr(92) + "/"
@@ -64,9 +81,38 @@ class Anonymiseur:
     retrouve dans son propre dossier). Inactif en mode ``--brut``.
     """
 
-    def __init__(self, actif: bool = True):
+    def __init__(self, actif: bool = True, gdh: str = ""):
         self.actif = actif
         self._tables: dict[str, dict[str, str]] = {}
+        # Heure LOCALE (Romance Standard Time sur les postes du service), jamais
+        # UTC : le GDH doit se lire comme l'heure a laquelle on a lance l'outil.
+        self.gdh = gdh or datetime.datetime.now().strftime(FORMAT_GDH)
+        self.compound = False
+        self._racine: str | None = None
+        self._n_souscas = 0
+
+    def preparer(self, dossier: str) -> None:
+        """Fixe le nommage d'apres le cas RACINE : compound ou non.
+
+        Doit precéder tout autre appel — c'est la racine qui décide du préfixe de
+        toute la fabrication. Sans appel explicite, le premier cas rencontré est
+        pris pour la racine d'un cas simple (repli, cf. ``cas``).
+        """
+        if not self.actif or self._racine is not None:
+            return
+        nom, compound = "", False
+        case_xml = os.path.join(dossier, CASE_XML)
+        if os.path.isfile(case_xml):
+            try:
+                racine = ET.parse(case_xml).getroot()
+                nom = (racine.findtext("name") or "").strip()
+                compound = (racine.get("compound", "") or "").strip().lower() == "true"
+            except (ET.ParseError, OSError):
+                pass
+        self.compound = compound
+        self._racine = nom or os.path.basename(dossier.rstrip(SEPARATEURS)) or dossier
+        prefixe = PREFIXE_COMPOUND if compound else PREFIXE_SIMPLE
+        self._tables.setdefault("cas", {})[self._racine] = "{}_{}".format(prefixe, self.gdh)
 
     def _alias(self, famille: str, valeur: str, gabarit: str) -> str:
         if not self.actif or not valeur:
@@ -77,7 +123,26 @@ class Anonymiseur:
         return table[valeur]
 
     def cas(self, nom: str) -> str:
-        return self._alias("cas", nom, "CAS_{n}")
+        """Alias d'un cas : ``CAS_CP_<gdh>`` / ``CAS_<gdh>`` pour la racine,
+        ``CAS_CP_<n>_<gdh>`` pour chaque sous-cas, dans l'ordre de rencontre.
+
+        La numérotation ignore la profondeur : un sous-cas de sous-cas prend le
+        numéro suivant, pas une notation hiérarchique — ce que le compound
+        déclare est une liste, pas un arbre étiqueté.
+        """
+        if not self.actif or not nom:
+            return nom
+        table = self._tables.setdefault("cas", {})
+        if nom in table:
+            return table[nom]
+        if self._racine is None:
+            # Appel direct sans ``preparer`` : le premier cas vu fait la racine.
+            self._racine = nom
+            table[nom] = "{}_{}".format(PREFIXE_SIMPLE, self.gdh)
+            return table[nom]
+        self._n_souscas += 1
+        table[nom] = "{}_{}_{}".format(PREFIXE_COMPOUND, self._n_souscas, self.gdh)
+        return table[nom]
 
     def user(self, nom: str) -> str:
         return self._alias("user", nom, "user{n}")
@@ -414,6 +479,10 @@ def copier_cas(src: str, racine_dst: str, ano: Anonymiseur, options,
     le squelette doit savoir représenter.
     """
     vus = vus if vus is not None else set()
+    if profondeur == 0:
+        # Le tout premier alias demande est celui de la racine (via le rapport
+        # ci-dessous) : le type de cas doit donc etre connu avant.
+        ano.preparer(src)
     cle = os.path.normcase(os.path.abspath(src))
     if cle in vus or profondeur > MAX_PROFONDEUR:
         return {"chemin": ano.chemin_cas(src) if ano.actif else src,
@@ -559,6 +628,7 @@ def ecrire_manifeste(dossier: str, rapport: dict, ano: Anonymiseur,
         "",
         "- Mode : **{}**".format(mode),
         "- Logs : {}".format(options.logs),
+        "- GDH des noms de cas : `{}`".format(ano.gdh) if ano.actif else "",
         "",
     ]
     if not ano.actif:
@@ -591,7 +661,7 @@ class Options:
     """
 
     def __init__(self, cas="", sortie="", brut=False, logs="inventaire",
-                 nb_logs=5, max_log_ko=256, force=False):
+                 nb_logs=5, max_log_ko=256, force=False, gdh=""):
         self.cas = cas
         self.sortie = sortie
         self.brut = brut
@@ -599,6 +669,7 @@ class Options:
         self.nb_logs = nb_logs
         self.max_log_ko = max_log_ko
         self.force = force
+        self.gdh = gdh
 
 
 def valider(options) -> str:
@@ -631,10 +702,13 @@ def fabriquer(options):
     doit pas pouvoir être sautée par l'une d'elles.
     """
     os.makedirs(options.sortie, exist_ok=True)
-    ano = Anonymiseur(actif=not options.brut)
+    ano = Anonymiseur(actif=not options.brut, gdh=getattr(options, "gdh", ""))
     rapport = copier_cas(options.cas, options.sortie, ano, options)
     fuites = verifier_anonymat(options.sortie, ano) if ano.actif else []
     ecrire_manifeste(options.sortie, rapport, ano, options, fuites)
+    # Le GDH voyage avec le rapport : les deux interfaces l'affichent, et sans
+    # lui on ne peut plus relier un squelette a la fabrication qui l'a produit.
+    rapport["gdh"] = ano.gdh if ano.actif else ""
     return rapport, fuites
 
 
@@ -661,6 +735,9 @@ def main(argv=None) -> int:
                          help="troncature des logs copiés, en Ko (défaut : 256)")
     parseur.add_argument("--force", action="store_true",
                          help="écraser un dossier de sortie non vide")
+    parseur.add_argument("--gdh", default="",
+                         help="groupe date-heure des noms de cas (défaut : maintenant, "
+                              "format AAAAMMJJ_HHMM) — le forcer refabrique aux mêmes noms")
     options = parseur.parse_args(argv)
 
     refus = valider(options)
@@ -676,6 +753,8 @@ def main(argv=None) -> int:
     print("\n".join(_lignes_rapport(rapport)))
     print("\nSquelette écrit dans : {}".format(os.path.abspath(options.sortie)))
     print("Manifeste : {}".format(os.path.join(options.sortie, MANIFESTE)))
+    if rapport.get("gdh"):
+        print("GDH des noms de cas : {}".format(rapport["gdh"]))
     if fuites:
         print("\n[!] {} valeur(s) d'origine retrouvee(s) dans le squelette "
               "(voir le manifeste).".format(len(fuites)), file=sys.stderr)
