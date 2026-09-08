@@ -457,7 +457,8 @@ BUILTIN = {
             "profiles.set_default": "★ Définir par défaut",
             "profiles.set_default_title": "Profil par défaut",
             "profiles.set_default_log": "Profil par défaut des nouvelles sources : « {n} ».",
-            "profiles.set_default_msg": "« {n} » sera appliqué aux nouvelles sources analysées.\n\nLes sources déjà listées gardent le leur ; la colonne « Profil » de l'onglet Import permet de les changer une à une."
+            "profiles.set_default_msg": "« {n} » sera appliqué aux nouvelles sources analysées.\n\nLes sources déjà listées gardent le leur ; la colonne « Profil » de l'onglet Import permet de les changer une à une.",
+            "import.scan_none_subdirs": "Aucune image forensique directement dans ce dossier.\n\nIl contient {n} sous-dossier(s). Les explorer aussi ?"
         },
         "help": [
             [
@@ -1149,7 +1150,8 @@ BUILTIN = {
             "profiles.set_default": "★ Set as default",
             "profiles.set_default_title": "Default profile",
             "profiles.set_default_log": "Default profile for new sources: « {n} ».",
-            "profiles.set_default_msg": "« {n} » will be applied to newly analysed sources.\n\nSources already listed keep theirs; the « Profile » column of the Import tab changes them one by one."
+            "profiles.set_default_msg": "« {n} » will be applied to newly analysed sources.\n\nSources already listed keep theirs; the « Profile » column of the Import tab changes them one by one.",
+            "import.scan_none_subdirs": "No forensic image directly in this folder.\n\nIt contains {n} subfolder(s). Explore them too?"
         },
         "help": [
             [

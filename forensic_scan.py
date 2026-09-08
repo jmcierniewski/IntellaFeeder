@@ -131,6 +131,20 @@ def scan_folder(root: str, on_progress=None, should_stop=None,
     return found, counts
 
 
+def count_subdirs(root: str) -> int:
+    """Nombre de sous-dossiers immédiats — 0 si illisible.
+
+    Sert à distinguer « ce dossier ne contient aucune image » de « les images
+    sont un cran plus bas » : sans cette nuance, une exploration non récursive
+    qui ne ramène rien ressemble à une panne.
+    """
+    try:
+        with os.scandir(root) as it:
+            return sum(1 for e in it if e.is_dir())
+    except OSError:
+        return 0
+
+
 def classify_paths(paths) -> tuple[list, list, list]:
     """Trie des chemins lâchés sur le panneau « Images forensiques ».
 

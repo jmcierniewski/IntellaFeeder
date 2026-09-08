@@ -51,6 +51,8 @@ class ImportTab(ttk.Frame):
         self._heading_base = {}    # colid -> texte d'en-tête de base
         self._size_running = False  # calcul de taille en cours (anti double-clic)
         self._scan_running = False  # exploration d'un dossier d'images en cours
+        self._scan_roots: list = []      # dossiers du dernier dépôt (relance récursive)
+        self._scan_was_recursive = False
         self._scan_cancel = False   # annulation demandée (lue par le worker)
         self._size_cancel = False   # annulation demandée (lue par le worker)
         self._size_by_key = {}      # chemin -> Source (retour du moteur de mesure)
@@ -326,9 +328,15 @@ class ImportTab(ttk.Frame):
             self._drop_on_folders([os.path.normpath(chemin)])
 
     # -- exploration récursive (worker + file, comme la mesure de tailles) -- #
-    def _scan_folders(self, dossiers):
+    def _scan_folders(self, dossiers, recursive=None):
+        """``recursive=None`` : on suit la case à cocher. Forcé à True quand
+        l'utilisateur accepte de descendre après un premier passage à vide."""
         if self._scan_running:
             return
+        if recursive is None:
+            recursive = bool(self.var_recursive.get())
+        self._scan_roots = list(dossiers)     # pour reproposer en récursif
+        self._scan_was_recursive = recursive
         self._scan_running = True
         self._scan_cancel = False
         self._scan_queue = queue.Queue()
@@ -340,7 +348,7 @@ class ImportTab(ttk.Frame):
                                 "Exploration de {n} dossier(s) à la recherche d'images…",
                                 n=len(dossiers)))
         threading.Thread(target=self._scan_worker,
-                         args=(list(dossiers), bool(self.var_recursive.get())),
+                         args=(list(dossiers), recursive),
                          daemon=True).start()
         self.after(150, self._poll_scan)
 
@@ -402,6 +410,18 @@ class ImportTab(ttk.Frame):
                                 n=n, s=(" — " + resume) if resume else ""))
         titre = i18n.t("import.scan_title", "Images forensiques")
         if not trouves:
+            # Sans cette proposition, une exploration non récursive qui ne
+            # ramène rien passe pour une panne du glisser-déposer — c'est ce qui
+            # est arrivé le 08/09/2026, les images étant un cran plus bas.
+            sous = (0 if self._scan_was_recursive
+                    else sum(forensic_scan.count_subdirs(d) for d in self._scan_roots))
+            if sous and messagebox.askyesno(titre, i18n.t(
+                    "import.scan_none_subdirs",
+                    "Aucune image forensique directement dans ce dossier.\n\n"
+                    "Il contient {n} sous-dossier(s). Les explorer aussi ?",
+                    n=sous)):
+                self._scan_folders(self._scan_roots, recursive=True)
+                return
             messagebox.showinfo(titre, i18n.t(
                 "import.scan_none", "Aucune image forensique trouvée."))
         elif cancelled:

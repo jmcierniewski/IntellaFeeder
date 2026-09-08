@@ -158,3 +158,25 @@ class TestSummarize:
 
     def test_vide(self):
         assert fs.summarize_counts({}) == ""
+
+
+class TestCountSubdirs:
+    """Distingue « pas d'image ici » de « les images sont un cran plus bas ».
+
+    Sans cette nuance, une exploration non récursive qui ne ramène rien passe
+    pour une panne du glisser-déposer (constaté le 08/09/2026).
+    """
+    def test_compte_les_sous_dossiers_immediats(self, tmp_path):
+        racine = tmp_path / "lot"
+        for n in ("SCELLE_01", "SCELLE_02", "SCELLE_03"):
+            (racine / n).mkdir(parents=True)
+        touch(str(racine), "lisez-moi.txt")
+        assert fs.count_subdirs(str(racine)) == 3
+
+    def test_zero_si_plat(self, tmp_path):
+        racine = str(tmp_path / "plat")
+        touch(racine, "A.ad1")
+        assert fs.count_subdirs(racine) == 0
+
+    def test_zero_si_illisible(self, tmp_path):
+        assert fs.count_subdirs(str(tmp_path / "nexiste_pas")) == 0
