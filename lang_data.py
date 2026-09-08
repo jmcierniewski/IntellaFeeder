@@ -458,7 +458,20 @@ BUILTIN = {
             "profiles.set_default_title": "Profil par défaut",
             "profiles.set_default_log": "Profil par défaut des nouvelles sources : « {n} ».",
             "profiles.set_default_msg": "« {n} » sera appliqué aux nouvelles sources analysées.\n\nLes sources déjà listées gardent le leur ; la colonne « Profil » de l'onglet Import permet de les changer une à une.",
-            "import.scan_none_subdirs": "Aucune image forensique directement dans ce dossier.\n\nIl contient {n} sous-dossier(s). Les explorer aussi ?"
+            "import.scan_none_subdirs": "Aucune image forensique directement dans ce dossier.\n\nIl contient {n} sous-dossier(s). Les explorer aussi ?",
+            "import.indexed_other_host": "Déjà dans le cas sous un autre nom de serveur : {p}",
+            "import.add_label": "Ajouter :",
+            "import.add_folders_btn": "Dossiers…",
+            "import.add_files_btn": "Fichiers…",
+            "import.pick_images_title": "Fichiers image forensique",
+            "import.image_filetypes": "Images forensiques",
+            "import.pick_files_title": "Fichiers à ajouter comme sources",
+            "import.run_all": "▶ Lancer l'import complet",
+            "import.steps_show": "⋯ Étapes",
+            "import.steps_hide": "⋯ Masquer",
+            "import.generated_log": "Fichiers d'import générés dans {p}.",
+            "topbar.language_lose_work": "{n} source(s) sont listées dans l'onglet « Import ». Le redémarrage les perd.\n\nExportez la liste d'abord (« Exporter la liste… ») si vous voulez la retrouver.\n\nContinuer quand même ?",
+            "inventory.info_profile_ignored": "Non repris (non pilotables à l'import) : {k}"
         },
         "help": [
             [
@@ -1151,7 +1164,20 @@ BUILTIN = {
             "profiles.set_default_title": "Default profile",
             "profiles.set_default_log": "Default profile for new sources: « {n} ».",
             "profiles.set_default_msg": "« {n} » will be applied to newly analysed sources.\n\nSources already listed keep theirs; the « Profile » column of the Import tab changes them one by one.",
-            "import.scan_none_subdirs": "No forensic image directly in this folder.\n\nIt contains {n} subfolder(s). Explore them too?"
+            "import.scan_none_subdirs": "No forensic image directly in this folder.\n\nIt contains {n} subfolder(s). Explore them too?",
+            "import.indexed_other_host": "Already in the case under a different server name: {p}",
+            "import.add_label": "Add:",
+            "import.add_folders_btn": "Folders…",
+            "import.add_files_btn": "Files…",
+            "import.pick_images_title": "Forensic image files",
+            "import.image_filetypes": "Forensic images",
+            "import.pick_files_title": "Files to add as sources",
+            "import.run_all": "▶ Run the full import",
+            "import.steps_show": "⋯ Steps",
+            "import.steps_hide": "⋯ Hide",
+            "import.generated_log": "Import files generated in {p}.",
+            "topbar.language_lose_work": "{n} source(s) are listed in the « Import » tab. Restarting loses them.\n\nExport the list first (« Export the list… ») if you want it back.\n\nContinue anyway?",
+            "inventory.info_profile_ignored": "Not carried over (not settable at import): {k}"
         },
         "help": [
             [

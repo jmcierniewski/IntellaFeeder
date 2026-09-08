@@ -74,6 +74,27 @@ def align_unc_host(path: str, reference: str) -> str:
     return "\\\\" + b[0] + "\\" + a[1] + tail
 
 
+def share_key(path: str) -> str:
+    r"""Clé de comparaison d'un chemin, **insensible au nom d'hôte** pour un UNC.
+
+    Un même partage se désigne par son nom NetBIOS ou par son IP, et Intella
+    enregistre le chemin tel qu'il a été donné : dans un même cas, une source
+    peut être en ``\\NAS\part\x`` et une autre en ``\\10.0.0.1\part\y``
+    (constaté le 08/09/2026). Comparer les chemins bruts fait alors passer une
+    source déjà indexée pour nouvelle — et elle repart à l'import en double.
+
+    On ramène donc l'hôte à ``*``. Le risque assumé est le faux positif : deux
+    serveurs différents portant le même nom de partage ET le même sous-chemin.
+    L'appelant journalise la correspondance pour qu'elle reste vérifiable.
+    """
+    parts = unc_parts(path)
+    if not parts:
+        return normalize_path(path).lower()
+    _hote, partage, reste = parts
+    tail = "\\" + reste if reste else ""
+    return normalize_path("\\\\*\\" + partage + tail).lower()
+
+
 def is_non_first_segment(path: str) -> bool:
     """Vrai si le chemin ressemble à un segment d'image NON initial.
 

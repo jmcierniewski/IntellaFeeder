@@ -37,8 +37,12 @@ class ProfilesTab(ttk.Frame):
         self._names = []          # identifiants des profils, dans l'ordre de la liste
         self.tooltip = Tooltip(self)
         self._build()
-        self._refresh_list()
-        self._new()             # formulaire vierge (défauts) au démarrage
+        # Ouvre sur le profil marqué par défaut, pas sur un formulaire vierge :
+        # voir son nom étoilé dans la liste mais les réglages d'Intella dans le
+        # formulaire donnait l'impression que le choix n'était pas pris (retour
+        # utilisateur du 08/09/2026).
+        self._refresh_list(select=self._default_profile())
+        self._on_select()
 
     # ------------------------------------------------------------------ #
     def _build(self):

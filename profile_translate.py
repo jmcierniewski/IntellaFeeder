@@ -39,6 +39,19 @@ def _as_bool(text: str) -> bool:
     return str(text).strip().lower() in ("1", "true", "vrai", "oui", "yes")
 
 
+def unsupported_keys(src: dict) -> list:
+    """Réglages présents dans l'export XML mais que le catalogue ne connaît pas.
+
+    ⚠ Ces réglages sont **perdus** : « Info Profil » ne recopie que ce que
+    `-addSourcesFromJson` sait recevoir, et un profil n'émet que ces options-là.
+    Les afficher évite de croire qu'un profil rejoue *tous* les réglages de la
+    source d'origine (question posée le 08/09/2026).
+    """
+    connus = set(_BOOL_MAP) | set(_VERBATIM_MAP) | set(_INT_MAP) | {"crawlerMaxBinarySize"}
+    io_opts = src.get("index_options") or {}
+    return sorted(k for k in io_opts if k not in connus)
+
+
 def from_xml_source(src: dict) -> dict:
     """``src`` = dict d'une source parsée (voir ``case_export``) contenant
     ``index_options`` (dict) et ``domain_boundaries`` (dict). Retourne les

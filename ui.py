@@ -144,6 +144,18 @@ class MainWindow:
         # qu'au redémarrage — cf. limite tkinter documentée dans i18n.py).
         i18n.load(code)
         title = i18n.t("topbar.language", "Langue")
+        # Le redémarrage repart d'une application vierge : une liste de sources
+        # en cours de préparation serait perdue sans prévenir (08/09/2026).
+        # On le dit AVANT, et on laisse la possibilité de l'exporter d'abord.
+        tab = getattr(self, "import_tab", None)
+        en_cours = len(getattr(tab, "sources", []) or []) if tab else 0
+        if en_cours and not messagebox.askyesno(title, i18n.t(
+                "topbar.language_lose_work",
+                "{n} source(s) sont listées dans l'onglet « Import ». Le "
+                "redémarrage les perd.\n\nExportez la liste d'abord "
+                "(« Exporter la liste… ») si vous voulez la retrouver.\n\n"
+                "Continuer quand même ?", n=en_cours)):
+            return
         if messagebox.askyesno(title, i18n.t(
                 "topbar.language_restart_ask",
                 "La langue choisie ne s'applique qu'au démarrage de l'application "

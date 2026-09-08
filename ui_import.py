@@ -133,8 +133,15 @@ class ImportTab(ttk.Frame):
         chk.grid(row=4, column=0, columnspan=4, sticky="w", padx=6, pady=(0, 4))
 
     def _build_panels(self):
-        frame = ttk.Frame(self)
-        frame.pack(fill="both", expand=False, padx=8, pady=4)
+        # PanedWindow : la poignée entre les panneaux de collage et « Sources à
+        # importer » se tire à la souris (demande du 08/09/2026) — selon le
+        # moment on veut voir les chemins collés ou le tableau, pas les deux.
+        self.split = ttk.PanedWindow(self, orient="vertical")
+        self.split.pack(fill="both", expand=True, padx=0, pady=0)
+        haut = ttk.Frame(self.split)
+        self.split.add(haut, weight=1)
+        frame = ttk.Frame(haut)
+        frame.pack(fill="both", expand=True, padx=8, pady=4)
         frame.columnconfigure(0, weight=1)
         frame.columnconfigure(1, weight=1)
 
@@ -159,7 +166,7 @@ class ImportTab(ttk.Frame):
             "import.drop_images_hint",
             "Glissez ici des images ou des DOSSIERS : seules les images "
             "forensiques (1er tronçon) sont ajoutées."),
-            self._pick_folder_for_images)
+            self._pick_folder_for_images, self._pick_files_for_images)
         ttk.Checkbutton(
             bar_images, variable=self.var_recursive,
             text=i18n.t("import.recursive_chk", "Explorer les sous-dossiers"),
@@ -167,11 +174,11 @@ class ImportTab(ttk.Frame):
         self._panel_footer(right, i18n.t(
             "import.drop_folders_hint",
             "Glissez ici des dossiers ou des fichiers : ils sont ajoutés tels quels."),
-            self._pick_folder_for_folders)
+            self._pick_folder_for_folders, self._pick_files_for_folders)
 
         # Bandeau d'exploration (masqué au repos) : un dossier de scellés sur
         # partage réseau se parcourt en minutes et doit rester interruptible.
-        self.scan_bar = MeasureBar(self, pack_opts={"anchor": "w", "fill": "x",
+        self.scan_bar = MeasureBar(haut, pack_opts={"anchor": "w", "fill": "x",
                                                     "padx": 12, "pady": (0, 4)})
 
         # Interrupteur de secours : `enable_dnd = 0` dans intellafeeder.ini coupe
@@ -192,14 +199,21 @@ class ImportTab(ttk.Frame):
                     "« Ajouter un dossier… » ou le collage."), level="WARN")
                 break
 
-    def _panel_footer(self, parent, hint: str, on_add):
-        """Ligne sous une zone de collage : bouton d'ajout + rappel du comportement."""
+    def _panel_footer(self, parent, hint: str, on_add_folder, on_add_files):
+        """Ligne sous une zone de collage : ajouts + rappel du comportement.
+
+        « Ajouter : Dossiers… Fichiers… » plutôt que deux boutons à libellé
+        long — la place sous les panneaux est comptée (08/09/2026).
+        """
         bar = ttk.Frame(parent)
         bar.pack(fill="x", padx=4, pady=(0, 4))
-        make_button(bar, i18n.t("import.add_folder_btn", "Ajouter un dossier…"),
-                    on_add).pack(side="left")
+        ttk.Label(bar, text=i18n.t("import.add_label", "Ajouter :")).pack(side="left")
+        make_button(bar, i18n.t("import.add_folders_btn", "Dossiers…"),
+                    on_add_folder).pack(side="left", padx=(4, 2))
+        make_button(bar, i18n.t("import.add_files_btn", "Fichiers…"),
+                    on_add_files).pack(side="left", padx=2)
         ttk.Label(bar, text=hint, foreground="#64748b",
-                  wraplength=430, justify="left").pack(side="left", padx=8)
+                  wraplength=380, justify="left").pack(side="left", padx=8)
         return bar
 
     @staticmethod
@@ -318,6 +332,33 @@ class ImportTab(ttk.Frame):
         if chemin:
             self._scan_folders([os.path.normpath(chemin)])
 
+    def _pick_files_for_images(self):
+        """Sélection de FICHIERS images (filtre sur les extensions connues).
+
+        Le dialogue propose les formats reconnus, mais le tri final reste celui
+        de `forensic_scan` : un `.ad2` choisi à la main est refusé comme il le
+        serait au dépôt.
+        """
+        if self._compound_blocked() or self._busy_measuring():
+            return
+        motifs = "*.E01 *.Ex01 *.L01 *.Lx01 *.s01 *.ad1 *.dd *.001 *.vmdk *.vhd *.vhdx"
+        chemins = filedialog.askopenfilenames(
+            title=i18n.t("import.pick_images_title", "Fichiers image forensique"),
+            filetypes=[(i18n.t("import.image_filetypes", "Images forensiques"), motifs),
+                       (i18n.t("common.filetype_all", "Tous"), "*.*")])
+        if chemins:
+            self._drop_on_images([os.path.normpath(p) for p in chemins])
+
+    def _pick_files_for_folders(self):
+        """Sélection de FICHIERS pour le panneau « Dossiers standard » (tels quels)."""
+        if self._compound_blocked() or self._busy_measuring():
+            return
+        chemins = filedialog.askopenfilenames(
+            title=i18n.t("import.pick_files_title", "Fichiers à ajouter comme sources"),
+            filetypes=[(i18n.t("common.filetype_all", "Tous"), "*.*")])
+        if chemins:
+            self._drop_on_folders([os.path.normpath(p) for p in chemins])
+
     def _pick_folder_for_folders(self):
         if self._compound_blocked() or self._busy_measuring():
             return
@@ -434,7 +475,9 @@ class ImportTab(ttk.Frame):
                 "import.scan_added", "{n} image(s) ajoutée(s) : {s}.", n=n, s=resume))
 
     def _build_recap(self):
-        frame = ttk.LabelFrame(self, text=i18n.t("import.recap_frame", "Sources à importer"))
+        bas = ttk.Frame(self.split)
+        self.split.add(bas, weight=3)
+        frame = ttk.LabelFrame(bas, text=i18n.t("import.recap_frame", "Sources à importer"))
         frame.pack(fill="both", expand=True, padx=8, pady=4)
 
         # Barre d'outils sur 2 lignes : ligne 1 = tout ce qui concerne les SOURCES,
@@ -571,24 +614,67 @@ class ImportTab(ttk.Frame):
         """
         state = "disabled" if busy else "normal"
         for w in (self.btn_analyze, self.btn_import_list, self.btn_check_all,
-                  self.btn_uncheck_all, self.btn_generate, self.btn_import):
+                  self.btn_uncheck_all, self.btn_generate, self.btn_import,
+                  self.btn_run_all):
             w.config(state=state)
         self.cb_default_profile.config(state="disabled" if busy else "readonly")
 
     def _build_actions(self):
-        # Ordre visuel gauche → droite : Générer | Importer | Valider.
+        """Une action principale, et les 3 étapes détaillées à la demande.
+
+        Le parcours nominal enchaîne toujours Générer → Importer → Valider : en
+        faire un seul bouton évite trois clics et deux confirmations (demande du
+        08/09/2026). Les étapes restent accessibles — un .bat lancé hors
+        application se valide encore à la main, et une génération seule sert à
+        relire les fichiers avant de lancer.
+        """
         bar = ttk.Frame(self)
         bar.pack(fill="x", padx=8, pady=(0, 8))
-        # « Générer » = action principale → vert (primary) ; les autres en style standard.
-        self.btn_generate = make_button(bar, i18n.t("import.generate", "Générer les fichiers d'import"),
-                                        self.generer, color=config.ACTION_COLOR)
+        self.btn_run_all = make_button(
+            bar, i18n.t("import.run_all", "▶ Lancer l'import complet"),
+            self.lancer_import_complet, color=config.ACTION_COLOR)
+        self.btn_run_all.pack(side="left")
+        self.btn_steps = make_button(
+            bar, i18n.t("import.steps_show", "⋯ Étapes"), self._toggle_steps)
+        self.btn_steps.pack(side="left", padx=4)
+
+        # Étapes détaillées : masquées au repos, dépliées par « ⋯ ».
+        self.steps_bar = ttk.Frame(self)
+        self._steps_visible = False
+        self.btn_generate = make_button(
+            self.steps_bar, i18n.t("import.generate", "Générer les fichiers d'import"),
+            self.generer)
         self.btn_generate.pack(side="left")
-        self.btn_validate = make_button(bar, i18n.t("import.validate", "Valider les opérations"),
-                                        self.valider_operations)
-        self.btn_validate.pack(side="right", padx=6)
-        self.btn_import = make_button(bar, i18n.t("import.run_import", "Importer (lancer le .bat)"),
-                                      self.importer)
-        self.btn_import.pack(side="right", padx=6)
+        self.btn_import = make_button(
+            self.steps_bar, i18n.t("import.run_import", "Importer (lancer le .bat)"),
+            self.importer)
+        self.btn_import.pack(side="left", padx=6)
+        self.btn_validate = make_button(
+            self.steps_bar, i18n.t("import.validate", "Valider les opérations"),
+            self.valider_operations)
+        self.btn_validate.pack(side="left", padx=6)
+
+    def _toggle_steps(self):
+        self._steps_visible = not self._steps_visible
+        if self._steps_visible:
+            self.steps_bar.pack(fill="x", padx=8, pady=(0, 8))
+            self.btn_steps.config(text=i18n.t("import.steps_hide", "⋯ Masquer"))
+        else:
+            self.steps_bar.pack_forget()
+            self.btn_steps.config(text=i18n.t("import.steps_show", "⋯ Étapes"))
+
+    def lancer_import_complet(self):
+        """Générer → Importer → Valider, sans confirmation intermédiaire.
+
+        La validation est déclenchée par ``_poll_import`` dès que le .bat rend
+        la main : l'enchaînement s'arrête de lui-même si la génération échoue
+        (limite dépassée, tailles manquantes), avec son message habituel.
+        """
+        if self._compound_blocked() or self._busy_measuring():
+            return
+        if not self.generer(auto=True):
+            return
+        self.importer(auto=True)
 
     # ------------------------------------------------------------------ #
     # Cas cible (verrouillé, depuis l'inventaire / case.xml)             #
@@ -863,17 +949,44 @@ class ImportTab(ttk.Frame):
     # Inventaire / dédoublonnage / volume existant                       #
     # ------------------------------------------------------------------ #
     def _inventory_matches(self) -> bool:
-        """Vrai si l'inventaire (liste des sources) concerne le cas ciblé."""
+        """Vrai si l'inventaire (liste des sources) concerne le cas ciblé.
+
+        La comparaison ignore le **nom d'hôte** d'un chemin UNC : le même cas
+        s'ouvre indifféremment par nom NetBIOS ou par IP, et exiger la même
+        écriture ferait passer l'inventaire pour étranger au cas — donc plus
+        aucun retrait des sources déjà indexées.
+        """
         inv = self.app.inventory
         if not inv:
             return False
         case = path_parser.normalize_path(self.var_case.get()).lower()
-        return bool(case) and case == inv.get("case_path_key")
+        if not case:
+            return False
+        if case == inv.get("case_path_key"):
+            return True
+        return path_parser.share_key(case) == path_parser.share_key(
+            inv.get("case_path", "") or inv.get("case_path_key", ""))
 
     def _is_indexed(self, s) -> bool:
+        r"""La source est-elle déjà dans le cas ? Chemin exact OU même partage.
+
+        🐞 08/09/2026 : un cas réel mélange les écritures d'hôte (une source en
+        ``\\IP\part\…``, les autres en ``\\NOM\part\…``). Comparer les chemins
+        bruts laissait repartir à l'import une source déjà indexée. La
+        correspondance « même partage, hôte différent » est journalisée pour
+        rester vérifiable.
+        """
         if not self._inventory_matches():
             return False
-        return path_parser.normalize_path(s.path).lower() in self.app.inventory["existing_paths"]
+        inv = self.app.inventory
+        if path_parser.normalize_path(s.path).lower() in inv["existing_paths"]:
+            return True
+        if path_parser.share_key(s.path) in (inv.get("existing_share_keys") or set()):
+            self.app.log.log(i18n.t(
+                "import.indexed_other_host",
+                "Déjà dans le cas sous un autre nom de serveur : {p}", p=s.path))
+            return True
+        return False
 
     def _existing_bytes(self) -> int:
         """Volume déjà occupé pour le garde-fou de dépassement.
@@ -1448,16 +1561,21 @@ class ImportTab(ttk.Frame):
             text += "\n" + i18n.t("import.and_n_more", "… et {n} autre(s).", n=len(items) - cap)
         return text
 
-    def generer(self):
+    def generer(self, auto: bool = False) -> bool:
+        """Écrit les fichiers d'import. Retourne True si la génération a eu lieu.
+
+        ``auto`` : enchaînement automatique (bouton « Lancer l'import complet »),
+        le compte rendu part au journal au lieu d'ouvrir une fenêtre.
+        """
         if self._compound_blocked():
-            return
+            return False
         params = self._params()
         if not self.app.case_meta:
             messagebox.showerror(
                 i18n.t("common.case_required_title", "Cas requis"),
                 i18n.t("import.select_case_target",
                       "Sélectionnez d'abord un cas dans l'onglet « 1. Inventaire du cas »."))
-            return
+            return False
         # Seules les lignes cochées « Importer » sont générées.
         selected = [s for s in self.sources if s.import_selected]
         if not selected:
@@ -1465,7 +1583,7 @@ class ImportTab(ttk.Frame):
                 i18n.t("import.empty_selection_title", "Sélection vide"),
                 i18n.t("import.empty_selection_body",
                       "Cochez au moins une source dans la colonne « Imp. » (Importer)."))
-            return
+            return False
         # Anomalie corrigée (champ « Fichier de tâches » vidé en cours de session) :
         #   • aucune tâche cochée → on n'exige aucun fichier ;
         #   • fichier toujours valide → on le relit (prend en compte une édition) ;
@@ -1496,7 +1614,7 @@ class ImportTab(ttk.Frame):
             messagebox.showerror(
                 i18n.t("import.corrections_needed", "Corrections nécessaires"),
                 self._format_list(errors, 30))
-            return
+            return False
 
         # Tailles obligatoires : le garde-fou de limite n'a aucun sens sans elles.
         # On ne les calcule plus en silence ici (scan long, UI figée, aucune
@@ -1510,7 +1628,7 @@ class ImportTab(ttk.Frame):
                        "Cliquez sur « Calculer la taille » avant de générer "
                        "(sans les tailles, le contrôle de la limite du cas est impossible).",
                        n=len(missing), list=self._format_list([s.name for s in missing], 12)))
-            return
+            return False
 
         limit_b = self._limit_gb() * config.GB
 
@@ -1538,24 +1656,30 @@ class ImportTab(ttk.Frame):
                     "ciblez-le comme cas, recochez et réimportez.",
                     lim=self._limit_gb(), n=len(dropped), v=config.human_size(vol),
                     list=self._format_list([s.name for s in dropped], 12)))
-            return
+            return False
 
         if warnings and not messagebox.askyesno(
             i18n.t("import.warnings_title", "Avertissements"),
             self._format_list(warnings) + "\n\n" + i18n.t(
                 "import.generate_anyway", "Générer malgré tout ?")
         ):
-            return
+            return False
 
         try:
             report = generator.generate(selected, params, self.tasks, self.app.log.log)
         except OSError as exc:
             messagebox.showerror(i18n.t("import.write_title", "Écriture"),
                                  i18n.t("common.export_failed", "Échec :\n{e}", e=exc))
-            return
+            return False
 
         self.app.save_settings()
-        self._show_report(report, len(selected))
+        if auto:
+            self.app.log.log(i18n.t(
+                "import.generated_log", "Fichiers d'import générés dans {p}.",
+                p=os.path.abspath(report["output"])))
+        else:
+            self._show_report(report, len(selected))
+        return True
 
     def _enforce_limit(self, selected, existing_bytes, limit_bytes) -> list:
         """Décoche le surplus pour tenir sous la limite (coupe séquentielle).
@@ -1640,7 +1764,13 @@ class ImportTab(ttk.Frame):
         single = os.path.join(scripts, f"{safe}_import.bat")
         return single if os.path.isfile(single) else None
 
-    def importer(self):
+    def importer(self, auto: bool = False):
+        """``auto`` : lancé par « Lancer l'import complet », sans confirmation.
+
+        Les GARDES restent actives (cas compound, .bat absent, import déjà en
+        cours) : seule la question « continuer ? » est sautée — c'est elle que
+        l'enchaînement doit éviter, pas les contrôles.
+        """
         if self._compound_blocked():
             return
         title = i18n.t("import.run_import", "Importer (lancer le .bat)")
@@ -1671,7 +1801,7 @@ class ImportTab(ttk.Frame):
                 "« Valider les opérations » ne pourra pas être lancé automatiquement "
                 "à la fin de l'import.\n\nLancer l'import quand même ?")):
             return
-        if not messagebox.askyesno(
+        if not auto and not messagebox.askyesno(
             title, i18n.t(
                 "import.run_confirm",
                 "Lancer l'import dans Intella ?\n\n{b}\n\n"
@@ -1695,6 +1825,7 @@ class ImportTab(ttk.Frame):
             messagebox.showerror(title, i18n.t("import.launch_impossible", "Lancement impossible :\n{e}", e=exc))
             return
         self.btn_import.config(state="disabled")
+        self.btn_run_all.config(state="disabled")
         self.after(1000, self._poll_import)
 
     def _poll_import(self):
@@ -1711,6 +1842,7 @@ class ImportTab(ttk.Frame):
             return
         self._import_proc = None
         self.btn_import.config(state="normal")
+        self.btn_run_all.config(state="normal")
         if not self._auto_validate:
             self.app.log.log(i18n.t(
                 "import.finished_no_validate_log",

@@ -203,6 +203,9 @@ class ExportTab(ttk.Frame):
                 i18n.t("inventory.xml_read_failed", "Lecture de case.xml impossible :\n{e}", e=exc))
             return
         self.app.set_case_meta(meta)
+        # Nouveau cas : la lecture des sources redevient utile (le bouton est
+        # grisé tant qu'on reste sur le cas déjà lu).
+        self.btn_run.config(state="normal")
         self.app.log.log(i18n.t(
             "inventory.case_detected_log",
             "Cas détecté : « {n} » — créé par {u}, {s} occupé(s).",
@@ -300,7 +303,10 @@ class ExportTab(ttk.Frame):
         messagebox.showerror(i18n.t("inventory.sources_title", "Inventaire des sources"), msg)
 
     def _done(self, rows, columns, inventory):
-        self.btn_run.config(state="normal")
+        # Lecture réussie : le bouton reste grisé jusqu'au prochain changement de
+        # cas (demande du 08/09/2026). Relire le même cas ne sert à rien et coûte
+        # un appel IntellaCmd de plusieurs secondes.
+        self.btn_run.config(state="disabled")
         self.rows, self.columns = rows, columns
         self.csv_columns = list(case_export.CSV_COLUMNS_COMPOUND
                                 if inventory.get("is_compound")
@@ -785,6 +791,16 @@ class ExportTab(ttk.Frame):
             "inventory.info_profile_log",
             "Info Profil : réglages de « {n} » transférés à l'onglet Profils ({c} option(s)).",
             n=name, c=len(values)))
+        # Ce qui n'entre pas dans le catalogue est PERDU : un profil n'émet que
+        # les options pilotables par `-addSourcesFromJson`. Le taire laisserait
+        # croire qu'il rejoue tous les réglages de la source (question du
+        # 08/09/2026).
+        ignores = profile_translate.unsupported_keys(src)
+        if ignores:
+            self.app.log.log(i18n.t(
+                "inventory.info_profile_ignored",
+                "Non repris (non pilotables à l'import) : {k}", k=", ".join(ignores)),
+                level="WARN")
 
     def _export_xml(self):
         """Enregistre une copie du XML produit par « Lire les sources »."""

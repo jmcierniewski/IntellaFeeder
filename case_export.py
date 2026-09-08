@@ -182,6 +182,7 @@ def run_export_subcases(exe: str, user: str, subcases: list, log,
     reports: list = []
     xml_paths: list = []
     existing_paths: set = set()
+    existing_share_keys: set = set()
     folder_unknown: list = []
     sources_detail: list = []
     case_tasks: list = []
@@ -240,6 +241,7 @@ def run_export_subcases(exe: str, user: str, subcases: list, log,
             d["subcase_path"] = path
             sources_detail.append(d)
         existing_paths |= sub_inv.get("existing_paths", set())
+        existing_share_keys |= sub_inv.get("existing_share_keys", set())
         # Chaque dossier à 0 porte SON sous-cas : c'est là (et pas au niveau du
         # compound) que se lit et s'écrit le cache de tailles `IF_<cas>.info` —
         # un sous-cas peut être retiré du lot, ou recevoir de nouvelles sources,
@@ -274,6 +276,7 @@ def run_export_subcases(exe: str, user: str, subcases: list, log,
         "case_path": case_path,
         "case_path_key": _norm(case_path),
         "existing_paths": existing_paths,
+        "existing_share_keys": existing_share_keys,
         "known_bytes": known_bytes,
         "folder_unknown": folder_unknown,
         "source_count": len(rows),
@@ -471,18 +474,24 @@ def build_inventory(parsed: dict) -> dict:
     - ``folder_unknown`` : sources dossier à la taille non reportée.
     """
     existing_paths: set[str] = set()
+    # Mêmes chemins, hôte UNC neutralisé : un cas mélange les écritures (nom
+    # NetBIOS et IP) et une source redéposée sous l'autre forme repartait à
+    # l'import en double (08/09/2026). Cf. `path_parser.share_key`.
+    existing_share_keys: set[str] = set()
     known_bytes = 0
     folder_unknown = []
 
     case_tasks: list = []          # définitions de tâches recyclables (dédupliquées)
     seen_task_sigs: set = set()
     for s in parsed["sources"]:
-        for p in s["paths"]:
-            existing_paths.add(_norm(p))
+        chemins = list(s["paths"])
         if s["disk_image_path"]:
-            existing_paths.add(_norm(s["disk_image_path"]))
+            chemins.append(s["disk_image_path"])
         if s["primary_path"]:
-            existing_paths.add(_norm(s["primary_path"]))
+            chemins.append(s["primary_path"])
+        for p in chemins:
+            existing_paths.add(_norm(p))
+            existing_share_keys.add(path_parser.share_key(p))
         if s["size_unknown"]:
             folder_unknown.append({"name": s["name"], "path": s["primary_path"]})
         else:
@@ -499,6 +508,7 @@ def build_inventory(parsed: dict) -> dict:
         "case_path": parsed["case"].get("path", ""),
         "case_path_key": _norm(parsed["case"].get("path", "")),
         "existing_paths": existing_paths,
+        "existing_share_keys": existing_share_keys,
         "known_bytes": known_bytes,
         "folder_unknown": folder_unknown,
         "source_count": len(parsed["sources"]),
