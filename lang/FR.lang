@@ -157,7 +157,7 @@
     "opt.enableCrawlerScript": "Activer un script de crawler",
     "opt.sourceCrawlerScriptType": "Type de script de crawler",
     "opt.sourceCrawlerScriptFile": "Fichier de script de crawler",
-    "profiles.intro": "Un profil = jeu de paramètres d'analyse appliqué à une source à l'import (affecté dans l'onglet « 2. Import », colonne « Profil »). Le profil « défaut » applique les réglages par défaut d'Intella (aucune option forcée). Seules les valeurs différentes du défaut sont enregistrées et émises.",
+    "profiles.intro": "Un profil = jeu de paramètres d'analyse appliqué à une source à l'import (affecté dans l'onglet « 2. Import », colonne « Profil »). « Défaut Intella » applique les réglages standard d'Intella (aucune option forcée) ; seules les valeurs qui en diffèrent sont enregistrées et émises. L'étoile ★ marque le profil donné aux nouvelles sources — « Définir par défaut » le change.",
     "profiles.saved": "Profils enregistrés",
     "profiles.name_label": "Nom du profil",
     "profiles.new": "Nouveau",
@@ -433,7 +433,11 @@
     "profiles.duplicate_log": "Profil « {s} » dupliqué en « {n} ».",
     "profiles.default_hint": "Profil appliqué aux nouvelles sources (mémorisé).",
     "profiles.select_first": "Sélectionnez d'abord un profil.",
-    "profiles.copy_suffix": "{n} (copie)"
+    "profiles.copy_suffix": "{n} (copie)",
+    "profiles.set_default": "★ Définir par défaut",
+    "profiles.set_default_title": "Profil par défaut",
+    "profiles.set_default_log": "Profil par défaut des nouvelles sources : « {n} ».",
+    "profiles.set_default_msg": "« {n} » sera appliqué aux nouvelles sources analysées.\n\nLes sources déjà listées gardent le leur ; la colonne « Profil » de l'onglet Import permet de les changer une à une."
   },
   "help": [
     [

@@ -157,7 +157,7 @@
     "opt.enableCrawlerScript": "Enable a crawler script",
     "opt.sourceCrawlerScriptType": "Crawler script type",
     "opt.sourceCrawlerScriptFile": "Crawler script file",
-    "profiles.intro": "A profile is a set of analysis settings applied to a source at import time (assigned in the « 2. Import » tab, « Profile » column). The « default » profile applies Intella's default settings (no option forced). Only values that differ from the default are saved and emitted.",
+    "profiles.intro": "A profile = a set of analysis settings applied to a source at import time (assigned in the « 2. Import » tab, « Profile » column). « Intella defaults » applies Intella's standard settings (no option forced); only values that differ from them are saved and emitted. The ★ marks the profile given to new sources — « Set as default » changes it.",
     "profiles.saved": "Saved profiles",
     "profiles.name_label": "Profile name",
     "profiles.new": "New",
@@ -433,7 +433,11 @@
     "profiles.duplicate_log": "Profile « {s} » duplicated as « {n} ».",
     "profiles.default_hint": "Profile applied to new sources (remembered).",
     "profiles.select_first": "Select a profile first.",
-    "profiles.copy_suffix": "{n} (copy)"
+    "profiles.copy_suffix": "{n} (copy)",
+    "profiles.set_default": "★ Set as default",
+    "profiles.set_default_title": "Default profile",
+    "profiles.set_default_log": "Default profile for new sources: « {n} ».",
+    "profiles.set_default_msg": "« {n} » will be applied to newly analysed sources.\n\nSources already listed keep theirs; the « Profile » column of the Import tab changes them one by one."
   },
   "help": [
     [

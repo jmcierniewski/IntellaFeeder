@@ -49,9 +49,10 @@ class ProfilesTab(ttk.Frame):
                 "profiles.intro",
                 "Un profil = jeu de paramètres d'analyse appliqué à une source à "
                 "l'import (affecté dans l'onglet « 2. Import », colonne « Profil »). "
-                "Le profil « défaut » applique les réglages par défaut d'Intella "
-                "(aucune option forcée). Seules les valeurs différentes du défaut "
-                "sont enregistrées et émises."))
+                "« Défaut Intella » applique les réglages standard d'Intella (aucune "
+                "option forcée) ; seules les valeurs qui en diffèrent sont "
+                "enregistrées et émises. L'étoile ★ marque le profil donné aux "
+                "nouvelles sources — « Définir par défaut » le change."))
         intro.pack(fill="x")
 
         body = ttk.Frame(self)
@@ -75,6 +76,8 @@ class ProfilesTab(ttk.Frame):
         make_button(btns, i18n.t("profiles.new", "Nouveau"), self._new).pack(fill="x", pady=1)
         make_button(btns, i18n.t("profiles.duplicate", "Dupliquer…"),
                     self._duplicate).pack(fill="x", pady=1)
+        make_button(btns, i18n.t("profiles.set_default", "★ Définir par défaut"),
+                    self._set_default).pack(fill="x", pady=1)
         make_button(btns, i18n.t("common.save", "Enregistrer"), self._save,
                    color="#16a34a").pack(fill="x", pady=1)
         make_button(btns, i18n.t("profiles.rename", "Renommer…"), self._rename).pack(fill="x", pady=1)
@@ -188,9 +191,13 @@ class ProfilesTab(ttk.Frame):
         # reste du code — .ini, listes exportées, colonne « Profil » — travaille
         # sur l'identifiant.
         self._names = profiles.list_names()
+        defaut = self._default_profile()
         self.listbox.delete(0, "end")
         for n in self._names:
-            self.listbox.insert("end", profiles.display_name(n))
+            # ★ : le profil donné aux nouvelles sources. Sans repère dans la
+            # liste, le réglage était invisible (retour utilisateur du 08/09).
+            marque = "★ " if n == defaut else "    "
+            self.listbox.insert("end", marque + profiles.display_name(n))
         if select and select in self._names:
             i = self._names.index(select)
             self.listbox.selection_clear(0, "end")
@@ -261,6 +268,44 @@ class ProfilesTab(ttk.Frame):
         self._load_values(profile_catalog.default_values())
         self._set_comment("")
         self._set_form_state(True)
+
+    def _default_profile(self) -> str:
+        """Identifiant du profil donné aux nouvelles sources (mémorisé au .ini)."""
+        nom = self.app.settings.get("default_profile", profiles.DEFAULT_NAME)
+        return nom if profiles.exists(nom) else profiles.DEFAULT_NAME
+
+    def _set_default(self):
+        """Déclare le profil sélectionné « par défaut » pour les nouvelles sources.
+
+        Le réglage existait déjà (combo de l'onglet Import) mais **ne se voyait
+        pas** : c'est ici qu'on le cherche, à côté des profils. Écrit tout de
+        suite au `.ini` — un réglage qu'on ne retrouve pas au redémarrage passe
+        pour n'avoir pas été pris.
+        """
+        titre = i18n.t("profiles.set_default_title", "Profil par défaut")
+        nom = self._selected_name()
+        if not nom:
+            messagebox.showinfo(titre, i18n.t(
+                "profiles.select_first", "Sélectionnez d'abord un profil."))
+            return
+        self.app.settings.set("default_profile", nom)
+        self.app.settings.save()
+        self._refresh_list(select=nom)
+        # L'onglet Import affiche le même réglage : il doit suivre sans attendre
+        # un redémarrage.
+        tab = getattr(self.app, "import_tab", None)
+        if tab is not None and hasattr(tab, "cb_default_profile"):
+            tab.cb_default_profile.set(profiles.display_name(nom))
+        self.app.log.log(i18n.t(
+            "profiles.set_default_log",
+            "Profil par défaut des nouvelles sources : « {n} ».",
+            n=profiles.display_name(nom)))
+        messagebox.showinfo(titre, i18n.t(
+            "profiles.set_default_msg",
+            "« {n} » sera appliqué aux nouvelles sources analysées.\n\n"
+            "Les sources déjà listées gardent le leur ; la colonne « Profil » "
+            "de l'onglet Import permet de les changer une à une.",
+            n=profiles.display_name(nom)))
 
     def _duplicate(self):
         """Copie le profil sélectionné sous un autre nom, puis l'ouvre.

@@ -163,14 +163,23 @@ class MainWindow:
         script. Les paramètres sont enregistrés avant, comme à une fermeture
         normale.
 
-        🐞 **Le répertoire courant n'est PAS transmis au nouveau processus**
-        (bug du 07/09/2026, exe onefile) : le 1er redémarrage passait, le 2e
-        échouait sur « interpréteur Python introuvable ». En onefile, le
-        processus s'exécute depuis un dossier temporaire ``_MEIxxxx`` que le
-        bootloader **supprime en sortant** ; hériter de ce répertoire faisait
-        démarrer le processus suivant dans un dossier en train de disparaître.
-        On démarre donc dans ``config.base_dir()`` — le dossier de l'exe (ou du
-        script), qui existe toujours.
+        🐞 **L'environnement PyInstaller doit être PURGÉ** avant de relancer un
+        exe onefile (bug des 07-08/09/2026). Le bootloader transmet à son
+        processus applicatif ``_PYI_APPLICATION_HOME_DIR`` (et ``_MEIPASS2``
+        avant PyInstaller 6), qui désigne le dossier temporaire ``_MEIxxxx`` où
+        l'exe s'est extrait. Ces variables **s'héritent** : le processus relancé
+        réutilisait le ``_MEI`` de son parent au lieu de faire le sien.
+
+        D'où le symptôme exact, vérifié en isolant le mécanisme dans un exe
+        d'essai : **le 1er redémarrage passe** (le nouveau processus a déjà tout
+        chargé en mémoire quand le dossier disparaît), **le 2e échoue** sur
+        « interpréteur Python introuvable » — il pointe vers un ``_MEI`` que le
+        processus d'origine a supprimé en mourant. Purger ces variables rend à
+        chaque relance sa propre extraction (constaté : 5 dossiers distincts au
+        lieu d'un seul partagé).
+
+        Le répertoire courant n'est pas transmis non plus : on démarre dans
+        ``config.base_dir()``, qui existe toujours.
         """
         cmd = []
         try:
@@ -179,12 +188,14 @@ class MainWindow:
                 cmd = [sys.executable] + sys.argv[1:]
             else:
                 cmd = [sys.executable, os.path.abspath(sys.argv[0])] + sys.argv[1:]
+            env = {k: v for k, v in os.environ.items()
+                   if not k.startswith("_PYI") and k != "_MEIPASS2"}
             depart = config.base_dir()
             if not os.path.isdir(depart):
                 depart = None            # laisse Windows choisir plutôt qu'échouer
             self.log.log(i18n.t("topbar.restart_log", "Redémarrage : {c}",
                                 c=subprocess.list2cmdline(cmd)))
-            subprocess.Popen(cmd, cwd=depart)
+            subprocess.Popen(cmd, cwd=depart, env=env)
         except (OSError, ValueError) as exc:
             messagebox.showerror(
                 i18n.t("topbar.language", "Langue"),

@@ -232,15 +232,20 @@ class DetailTab(ttk.Frame):
         nulle part ailleurs qu'ici. Les sous-cas non joignables sont exclus de
         la comparaison — on ne sait pas ce qu'ils déclarent.
         """
+        # Regroupement insensible à la casse, mais AFFICHAGE de la graphie
+        # d'origine : un chemin rendu en minuscules se relit mal et ne
+        # correspond plus à ce qui est écrit dans le case.prefs.
         valeurs = {}
         for nom, opt in ([(meta.get("name", ""), meta.get("optimization", ""))]
                          + [(sc["name"], sc.get("optimization", ""))
                             for sc in subs if sc["exists"]]):
-            valeurs.setdefault((opt or "").strip().lower(), []).append(nom)
+            opt = (opt or "").strip()
+            cle = opt.lower()
+            valeurs.setdefault(cle, (opt, []))[1].append(nom)
         if len(valeurs) < 2:
             return
         detail = " / ".join(f"« {opt or '—'} » : {', '.join(noms)}"
-                            for opt, noms in valeurs.items())
+                            for opt, noms in valeurs.values())
         self.text.insert("end", i18n.t(
             "detail.optim_diverge",
             "⚠ Dossiers d'optimisation différents dans ce lot — {d}", d=detail) + "\n",
