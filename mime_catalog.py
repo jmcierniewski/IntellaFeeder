@@ -271,6 +271,49 @@ def classify_filter(texte: str) -> list[tuple[str, str, str]]:
     return [(nom, status(nom), describe(nom)) for nom in split_filter(texte)]
 
 
+CATEGORY_PREFIX = "category/"
+# « Toutes les catégories » : la cocher revient à tout inclure, ce qui équivaut
+# à n'avoir aucun filtre. On la garde visible (Intella la propose) mais l'UI la
+# signale, sinon on croit avoir filtré quelque chose.
+CATEGORY_ROOT = "category/root"
+
+
+def categories() -> list[tuple[str, str]]:
+    """``[(nom, libellé)]`` des catégories connues, triées par libellé.
+
+    C'est le **bon grain pour composer un filtre** : les 78 catégories sont
+    toutes décrites et toutes présentes dans des filtres réels, là où les
+    ~600 types comptent 121 alias sans libellé ; et elles bougent bien moins
+    d'une version d'Intella à l'autre.
+    """
+    noms = {n for n in _descriptions if n.startswith(CATEGORY_PREFIX)}
+    noms |= {n for n in _observed if n.startswith(CATEGORY_PREFIX)}
+    return sorted(((n, describe(n)) for n in noms), key=lambda c: c[1].lower())
+
+
+def filter_categories(texte: str) -> list[str]:
+    """Les entrées ``category/…`` d'un filtre, dans l'ordre d'apparition."""
+    return [n for n in split_filter(texte) if n.startswith(CATEGORY_PREFIX)]
+
+
+def filter_is_only_categories(texte: str) -> bool:
+    """Vrai si le filtre ne contient **que** des catégories (donc éditable au
+    sélecteur). Un filtre vide n'en est pas un : il ne se représente pas."""
+    entrees = [n for n in split_filter(texte) if n]
+    return bool(entrees) and all(n.startswith(CATEGORY_PREFIX) for n in entrees)
+
+
+def build_category_filter(noms) -> str:
+    """Compose la valeur de ``sourceTypeFilter`` à partir de catégories cochées.
+
+    Trie par **libellé** pour que deux compositions équivalentes donnent la même
+    chaîne — un profil relu ne doit pas paraître modifié parce que l'ordre des
+    cases a changé.
+    """
+    voulues = {n for n in noms if n}
+    return ",".join(n for n, _lib in categories() if n in voulues)
+
+
 def search(motif: str, limit: int = 500) -> list[tuple[str, str, str]]:
     """Cherche dans **les deux** sources : ``[(nom, état, libellé)]``.
 

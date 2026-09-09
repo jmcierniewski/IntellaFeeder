@@ -17,6 +17,7 @@ from tkinter import messagebox, simpledialog, ttk
 import i18n
 import profile_catalog
 import profiles
+from ui_category_picker import CategoryPicker
 from ui_widgets import Tooltip, make_button, mime_filter_summary, show_mime_filter
 
 # Unités d'option traduites via les clés i18n générales (unit.mb, unit.gb…).
@@ -104,8 +105,14 @@ class ProfilesTab(ttk.Frame):
         self.txt_comment.grid(row=0, column=0, sticky="ew", padx=(6, 0), pady=6)
         cvsb.grid(row=0, column=1, sticky="ns", pady=6)
 
-        right = ttk.LabelFrame(rightcol, text=i18n.t("profiles.analysis_options", "Options d'analyse"))
-        right.grid(row=1, column=0, sticky="nsew")
+        # Sous-onglets : le formulaire d'options, et le sélecteur de catégories
+        # (deux façons de remplir le MÊME profil — la liste de gauche et les
+        # boutons restent communs, sinon on perdrait le fil de ce qu'on édite).
+        subnb = ttk.Notebook(rightcol)
+        self.subnotebook = subnb
+        subnb.grid(row=1, column=0, sticky="nsew")
+
+        right = ttk.LabelFrame(subnb, text=i18n.t("profiles.analysis_options", "Options d'analyse"))
         right.rowconfigure(0, weight=1)
         right.columnconfigure(0, weight=1)
         canvas = tk.Canvas(right, highlightthickness=0)
@@ -125,6 +132,26 @@ class ProfilesTab(ttk.Frame):
         canvas.bind("<Leave>", lambda _e: canvas.unbind_all("<MouseWheel>"))
 
         self._build_form(form)
+
+        self.picker = CategoryPicker(
+            subnb, self.app,
+            get_filter=lambda: self._get_option("sourceTypeFilter"),
+            get_mode=self._filter_mode,
+            set_filter=self._set_filter_from_picker)
+        subnb.add(right, text=" " + i18n.t("profiles.tab_options", "Réglages"))
+        subnb.add(self.picker, text=" " + i18n.t("profiles.tab_types",
+                                                 "Types de fichiers à indexer"))
+
+    def _set_filter_from_picker(self, filtre: str, mode: str):
+        """Écrit ce que le sélecteur a composé — le profil reste à enregistrer.
+
+        Volontairement **sans sauvegarde automatique** : le sélecteur remplit le
+        formulaire comme le ferait une saisie, et « Enregistrer » garde son rôle
+        de point de validation unique.
+        """
+        self._set_option("sourceTypeFilter", filtre)
+        self._set_option("sourceTypeFilterMode", mode)
+        self._refresh_mime_summary()
 
     def _build_form(self, form):
         for group, opts in profile_catalog.GROUPS:
@@ -300,6 +327,10 @@ class ProfilesTab(ttk.Frame):
             if key in values:
                 self._set_option(key, values[key])
         self._refresh_mime_summary()
+        # Le sélecteur montre le filtre du profil affiché : sans ce rappel, il
+        # garderait les cases du profil précédent.
+        if hasattr(self, "picker"):
+            self.picker.refresh()
 
     def _collect_values(self) -> dict:
         return {key: profile_catalog.coerce(key, self._get_option(key))

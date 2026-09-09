@@ -398,9 +398,12 @@ class ExportTab(ttk.Frame):
         Silencieux et sans conséquence en cas d'échec : c'est un service rendu
         à l'affichage des profils, jamais une condition de la lecture du cas.
         """
+        sources = inventory.get("sources_detail") or []
+        # AVANT d'apprendre : ce que le référentiel ne décrivait pas. Après,
+        # tout serait « observé » et le signal serait perdu.
         try:
-            nouveaux = mime_catalog.learn_from_sources(
-                inventory.get("sources_detail") or [])
+            inedits = self._undescribed_types(sources)
+            nouveaux = mime_catalog.learn_from_sources(sources)
         except Exception:       # référentiel indisponible, disque plein…
             return
         if nouveaux:
@@ -408,6 +411,48 @@ class ExportTab(ttk.Frame):
                 "inventory.mime_learned",
                 "{n} type(s) MIME appris depuis les filtres du cas.",
                 n=len(nouveaux)))
+        if inedits:
+            self._warn_stale_reference(inedits)
+
+    @staticmethod
+    def _undescribed_types(sources) -> list:
+        """Types filtrés par ce cas qu'aucune description ne nomme."""
+        vus = set()
+        for src in sources:
+            db = (src or {}).get("domain_boundaries") or {}
+            brut = (db.get("mimeTypes") or "").strip()
+            if brut:
+                vus.update(mime_catalog.split_filter(brut))
+        return sorted(n for n in vus if n and mime_catalog.label(n) is None)
+
+    def _warn_stale_reference(self, inedits) -> None:
+        """Signale un référentiel probablement plus ancien que l'Intella du poste.
+
+        C'est le seul chaînon qui restait manuel : sans ce rappel, la mise à
+        jour du référentiel dépendait de ce que l'utilisateur pensait à faire —
+        et rien ne lui disait qu'il y avait lieu d'y penser.
+        ⚠ Un nom non décrit n'est **pas** une erreur : 121 alias d'un filtre
+        réel sont dans ce cas. On informe (journal + une fois par session), on
+        n'alerte pas.
+        """
+        self.app.log.log(i18n.t(
+            "inventory.mime_undescribed",
+            "{n} type(s) filtré(s) par ce cas ne sont décrits par aucun "
+            "référentiel : {ex}…",
+            n=len(inedits), ex=", ".join(inedits[:5])), level="WARN")
+        if getattr(self.app, "_mime_stale_warned", False):
+            return
+        self.app._mime_stale_warned = True
+        messagebox.showinfo(
+            i18n.t("inventory.mime_stale_title", "Référentiel de types MIME"),
+            i18n.t(
+                "inventory.mime_stale",
+                "{n} type(s) filtré(s) par ce cas n'ont pas de description : votre "
+                "référentiel est peut-être plus ancien que votre version d'Intella.\n\n"
+                "Ces types restent utilisables ; seuls leurs libellés manquent. Pour "
+                "les obtenir, importez le fichier de descriptions depuis votre "
+                "installation d'Intella : onglet Maintenance → Types MIME.",
+                n=len(inedits)))
 
     def _apply_cached_folder_sizes(self, inventory) -> int:
         """Applique les tailles de dossiers déjà mémorisées (IF_<cas>.info).

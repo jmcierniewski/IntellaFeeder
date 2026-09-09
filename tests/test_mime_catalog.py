@@ -142,6 +142,46 @@ def test_classify_filter(mimes):
     ]
 
 
+# --- Catégories : la matière du sélecteur ----------------------------------
+
+def test_categories_triees_par_libelle(mimes):
+    _ecrire(mimes, "d.properties",
+            "category/zeta=Alpha\ncategory/alpha=Zeta\napplication/pdf=PDF\n")
+    mc.load()
+    assert mc.categories() == [("category/zeta", "Alpha"), ("category/alpha", "Zeta")]
+
+
+def test_categories_incluent_les_observees_non_decrites(mimes):
+    mc.learn(["category/inedite", "application/x"])
+    assert ("category/inedite", "category/inedite") in mc.categories()
+
+
+def test_filter_is_only_categories(mimes):
+    assert mc.filter_is_only_categories("category/a,category/b") is True
+    assert mc.filter_is_only_categories("category/a,application/pdf") is False
+    assert mc.filter_is_only_categories("") is False        # rien à représenter
+    assert mc.filter_is_only_categories("  ,  ") is False
+
+
+def test_build_category_filter_ordre_stable(mimes):
+    """Deux compositions équivalentes doivent donner la MÊME chaîne.
+
+    Sinon un profil relu paraîtrait modifié parce que l'ordre des cases a
+    changé, et « Enregistrer » proposerait une différence qui n'en est pas une.
+    """
+    _ecrire(mimes, "d.properties", "category/b=Bravo\ncategory/a=Alpha\n")
+    mc.load()
+    assert mc.build_category_filter(["category/b", "category/a"]) \
+        == mc.build_category_filter(["category/a", "category/b"]) \
+        == "category/a,category/b"
+
+
+def test_build_category_filter_ignore_l_inconnu(mimes):
+    _ecrire(mimes, "d.properties", "category/a=Alpha\n")
+    mc.load()
+    assert mc.build_category_filter(["category/a", "category/jamais_vue"]) == "category/a"
+
+
 # --- Recherche -------------------------------------------------------------
 
 def test_search_porte_sur_le_nom_ET_la_description(mimes):

@@ -529,7 +529,30 @@ BUILTIN = {
             "mime.origin_embedded": "Source : version INTÉGRÉE à l'application. Déposer un fichier .properties dans le dossier ci-dessous la remplacerait.",
             "mime.origin_external": "Source : FICHIER EXTERNE, qui remplace la version intégrée ({e} descriptions).",
             "mime.origin_learned": "{n} nom(s) appris de vos cas s'ajoutent à ceux livrés.",
-            "mime.filter_none_include": "Aucun filtre : le mode « include » reste sans effet tant que la liste est vide — tous les types sont indexés."
+            "mime.filter_none_include": "Aucun filtre : le mode « include » reste sans effet tant que la liste est vide — tous les types sont indexés.",
+            "profiles.tab_options": "Réglages",
+            "profiles.tab_types": "Types de fichiers à indexer",
+            "picker.apply": "Appliquer au profil",
+            "picker.reload": "Relire le profil",
+            "picker.all": "Tout cocher",
+            "picker.none": "Tout décocher",
+            "picker.count": "{n} catégorie(s) cochée(s) sur {t}.",
+            "picker.root_hint": "(= tout, donc aucun filtre)",
+            "picker.no_catalog": "Aucune catégorie connue : le référentiel de types n'est pas chargé (voir Maintenance → Types MIME).",
+            "picker.state_ok": "Le filtre de ce profil est composé de catégories : les cases ci-dessous le reflètent.",
+            "picker.state_empty": "Ce profil n'a aucun filtre : tous les types sont indexés. Cochez ce que vous voulez indexer, puis « Appliquer ».",
+            "picker.state_exclude": "Ce profil porte un filtre en mode « exclude » — il désigne ce qui est ÉCARTÉ. Il n'est pas converti ici : appliquer une sélection le remplacerait par un filtre « include ».",
+            "picker.state_types": "Ce profil filtre des types nommés un par un, pas des catégories. Appliquer une sélection remplacerait ce filtre.",
+            "picker.title": "Catégories à indexer",
+            "picker.nothing_to_do": "Aucune catégorie cochée et aucun filtre existant : rien à faire.",
+            "picker.confirm_clear": "Aucune catégorie n'est cochée. Retirer complètement le filtre de ce profil (tous les types seront indexés) ?",
+            "picker.cleared": "Filtre de types retiré du profil.",
+            "picker.root_warning": "« Tout » est coché : les autres cases ne changent rien. Décochez-la pour restreindre l'indexation.",
+            "picker.confirm_replace": "Ce profil a déjà un filtre. Le remplacer par les {n} catégorie(s) cochée(s) ?",
+            "picker.applied": "Filtre du profil : {n} catégorie(s), mode include.",
+            "inventory.mime_undescribed": "{n} type(s) filtré(s) par ce cas ne sont décrits par aucun référentiel : {ex}…",
+            "inventory.mime_stale_title": "Référentiel de types MIME",
+            "inventory.mime_stale": "{n} type(s) filtré(s) par ce cas n'ont pas de description : votre référentiel est peut-être plus ancien que votre version d'Intella.\n\nCes types restent utilisables ; seuls leurs libellés manquent. Pour les obtenir, importez le fichier de descriptions depuis votre installation d'Intella : onglet Maintenance → Types MIME."
         },
         "help": [
             [
@@ -642,59 +665,67 @@ BUILTIN = {
             ],
             [
                 "h1",
-                "Types MIME pour le filtre de types"
+                "Choisir les types de fichiers à indexer"
             ],
             [
                 "p",
-                "Le champ « Filtre de types MIME » attend une liste séparée par des virgules, à combiner avec le mode « inclure » ou « exclure ». Cette liste mélange DEUX niveaux qui cohabitent :"
+                "Par défaut, Intella indexe tout ce qu'il trouve. Vous pouvez restreindre l'indexation d'une source à certaines familles de fichiers — utile quand un scellé contient surtout des données sans intérêt pour l'enquête."
             ],
             [
                 "b",
-                "Les CATÉGORIES Intella (« category/… ») : de vrais regroupements thématiques d'Intella. Cocher une catégorie sélectionne d'un coup tous les formats qu'elle contient."
+                "Dans Intella, vous cochez ce que vous voulez, mais le cas enregistre la liste INVERSE — tout ce que vous n'avez pas coché, souvent des centaines d'entrées. IntellaFeeder, lui, vous fait cocher ce que vous voulez garder."
+            ],
+            [
+                "h2",
+                "Le sélecteur de catégories"
+            ],
+            [
+                "p",
+                "Onglet « Profils » → sous-onglet « Types de fichiers à indexer ». Cochez les catégories voulues, « Appliquer au profil », puis « Enregistrer ». Seules ces catégories seront indexées pour les sources qui utilisent ce profil."
             ],
             [
                 "b",
-                "Les TYPES INDIVIDUELS (« application/x-pdf », « application/rtf »…) : un format précis, coché à l'unité, indépendamment de sa catégorie."
+                "Aucune case cochée = aucun filtre : tout est indexé. C'est le réglage normal."
             ],
             [
-                "p",
-                "Un type individuel n'est donc PAS « contenu » dans un « category/… » de la liste : les deux se choisissent séparément. Exemple : application/x-pdf relève thématiquement des Documents, mais se coche seul (Intella n'imbrique pas). La liste exacte dépend de votre cas — le plus fiable est d'utiliser « Info Profil » sur une source réglée dans Intella."
-            ],
-            [
-                "h2",
-                "Catégories Intella (les vraies catégories)"
-            ],
-            [
-                "pcsv",
-                "category/accounts, category/browser_cookies, category/browser_downloads, category/chat, category/contacts, category/containers, category/crypto_currency, category/formulas, category/graphics, category/hangul_document, category/launched_programs, category/media, category/other_communications, category/other_documents, category/other_media, category/others, category/presentations, category/recently_accessed_files, category/scheduling, category/system, category/user_activity, category/user_sessions, category/video, category/voice, category/word_processing"
+                "b",
+                "« Toutes les catégories » revient au même : tout est indexé."
             ],
             [
                 "h2",
-                "Types individuels (formats précis)"
+                "Lire un filtre venu d'Intella"
             ],
             [
                 "p",
-                "Ce ne sont PAS des catégories Intella. Le regroupement par thème ci-dessous est le nôtre, uniquement pour faciliter la lecture."
+                "Un profil récupéré d'une source déjà réglée dans Intella (bouton « Info Profil » de l'Inventaire) porte souvent une longue liste de types à écarter. Le bouton « Voir les types… » l'affiche en clair, avec son sens : selon le mode, la liste désigne ce qui est indexé ou au contraire ce qui est écarté. Lisez toujours la ligne en gras en haut de la fenêtre avant de conclure."
             ],
             [
-                "bcsv",
-                "Traitement de texte & bureautique : application/rtf, text/rtf, application/x-pdf, application/msonenote, application/vnd.fdf, application/vnd.framemaker, application/x-framemaker, application/vnd.ms-publisher, application/vnd.ms-xpsdocument, application/vnd.oasis.opendocument.text (et -master, -template, -web), application/vnd.stardivision.writer (et -global), application/vnd.stardivision.math, application/vnd.stardivision.draw, application/vnd.sun.xml.writer (et .template), application/vnd.wordperfect, application/wps-office.wps/.wpt/.dpt/.ett, application/x-mspowerpoint, text/vnd.wap.wml"
+                "p",
+                "Les noms sont colorés : en bleu ceux que le référentiel sait nommer, en noir ceux qu'Intella écrit sans les décrire (ce sont des synonymes, c'est normal), en rouge ceux qui n'ont jamais été rencontrés — à vérifier."
             ],
             [
-                "bcsv",
-                "Images, vidéo & média : image/iff, image/x-iff, application/iff, application/x-iff, application/ogg, application/riff, application/x-iso-base-media, application/x-shockwave-flash, video/x-ms-asf, video/x-ms-wm"
+                "h1",
+                "Onglet Maintenance"
             ],
             [
-                "bcsv",
-                "Archives & conteneurs : application/binhex, application/unix-v7-tar, application/x-java-webarchive, application/x-rar-compressed-v5, application/x-sitx"
+                "p",
+                "Il regroupe ce qui ne fait pas partie du travail d'import quotidien."
             ],
             [
-                "bcsv",
-                "Artefacts Windows & forensic (Intella) : application/vnd.ms-registry, application/vnd.ms-registry-key, application/vnd.ms-windows-xml-event-log-entry, application/x-intella-windows-registry-artifacts, application/x-intella-windows-shellbag, application/x-intella-windows-10-timeline-entry, application/x-intella-windows-push-notification-entry, application/x-intella-operating-system-information, application/x-intella-startup-program, application/x-intella-installed-application, application/x-intella-time-zone-information, application/x-intella-usb-storage-device, application/x-intella-boot-sector-file, application/x-intella-net-connection, application/x-intella-device-acquisition, application/x-intella-aws-s3-bucket, application/x-intella-imap-connection, application/x-intella-sharepoint-post"
+                "b",
+                "Journal : les opérations de la session, exportables."
             ],
             [
-                "bcsv",
-                "Réseau & e-mail : application/pcap, application/vnd.tcpdump.pcap, message/rfc822-headers, application/applefile, multipart/appledouble"
+                "b",
+                "Options : réglages durables, comme l'exploration des sous-dossiers par défaut lorsque vous déposez un dossier d'images."
+            ],
+            [
+                "b",
+                "Types MIME : d'où viennent les noms de types, recherche, et import du fichier de descriptions livré avec Intella si votre version est plus récente."
+            ],
+            [
+                "b",
+                "Fichiers : où l'application range ses paramètres, profils et langues."
             ],
             [
                 "h1",
@@ -1293,7 +1324,30 @@ BUILTIN = {
             "mime.origin_embedded": "Source: version BUILT INTO the application. Dropping a .properties file in the folder below would replace it.",
             "mime.origin_external": "Source: EXTERNAL FILE, replacing the built-in version ({e} descriptions).",
             "mime.origin_learned": "{n} name(s) learned from your cases add to the shipped ones.",
-            "mime.filter_none_include": "No filter: “include” mode has no effect while the list is empty — every type is indexed."
+            "mime.filter_none_include": "No filter: “include” mode has no effect while the list is empty — every type is indexed.",
+            "profiles.tab_options": "Settings",
+            "profiles.tab_types": "File types to index",
+            "picker.apply": "Apply to profile",
+            "picker.reload": "Reload profile",
+            "picker.all": "Check all",
+            "picker.none": "Uncheck all",
+            "picker.count": "{n} of {t} categories checked.",
+            "picker.root_hint": "(= everything, so no filter at all)",
+            "picker.no_catalog": "No known category: the type reference is not loaded (see Maintenance → MIME types).",
+            "picker.state_ok": "This profile's filter is made of categories: the boxes below reflect it.",
+            "picker.state_empty": "This profile has no filter: every type is indexed. Check what you want indexed, then “Apply”.",
+            "picker.state_exclude": "This profile carries an “exclude” filter — it lists what is SKIPPED. It is not converted here: applying a selection would replace it with an “include” filter.",
+            "picker.state_types": "This profile filters individually named types, not categories. Applying a selection would replace that filter.",
+            "picker.title": "Categories to index",
+            "picker.nothing_to_do": "No category checked and no existing filter: nothing to do.",
+            "picker.confirm_clear": "No category is checked. Remove this profile's filter entirely (every type will be indexed)?",
+            "picker.cleared": "Type filter removed from the profile.",
+            "picker.root_warning": "“All items” is checked: the other boxes change nothing. Uncheck it to restrict indexing.",
+            "picker.confirm_replace": "This profile already has a filter. Replace it with the {n} checked category(ies)?",
+            "picker.applied": "Profile filter: {n} category(ies), include mode.",
+            "inventory.mime_undescribed": "{n} type(s) filtered by this case have no description: {ex}…",
+            "inventory.mime_stale_title": "MIME type reference",
+            "inventory.mime_stale": "{n} type(s) filtered by this case have no description: your reference may be older than your Intella version.\n\nThese types remain usable; only their labels are missing. To get them, import the description file from your Intella installation: Maintenance tab → MIME types."
         },
         "help": [
             [
@@ -1406,59 +1460,67 @@ BUILTIN = {
             ],
             [
                 "h1",
-                "MIME types for the type filter"
+                "Choosing which file types to index"
             ],
             [
                 "p",
-                "The « MIME type filter » field expects a comma-separated list, combined with either « include » or « exclude » mode. This list mixes TWO levels that coexist:"
+                "By default Intella indexes everything it finds. You can restrict a source to certain families of files — useful when an exhibit mostly holds data of no interest to the case."
             ],
             [
                 "b",
-                "Intella CATEGORIES (« category/… »): real thematic groupings defined by Intella. Checking a category selects all the formats it contains at once."
+                "In Intella you tick what you want, but the case stores the OPPOSITE list — everything you did not tick, often hundreds of entries. IntellaFeeder instead lets you tick what you want to keep."
+            ],
+            [
+                "h2",
+                "The category selector"
+            ],
+            [
+                "p",
+                "“Profiles” tab → “File types to index” sub-tab. Tick the categories you want, “Apply to profile”, then “Save”. Only those categories will be indexed for sources using this profile."
             ],
             [
                 "b",
-                "INDIVIDUAL TYPES (« application/x-pdf », « application/rtf »…): one precise format, checked on its own, independently of its category."
+                "No box ticked = no filter: everything is indexed. That is the normal setting."
             ],
             [
-                "p",
-                "An individual type is therefore NOT « contained » in a « category/… » entry in the list: the two are chosen separately. Example: application/x-pdf belongs thematically to Documents, but is checked on its own (Intella does not nest them). The exact list depends on your case — the most reliable approach is to use « Profile info » on a source configured in Intella."
-            ],
-            [
-                "h2",
-                "Intella categories (the real categories)"
-            ],
-            [
-                "pcsv",
-                "category/accounts, category/browser_cookies, category/browser_downloads, category/chat, category/contacts, category/containers, category/crypto_currency, category/formulas, category/graphics, category/hangul_document, category/launched_programs, category/media, category/other_communications, category/other_documents, category/other_media, category/others, category/presentations, category/recently_accessed_files, category/scheduling, category/system, category/user_activity, category/user_sessions, category/video, category/voice, category/word_processing"
+                "b",
+                "“All items” amounts to the same thing: everything is indexed."
             ],
             [
                 "h2",
-                "Individual types (precise formats)"
+                "Reading a filter that came from Intella"
             ],
             [
                 "p",
-                "These are NOT Intella categories. The thematic grouping below is ours, only to make reading easier."
+                "A profile picked up from a source already configured in Intella (“Profile info” button in the Inventory) often carries a long list of types to skip. The “View types…” button shows it in plain language, with its meaning: depending on the mode, the list says what is indexed or what is skipped. Always read the bold line at the top of the window before drawing conclusions."
             ],
             [
-                "bcsv",
-                "Word processing & office: application/rtf, text/rtf, application/x-pdf, application/msonenote, application/vnd.fdf, application/vnd.framemaker, application/x-framemaker, application/vnd.ms-publisher, application/vnd.ms-xpsdocument, application/vnd.oasis.opendocument.text (and -master, -template, -web), application/vnd.stardivision.writer (and -global), application/vnd.stardivision.math, application/vnd.stardivision.draw, application/vnd.sun.xml.writer (and .template), application/vnd.wordperfect, application/wps-office.wps/.wpt/.dpt/.ett, application/x-mspowerpoint, text/vnd.wap.wml"
+                "p",
+                "Names are colour-coded: blue for those the reference can name, black for those Intella writes without describing (they are synonyms, this is normal), red for those never seen before — worth checking."
             ],
             [
-                "bcsv",
-                "Images, video & media: image/iff, image/x-iff, application/iff, application/x-iff, application/ogg, application/riff, application/x-iso-base-media, application/x-shockwave-flash, video/x-ms-asf, video/x-ms-wm"
+                "h1",
+                "Maintenance tab"
             ],
             [
-                "bcsv",
-                "Archives & containers: application/binhex, application/unix-v7-tar, application/x-java-webarchive, application/x-rar-compressed-v5, application/x-sitx"
+                "p",
+                "It gathers what is not part of the daily import work."
             ],
             [
-                "bcsv",
-                "Windows & forensic artifacts (Intella): application/vnd.ms-registry, application/vnd.ms-registry-key, application/vnd.ms-windows-xml-event-log-entry, application/x-intella-windows-registry-artifacts, application/x-intella-windows-shellbag, application/x-intella-windows-10-timeline-entry, application/x-intella-windows-push-notification-entry, application/x-intella-operating-system-information, application/x-intella-startup-program, application/x-intella-installed-application, application/x-intella-time-zone-information, application/x-intella-usb-storage-device, application/x-intella-boot-sector-file, application/x-intella-net-connection, application/x-intella-device-acquisition, application/x-intella-aws-s3-bucket, application/x-intella-imap-connection, application/x-intella-sharepoint-post"
+                "b",
+                "Journal: this session's operations, exportable."
             ],
             [
-                "bcsv",
-                "Network & e-mail: application/pcap, application/vnd.tcpdump.pcap, message/rfc822-headers, application/applefile, multipart/appledouble"
+                "b",
+                "Options: lasting settings, such as exploring subfolders by default when you drop a folder of images."
+            ],
+            [
+                "b",
+                "MIME types: where type names come from, search, and import of the description file shipped with Intella if your version is newer."
+            ],
+            [
+                "b",
+                "Files: where the application keeps its settings, profiles and languages."
             ],
             [
                 "h1",
