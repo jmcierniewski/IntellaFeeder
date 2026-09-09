@@ -17,14 +17,23 @@ import pytest
 
 import config
 import mime_catalog as mc
+import mime_data
 
 
 @pytest.fixture
 def mimes(tmp_path, monkeypatch):
-    """Isole ``mimetypes\\`` et repart d'un référentiel vide."""
+    """Isole ``mimetypes\\`` **et** neutralise le référentiel embarqué.
+
+    Sans cette seconde partie, chaque test partirait des 679 descriptions et
+    800 noms livrés dans `mime_data` : les assertions porteraient sur un état
+    qui change à chaque régénération du module. La fusion embarqué + externe a
+    ses propres tests, plus bas.
+    """
     d = tmp_path / "mimetypes"
     d.mkdir()
     monkeypatch.setattr(config, "mime_dir", lambda: str(d))
+    monkeypatch.setattr(mime_data, "DESCRIPTIONS", {})
+    monkeypatch.setattr(mime_data, "OBSERVED", [])
     mc.load()
     return d
 
@@ -261,10 +270,53 @@ def test_import_fichier_absent(mimes):
         mc.import_descriptions(os.path.join(str(mimes), "nexiste_pas.properties"))
 
 
-# --- Absence de référentiel : cas NORMAL ----------------------------------
+# --- Référentiel embarqué : socle, surchargeable --------------------------
+
+def test_embarque_sert_de_socle(tmp_path, monkeypatch):
+    """Sans dossier `mimetypes\\`, l'exe nomme quand même les types."""
+    monkeypatch.setattr(config, "mime_dir", lambda: str(tmp_path / "absent"))
+    monkeypatch.setattr(mime_data, "DESCRIPTIONS", {"a/b": "Embarqué"})
+    monkeypatch.setattr(mime_data, "OBSERVED", ["a/b", "c/d"])
+    mc.load()
+    assert mc.label("a/b") == "Embarqué"
+    assert mc.status("c/d") == mc.STATUS_OBSERVED
+
+
+def test_fichier_externe_REMPLACE_les_descriptions_embarquees(tmp_path, monkeypatch):
+    """Importer, c'est installer une AUTRE version — pas fusionner deux époques.
+
+    Si les deux se mélangeaient, un type retiré par Vound resterait décrit par
+    l'embarqué, et le bilan « n type(s) disparu(s) » de l'import mentirait.
+    """
+    d = tmp_path / "mimetypes"
+    d.mkdir()
+    monkeypatch.setattr(config, "mime_dir", lambda: str(d))
+    monkeypatch.setattr(mime_data, "DESCRIPTIONS", {"a/b": "Embarqué", "vieux/x": "Parti"})
+    monkeypatch.setattr(mime_data, "OBSERVED", [])
+    _ecrire(d, "neuf.properties", "a/b=Externe\nc/d=Nouveau\n")
+    mc.load()
+    assert mc.label("a/b") == "Externe"
+    assert mc.label("vieux/x") is None           # remplacé, pas fusionné
+    assert mc.label("c/d") == "Nouveau"
+
+
+def test_noms_observes_FUSIONNENT_toujours(tmp_path, monkeypatch):
+    """Les noms sont des constats : en perdre ferait réapparaître des « inconnus »."""
+    d = tmp_path / "mimetypes"
+    d.mkdir()
+    monkeypatch.setattr(config, "mime_dir", lambda: str(d))
+    monkeypatch.setattr(mime_data, "DESCRIPTIONS", {})
+    monkeypatch.setattr(mime_data, "OBSERVED", ["embarque/x"])
+    _ecrire(d, mc.OBSERVED_FILENAME, "local/y\n", encodage="utf-8")
+    mc.load()
+    assert mc.status("embarque/x") == mc.STATUS_OBSERVED
+    assert mc.status("local/y") == mc.STATUS_OBSERVED
+
+
+# --- Absence totale de référentiel : cas NORMAL ---------------------------
 
 def test_sans_referentiel_tout_fonctionne(mimes):
-    """Rien n'est livré avec l'application : l'absence n'est pas une panne."""
+    """Un exe sans référentiel embarqué ni fichier ne doit pas être en panne."""
     assert mc.is_loaded() is False
     assert mc.label("a/b") is None
     assert mc.status("a/b") == mc.STATUS_UNKNOWN

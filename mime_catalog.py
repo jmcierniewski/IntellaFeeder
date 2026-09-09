@@ -8,10 +8,11 @@ qu'elle dépasse quelques entrées, et les filtres réels en comptent **600**.
 Deux sources de noms, et il en faut **deux** :
 
 1. **Les descriptions**, fichier ``mimetype-descriptions_<langue>.properties``
-   livré avec Intella (679 entrées). Il donne le libellé lisible.
-   ⚠ **Rien n'est livré avec IntellaFeeder** : ce fichier appartient à Vound et
-   s'importe depuis l'installation d'Intella (onglet Maintenance). Il change
-   d'une version d'Intella à l'autre — c'est justement pourquoi il est externe.
+   d'Intella (679 entrées). Il donne le libellé lisible. **Embarqué dans l'exe**
+   (``mime_data.DESCRIPTIONS``, généré par ``outils/gen_mime_data.py``) et
+   **surchargeable** par un fichier externe dans ``mimetypes\`` — même contrat
+   que ``lang\*.lang`` : une nouvelle version d'Intella s'absorbe sans
+   recompiler, par l'onglet Maintenance.
 2. **Les noms observés**, appris des exports XML que l'application lit déjà.
    Nécessaires parce que **le référentiel ne décrit pas tout** : sur un filtre
    quasi exhaustif (677 noms, constaté le 09/09/2026), **121 sont absents des
@@ -39,6 +40,7 @@ import os
 import re
 
 import config
+import mime_data
 
 # --- États d'un nom de type ------------------------------------------------
 STATUS_DESCRIBED = "described"
@@ -152,23 +154,34 @@ def observed_path() -> str:
 def load() -> None:
     """(Re)charge descriptions et noms observés. Ne lève jamais.
 
-    Un référentiel absent est un cas **normal** (rien n'est livré avec l'appli) :
-    tout continue de fonctionner, sans libellés.
+    **Embarqué d'abord, fichier externe ensuite** : ``mime_data`` fournit le
+    socle (l'exe fonctionne seul, sans dossier ``mimetypes\\``), un
+    ``.properties`` présent le **remplace** intégralement — c'est le sens d'un
+    import : installer une autre version, pas fusionner deux époques.
+    Les noms observés, eux, **s'ajoutent** : ce sont des constats, pas une
+    version, et en perdre reviendrait à réafficher des alias comme « inconnus ».
     """
     global _descriptions, _observed, _source_file, _duplicates
-    _descriptions, _observed, _duplicates = {}, set(), []
+    _descriptions = dict(getattr(mime_data, "DESCRIPTIONS", {}))
+    _observed = set(getattr(mime_data, "OBSERVED", []))
+    _duplicates = []
     _source_file = descriptions_path()
     if _source_file:
         try:
             with open(_source_file, encoding="latin-1") as fh:
-                _descriptions, _duplicates = parse_properties(fh.read())
+                externes, _duplicates = parse_properties(fh.read())
+            if externes:
+                _descriptions = externes
+            else:                       # fichier vide/illisible : on garde l'embarqué
+                _source_file = ""
         except OSError:
-            _descriptions, _duplicates, _source_file = {}, [], ""
+            _source_file = ""
+    _observed |= set(_descriptions)
     try:
         with open(observed_path(), encoding="utf-8") as fh:
             # Une ligne vide n'est pas une scorie : c'est le seul encodage
             # possible du type « Untyped », dont le nom EST la chaîne vide.
-            _observed = {ligne.strip() for ligne in fh}
+            _observed |= {ligne.strip() for ligne in fh}
     except OSError:
         pass
 

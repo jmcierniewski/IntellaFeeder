@@ -20,11 +20,10 @@ Cas/
 profils/*.json
 intellafeeder.ini
 
-# Référentiel de types MIME : le fichier de DESCRIPTIONS appartient à Vound
-# (livré avec Intella) et s'importe depuis l'installation locale — il n'a pas sa
-# place dans un dépôt public. La liste des NOMS observés, elle, est versionnée :
-# elle ne contient que des identifiants de types, et son obtention (cocher
-# méthodiquement l'interface d'Intella) n'est pas reproductible par hasard.
+# Référentiel de types MIME : le contenu est EMBARQUÉ dans `mime_data.py`
+# (décision de l'utilisateur, 09/09/2026 — comme les langues). Les copies
+# horodatées du .properties déposées ici par un import ne sont que des sources
+# de régénération : inutile de les versionner.
 mimetypes/*.properties
 
 # Divers éditeurs / OS
