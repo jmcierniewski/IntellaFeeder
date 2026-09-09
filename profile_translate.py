@@ -8,6 +8,8 @@ l'enregistrer comme profil. Correspondances issues de l'Étude 2 (CLAUDE.md) et
 constatées sur ``Fichiers de cas\\sources.xml``.
 """
 
+import mime_catalog
+
 # XML indexOptions -> clé JSON catalogue. (bool sauf mention.)
 _BOOL_MAP = {
     "indexMailContainers": "indexMailArchives",
@@ -88,9 +90,11 @@ def from_xml_source(src: dict) -> dict:
         values["sourceTypeFilterMode"] = "include" if "include" in mode else "exclude"
     mimes = (db.get("mimeTypes") or "").strip()
     if mimes:
-        # Nettoie les entrées vides (« ,, » constaté dans les exports Intella).
-        parts = [p.strip() for p in mimes.split(",") if p.strip()]
-        values["sourceTypeFilter"] = ",".join(parts)
+        # 🐞 Le « ,, » des exports Intella n'est PAS une scorie : le référentiel
+        # de Vound porte une entrée à clé vide (`=Untyped`), le type des items
+        # dont le format n'a pas été reconnu. L'écarter (ce que faisait le code
+        # jusqu'au 09/09/2026) retirait silencieusement un type du filtre.
+        values["sourceTypeFilter"] = ",".join(mime_catalog.split_filter(mimes))
     fnf = (db.get("fileNameFilters") or "").strip()
     if fnf:
         values["fileNameFilters"] = fnf

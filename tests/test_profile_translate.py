@@ -70,11 +70,18 @@ class TestDomainBoundaries:
         vals = pt.from_xml_source(_src(domain_boundaries={"includeMode": "EXCLUDE"}))
         assert vals["sourceTypeFilterMode"] == "exclude"
 
-    def test_mime_entrees_vides_nettoyees(self):
-        """Les exports Intella contiennent des « ,, » à ignorer."""
+    def test_mime_entree_vide_conservee_une_fois(self):
+        """🐞 Le « ,, » d'un export Intella EST un type : « Untyped ».
+
+        Corrigé le 09/09/2026 : le référentiel de Vound porte une entrée à clé
+        vide (``=Untyped``), celle des items dont le format n'a pas été reconnu.
+        L'ancien code la retirait, ce qui **modifiait le filtre en silence** —
+        une source réelle du 08/09 en portait une.
+        Les segments vides multiples se réduisent à un seul (dédoublonnage).
+        """
         vals = pt.from_xml_source(_src(domain_boundaries={
             "mimeTypes": "application/pdf,, ,image/jpeg,"}))
-        assert vals["sourceTypeFilter"] == "application/pdf,image/jpeg"
+        assert vals["sourceTypeFilter"] == "application/pdf,,image/jpeg"
 
     def test_filtre_nom_de_fichier(self):
         vals = pt.from_xml_source(_src(domain_boundaries={"fileNameFilters": "*.tmp"}))

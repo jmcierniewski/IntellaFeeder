@@ -5,9 +5,17 @@ détecté) et l'affiche en clair. Lecture seule, informatif.
 
 Cas **compound** : une section « Sous-cas référencés », placée juste après
 l'identité du cas, donne pour chacun nom, taille, chemin, accessibilité et
-**utilisateurs autorisés** (les droits sont portés par le sous-cas, pas par le
-compound) — c'est ici, avec l'Inventaire, que se lit un compound, l'Import lui
-étant fermé.
+utilisateurs — c'est ici, avec l'Inventaire, que se lit un compound, l'Import
+lui étant fermé.
+
+⚠ **Ce que la liste d'utilisateurs dit vraiment** (précisé par l'utilisateur le
+09/09/2026, après une alerte qui se révélait fausse) : un utilisateur n'apparaît
+dans le ``case.xml`` d'un cas **que s'il l'a déjà ouvert**. Ce n'est donc pas une
+liste de droits mais une liste de **passages**. Et sur un compound, **seuls les
+droits du compound comptent** : ses sous-cas, souvent jamais ouverts
+directement, peuvent n'afficher personne sans que rien n'aille mal. D'où le
+retrait de l'alerte « droits inégaux entre sous-cas » (v2.7b) au profit d'une
+note explicative : elle signalait comme un problème le cas nominal.
 """
 
 import os
@@ -185,7 +193,7 @@ class DetailTab(ttk.Frame):
                 "Cas déclaré compound mais ne référençant aucun sous-cas.") + "\n", "muted")
             return
         known = sum(sc["size"] for sc in subs if sc["exists"])
-        users_label = i18n.t("detail.authorized_users", "Utilisateurs autorisés")
+        users_label = i18n.t("detail.subcase_users", "Utilisateurs ayant ouvert")
         optim_label = i18n.t("detail.optim_folder", "Dossier d'optimisation")
         for num, sc in enumerate(subs, 1):
             if sc["exists"]:
@@ -197,9 +205,10 @@ class DetailTab(ttk.Frame):
                               n=sc["name"], e=sc["error"])
                 self.text.insert("end", f"{num}.  ✕ " + line + "\n", "sub_ko")
             self.text.insert("end", sc["path"] + "\n", "sub_path")
-            # Droits et dossier d'optimisation PAR SOUS-CAS : c'est le sous-cas
-            # qui les porte, et deux sous-cas d'un même lot ne s'accordent pas
-            # forcément — ni sur les personnes, ni sur l'emplacement.
+            # Dossier d'optimisation PAR SOUS-CAS : deux sous-cas d'un même lot
+            # ne s'accordent pas forcément sur l'emplacement — d'où l'alerte.
+            # La ligne « utilisateurs », elle, n'est PAS une liste de droits :
+            # voir l'en-tête du module et la note affichée sous la section.
             if sc["exists"]:
                 self.text.insert(
                     "end",
@@ -209,7 +218,7 @@ class DetailTab(ttk.Frame):
                     "end", optim_label + " : " + (sc.get("optimization") or "—") + "\n",
                     "sub_kv")
         self._optimization_warning(meta, subs)
-        self._users_warning(subs)
+        self._users_note(subs)
         missing = [sc for sc in subs if not sc["exists"]]
         recap = i18n.t(
             "detail.subcases_recap",
@@ -251,26 +260,24 @@ class DetailTab(ttk.Frame):
             "⚠ Dossiers d'optimisation différents dans ce lot — {d}", d=detail) + "\n",
             "warn")
 
-    def _users_warning(self, subs):
-        """Alerte si les sous-cas n'ouvrent pas aux mêmes personnes.
+    def _users_note(self, subs):
+        """Explique ce que la liste d'utilisateurs d'un sous-cas signifie.
 
-        Volontairement BRÈVE (demande du 07/09/2026) : la liste de chacun est
-        déjà donnée sous son bloc, on ne redit ici que les noms qui manquent
-        quelque part — c'est la seule information qui ne se lit pas d'un coup
-        d'œil quand il y a plusieurs sous-cas.
+        Remplace l'alerte « droits inégaux » de la v2.7b, qui signalait comme un
+        problème la situation **nominale** (précisé le 09/09/2026) : un
+        utilisateur n'apparaît dans un ``case.xml`` qu'après avoir ouvert le cas,
+        et les droits d'un lot compound sont portés par le compound seul. Des
+        sous-cas jamais ouverts n'affichent donc personne — c'est normal.
+
+        Note affichée seulement quand elle sert : au moins un sous-cas lisible.
         """
-        lisibles = [sc for sc in subs if sc["exists"]]
-        if len(lisibles) < 2:
-            return
-        listes = [set(sc.get("authorized_users", [])) for sc in lisibles]
-        partout = set.intersection(*listes)
-        partiels = sorted(set.union(*listes) - partout)
-        if not partiels:
+        if not any(sc["exists"] for sc in subs):
             return
         self.text.insert("end", i18n.t(
-            "detail.users_diverge",
-            "⚠ Droits inégaux entre sous-cas — pas partout : {u}",
-            u=", ".join(partiels)) + "\n", "warn")
+            "detail.subcase_users_note",
+            "Les accès du lot sont ceux du cas compound ci-dessus. Un sous-cas "
+            "ne liste que les utilisateurs qui l'ont déjà ouvert : « — » ne "
+            "signifie pas qu'il est sans droits.") + "\n", "muted")
 
     # ------------------------------------------------------------------ #
     def _export_tasks2(self):

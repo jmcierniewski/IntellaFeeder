@@ -23,6 +23,7 @@ import case_info
 import case_meta
 import config
 import i18n
+import mime_catalog
 import path_parser
 import profile_translate
 import sizing
@@ -312,6 +313,11 @@ class ExportTab(ttk.Frame):
                                 if inventory.get("is_compound")
                                 else case_export.CSV_COLUMNS)
         self.app.inventory = inventory
+        # Apprend les types MIME des filtres du cas : un nom écrit par Intella
+        # est valide même si le référentiel ne le décrit pas (ce sont souvent
+        # des alias). Sans cet apprentissage, un filtre réel afficherait plus de
+        # cent noms « inconnus » — et la couleur ne voudrait plus rien dire.
+        self._learn_mime_types(inventory)
         # Réutilise les tailles de dossiers déjà mesurées (fichier IF_<cas>.info) :
         # on ne re-scannera que les éventuels NOUVEAUX dossiers à 0.
         cached = self._apply_cached_folder_sizes(inventory)
@@ -385,6 +391,23 @@ class ExportTab(ttk.Frame):
             return (folder_entry["subcase_path"],
                     folder_entry.get("case_name") or folder_entry.get("subcase") or "")
         return meta.get("folder", ""), meta.get("name", "")
+
+    def _learn_mime_types(self, inventory) -> None:
+        """Enrichit le référentiel des types MIME avec ceux des filtres du cas.
+
+        Silencieux et sans conséquence en cas d'échec : c'est un service rendu
+        à l'affichage des profils, jamais une condition de la lecture du cas.
+        """
+        try:
+            nouveaux = mime_catalog.learn_from_sources(
+                inventory.get("sources_detail") or [])
+        except Exception:       # référentiel indisponible, disque plein…
+            return
+        if nouveaux:
+            self.app.log.log(i18n.t(
+                "inventory.mime_learned",
+                "{n} type(s) MIME appris depuis les filtres du cas.",
+                n=len(nouveaux)))
 
     def _apply_cached_folder_sizes(self, inventory) -> int:
         """Applique les tailles de dossiers déjà mémorisées (IF_<cas>.info).

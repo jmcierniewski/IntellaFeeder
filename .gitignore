@@ -20,6 +20,12 @@ Cas/
 profils/*.json
 intellafeeder.ini
 
+# Référentiel de types MIME : le fichier de descriptions appartient à Vound
+# (livré avec Intella) et s'importe depuis l'installation locale ; les noms
+# observés viennent des cas de l'utilisateur. Ni l'un ni l'autre n'a sa place
+# dans un dépôt public.
+mimetypes/
+
 # Divers éditeurs / OS
 .vscode/
 .idea/

@@ -17,7 +17,7 @@ from tkinter import messagebox, simpledialog, ttk
 import i18n
 import profile_catalog
 import profiles
-from ui_widgets import Tooltip, make_button
+from ui_widgets import Tooltip, make_button, mime_filter_summary, show_mime_filter
 
 # Unités d'option traduites via les clés i18n générales (unit.mb, unit.gb…).
 _UNIT_KEYS = {"Mo": "unit.mb", "Go": "unit.gb"}
@@ -162,6 +162,10 @@ class ProfilesTab(ttk.Frame):
                     self._text_widgets[key] = w
                     self._widgets[key] = w
                     gr += 2
+                    if key == "sourceTypeFilter":
+                        # Un « refine » complet dans Intella produit 600 noms
+                        # séparés par des virgules : illisible dans un champ.
+                        gr += self._add_mime_reader(box, gr, w)
                 else:
                     ttk.Label(box, text=label).grid(row=gr, column=0, sticky="w", padx=6, pady=2)
                     var = tk.StringVar(value=str(o["default"]))
@@ -181,6 +185,38 @@ class ProfilesTab(ttk.Frame):
                     self.vars[key] = var
                     self._widgets[key] = w
                     gr += 1
+
+    def _add_mime_reader(self, box, row, text_widget) -> int:
+        """Résumé du filtre de types + bouton de lecture. Retourne les lignes prises.
+
+        Le résumé se met à jour à la frappe : sans lui, rien ne dirait que le
+        champ contient 600 entrées plutôt que 3, ni qu'un nom n'a jamais été vu.
+        """
+        ligne = ttk.Frame(box)
+        ligne.grid(row=row, column=0, columnspan=2, sticky="ew", padx=6, pady=(0, 4))
+        self.lbl_mime = ttk.Label(ligne, text=mime_filter_summary(""))
+        self.lbl_mime.pack(side="left")
+        make_button(ligne, i18n.t("profiles.mime_view", "Voir les types…"),
+                    self._show_mime_filter).pack(side="right")
+        text_widget.bind("<<Modified>>", self._on_mime_modified)
+        return 1
+
+    def _on_mime_modified(self, event):
+        # Tk n'émet `<<Modified>>` qu'une fois tant que le drapeau n'est pas
+        # remis à zéro : l'oublier fige le résumé après la première frappe.
+        widget = event.widget
+        widget.edit_modified(False)
+        self._refresh_mime_summary()
+
+    def _refresh_mime_summary(self):
+        if not hasattr(self, "lbl_mime"):
+            return
+        self.lbl_mime.config(
+            text=mime_filter_summary(self._get_option("sourceTypeFilter")))
+
+    def _show_mime_filter(self):
+        show_mime_filter(self, self._get_option("sourceTypeFilter"),
+                         i18n.t("profiles.mime_title", "Types filtrés par ce profil"))
 
     def _attach_tip(self, widget, text):
         widget.bind("<Enter>", lambda e: self.tooltip.show(text, e.x_root + 12, e.y_root + 20))
@@ -250,6 +286,7 @@ class ProfilesTab(ttk.Frame):
         for key in self._widgets:
             if key in values:
                 self._set_option(key, values[key])
+        self._refresh_mime_summary()
 
     def _collect_values(self) -> dict:
         return {key: profile_catalog.coerce(key, self._get_option(key))

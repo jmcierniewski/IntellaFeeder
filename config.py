@@ -7,7 +7,7 @@ from datetime import datetime
 APP_NAME = "IntellaFeeder"
 # Affichée dans le titre de la fenêtre et le journal → à incrémenter à CHAQUE
 # construction d'exe livrée, sinon impossible de savoir quel build tourne.
-APP_VERSION = "2.8"
+APP_VERSION = "2.9"
 APP_TITLE = "IntellaFeeder — Générateur de sources d'import Intella"
 
 # --- Réglages forensiques par défaut ---
@@ -48,6 +48,11 @@ PROFILS_DIRNAME = "profils"
 
 # --- Langues de l'interface : 1 fichier JSON (.lang) par langue ---
 LANG_DIRNAME = "lang"
+
+# --- Référentiel des types MIME d'Intella (descriptions + noms observés) ---
+# Rien n'est livré avec l'application : le fichier de descriptions appartient à
+# Vound et s'importe depuis l'installation d'Intella (onglet Maintenance).
+MIME_DIRNAME = "mimetypes"
 
 # --- Glyphes des cases à cocher ---
 CHECK = "☑"
@@ -156,3 +161,8 @@ def profiles_dir() -> str:
 def lang_dir() -> str:
     """Dossier des fichiers de langue (``base\\lang``)."""
     return os.path.join(base_dir(), LANG_DIRNAME)
+
+
+def mime_dir() -> str:
+    """Dossier du référentiel de types MIME (``base\\mimetypes``)."""
+    return os.path.join(base_dir(), MIME_DIRNAME)

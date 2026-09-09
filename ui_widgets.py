@@ -1,7 +1,89 @@
-"""Petits widgets réutilisables (infobulle, boutons à look unifié)."""
+"""Petits widgets réutilisables (infobulle, boutons, lecteur de filtre MIME)."""
 
 import tkinter as tk
 from tkinter import ttk
+
+import i18n
+import mime_catalog
+
+# --- Filtre de types MIME : trois états, trois couleurs ------------------- #
+# Un filtre réel compte plusieurs centaines d'entrées, et **18 % d'entre elles
+# ne sont pas décrites** par le fichier livré par Vound : ce sont des alias
+# qu'Intella écrit sans les nommer (cf. `mime_catalog`). Le rouge est donc
+# réservé à ce qu'on n'a **jamais vu** — sinon il couvrirait la moitié de la
+# liste et ne voudrait plus rien dire.
+MIME_STATUS_COLORS = {
+    mime_catalog.STATUS_DESCRIBED: "#1d4ed8",   # bleu : nommé par le référentiel
+    mime_catalog.STATUS_OBSERVED: "#111827",    # noir : vu chez Intella, non décrit
+    mime_catalog.STATUS_UNKNOWN: "#b91c1c",     # rouge : jamais vu, à vérifier
+}
+
+
+def mime_status_label(etat: str) -> str:
+    """Libellé traduit d'un état de `mime_catalog` (module sans i18n)."""
+    return {
+        mime_catalog.STATUS_DESCRIBED: i18n.t("mime.state_described", "décrit"),
+        mime_catalog.STATUS_OBSERVED: i18n.t("mime.state_observed", "vu dans vos cas"),
+        mime_catalog.STATUS_UNKNOWN: i18n.t("mime.state_unknown", "inconnu"),
+    }.get(etat, etat)
+
+
+def mime_filter_summary(texte: str) -> str:
+    """Résumé d'un filtre en une ligne : « 608 types — 498 décrits, 110 vus… »."""
+    if not (texte or "").strip():
+        return i18n.t("mime.filter_none", "Aucun filtre (toutes les sources indexées).")
+    r = mime_catalog.summarize_filter(texte)
+    resume = i18n.t("mime.filter_summary",
+                    "{t} type(s) — {d} décrit(s), {o} vu(s) dans vos cas",
+                    t=r["total"], d=r[mime_catalog.STATUS_DESCRIBED],
+                    o=r[mime_catalog.STATUS_OBSERVED])
+    if r[mime_catalog.STATUS_UNKNOWN]:
+        resume += ", " + i18n.t("mime.filter_unknown", "{n} inconnu(s)",
+                                n=r[mime_catalog.STATUS_UNKNOWN])
+    return resume + "."
+
+
+def show_mime_filter(parent, texte: str, titre: str = "") -> None:
+    """Fenêtre de lecture d'un filtre de types : un tableau au lieu d'une chaîne.
+
+    Une liste de 600 noms séparés par des virgules n'est pas relisible dans un
+    champ de saisie — or c'est exactement ce que produit un « refine » complet
+    dans Intella. Lecture seule : le filtre s'édite toujours dans son champ.
+    """
+    win = tk.Toplevel(parent)
+    win.title(titre or i18n.t("mime.filter_title", "Types filtrés"))
+    win.geometry("860x560")
+    win.transient(parent.winfo_toplevel())
+
+    ttk.Label(win, text=mime_filter_summary(texte)).pack(
+        anchor="w", padx=10, pady=(10, 6))
+
+    holder = ttk.Frame(win)
+    holder.pack(fill="both", expand=True, padx=10, pady=(0, 10))
+    tree = ttk.Treeview(holder, columns=("name", "label", "state"),
+                        show="headings")
+    for col, entete, largeur in (
+            ("name", i18n.t("mime.col_name", "Type"), 350),
+            ("label", i18n.t("mime.col_label", "Description"), 330),
+            ("state", i18n.t("mime.col_state", "État"), 130)):
+        tree.heading(col, text=entete)
+        tree.column(col, width=largeur, anchor="w")
+    vsb = ttk.Scrollbar(holder, orient="vertical", command=tree.yview)
+    tree.configure(yscrollcommand=vsb.set)
+    tree.pack(side="left", fill="both", expand=True)
+    vsb.pack(side="right", fill="y")
+    for etat, couleur in MIME_STATUS_COLORS.items():
+        tree.tag_configure(etat, foreground=couleur)
+
+    if (texte or "").strip():
+        for nom, etat, libelle in mime_catalog.classify_filter(texte):
+            tree.insert("", "end",
+                        values=(nom or i18n.t("mime.untyped", "(sans type)"),
+                                libelle, mime_status_label(etat)),
+                        tags=(etat,))
+
+    make_button(win, i18n.t("common.close", "Fermer"), win.destroy).pack(
+        anchor="e", padx=10, pady=(0, 10))
 
 # --- Boutons : apparence unique pour toute l'application ----------------- #
 # tk.Button (et non ttk.Button) : sous le thème Windows, le FOND d'un ttk.Button

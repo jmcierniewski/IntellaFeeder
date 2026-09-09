@@ -8,6 +8,7 @@ from tkinter import filedialog, messagebox, ttk
 
 import config
 import i18n
+import mime_catalog
 import path_parser
 from app_log import AppLog
 from settings import Settings
@@ -15,7 +16,7 @@ from ui_detail import DetailTab
 from ui_export import ExportTab
 from ui_help import HelpTab
 from ui_import import ImportTab
-from ui_journal import JournalTab
+from ui_maintenance import MaintenanceTab
 from ui_profiles import ProfilesTab
 from ui_widgets import make_button
 
@@ -37,6 +38,11 @@ class MainWindow:
         # Changer la langue en cours de session (dropdown) ne retraduit pas les
         # widgets déjà construits : le nouveau choix s'applique au redémarrage.
         self._init_language()
+
+        # Référentiel des types MIME : rien n'est livré avec l'application (le
+        # fichier de descriptions appartient à Vound et s'importe depuis
+        # Maintenance). Son absence est un cas normal — `load` ne lève pas.
+        mime_catalog.load()
 
         # Variables partagées entre onglets.
         # Utilisateur : LECTURE SEULE, issu de case.xml (rempli à la détection).
@@ -68,7 +74,11 @@ class MainWindow:
         self.detail_tab = DetailTab(nb, self)
         self.import_tab = ImportTab(nb, self)
         self.profiles_tab = ProfilesTab(nb, self)
-        self.journal_tab = JournalTab(nb, self)
+        # Le Journal vit désormais SOUS Maintenance (sous-onglets, 09/09/2026) :
+        # `journal_tab` reste exposé pour qui le cherche, mais le sélectionner
+        # passe obligatoirement par `aller_a()`.
+        self.maintenance_tab = MaintenanceTab(nb, self)
+        self.journal_tab = self.maintenance_tab.journal_tab
         self.help_tab = HelpTab(nb, self)
         # Pastille de couleur par onglet pour les distinguer.
         self._tab_imgs = [self._swatch(c) for c in
@@ -82,7 +92,7 @@ class MainWindow:
                image=self._tab_imgs[2], compound="left")
         nb.add(self.profiles_tab, text=" " + i18n.t("tabs.profiles", "Profils"),
                image=self._tab_imgs[3], compound="left")
-        nb.add(self.journal_tab, text=" " + i18n.t("tabs.journal", "Journal"),
+        nb.add(self.maintenance_tab, text=" " + i18n.t("tabs.maintenance", "Maintenance"),
                image=self._tab_imgs[4], compound="left")
         nb.add(self.help_tab, text=" " + i18n.t("tabs.help", "Aide"),
                image=self._tab_imgs[5], compound="left")
@@ -288,12 +298,29 @@ class MainWindow:
         # Un onglet désactivé alors qu'il est affiché reste à l'écran : on
         # ramène l'utilisateur sur l'Inventaire, d'où vient la sélection du cas.
         if compound and self.notebook.select() == str(self.import_tab):
-            self.notebook.select(self.export_tab)
+            self.aller_a(self.export_tab)
+
+    def aller_a(self, onglet) -> None:
+        """Affiche un onglet, **où qu'il soit** — premier niveau ou sous-onglet.
+
+        Depuis que le Journal vit sous Maintenance, un ``notebook.select()``
+        direct échoue sur un onglet imbriqué. Un seul point de passage évite que
+        chaque nouvel appel réinvente la descente et qu'un seul l'oublie.
+        """
+        try:
+            if str(onglet) in self.notebook.tabs():
+                self.notebook.select(onglet)
+                return
+            if hasattr(self, "maintenance_tab") \
+                    and self.maintenance_tab.select_child(onglet):
+                self.notebook.select(self.maintenance_tab)
+        except tk.TclError:
+            pass
 
     def open_profiles_with(self, values, suggested_name=""):
         """Bascule sur l'onglet Profils et pré-remplit le formulaire (Info Profil)."""
         self.profiles_tab.load_from_values(values, suggested_name)
-        self.notebook.select(self.profiles_tab)
+        self.aller_a(self.profiles_tab)
 
     def clear_case_meta(self):
         self.case_meta = None
