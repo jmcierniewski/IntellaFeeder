@@ -528,7 +528,8 @@ BUILTIN = {
             "options.recursive_saved": "Exploration récursive par défaut : {v}.",
             "mime.origin_embedded": "Source : version INTÉGRÉE à l'application. Déposer un fichier .properties dans le dossier ci-dessous la remplacerait.",
             "mime.origin_external": "Source : FICHIER EXTERNE, qui remplace la version intégrée ({e} descriptions).",
-            "mime.origin_learned": "{n} nom(s) appris de vos cas s'ajoutent à ceux livrés."
+            "mime.origin_learned": "{n} nom(s) appris de vos cas s'ajoutent à ceux livrés.",
+            "mime.filter_none_include": "Aucun filtre : le mode « include » reste sans effet tant que la liste est vide — tous les types sont indexés."
         },
         "help": [
             [
@@ -1291,7 +1292,8 @@ BUILTIN = {
             "options.recursive_saved": "Recursive exploration by default: {v}.",
             "mime.origin_embedded": "Source: version BUILT INTO the application. Dropping a .properties file in the folder below would replace it.",
             "mime.origin_external": "Source: EXTERNAL FILE, replacing the built-in version ({e} descriptions).",
-            "mime.origin_learned": "{n} name(s) learned from your cases add to the shipped ones."
+            "mime.origin_learned": "{n} name(s) learned from your cases add to the shipped ones.",
+            "mime.filter_none_include": "No filter: “include” mode has no effect while the list is empty — every type is indexed."
         },
         "help": [
             [

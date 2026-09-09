@@ -52,6 +52,14 @@ def mime_filter_summary(texte: str, mode: str = "", avec_sens: bool = True) -> s
     lecture) : le répéter deux fois à trois lignes d'écart ne l'éclaire pas.
     """
     if not (texte or "").strip():
+        # Un mode « include » sans liste ne veut rien dire et n'est pas émis
+        # (cf. `profile_catalog.diff_from_default`) : le dire, sinon le combo
+        # laisse croire à un réglage actif.
+        if (mode or "").strip().lower().startswith("include"):
+            return i18n.t(
+                "mime.filter_none_include",
+                "Aucun filtre : le mode « include » reste sans effet tant que la "
+                "liste est vide — tous les types sont indexés.")
         return i18n.t("mime.filter_none", "Aucun filtre (tous les types indexés).")
     r = mime_catalog.summarize_filter(texte)
     resume = i18n.t("mime.filter_summary",

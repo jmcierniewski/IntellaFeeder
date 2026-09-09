@@ -68,6 +68,25 @@ class TestDiffFromDefault:
         vals["sourceTypeFilterMode"] = "include"
         assert pc.diff_from_default(vals)["sourceTypeFilterMode"] == "include"
 
+    def test_mode_include_sans_filtre_JAMAIS_emis(self):
+        """🐞 « n'indexer que rien » — le piège inverse (09/09/2026).
+
+        Basculer le combo sur « include » sans rien saisir émettait le mode tout
+        seul. IntellaCmd aurait pu le lire comme « n'indexer que cette liste
+        vide », et l'erreur ne se serait vue qu'après l'import — Intella ne
+        permet pas de revoir les réglages d'une source.
+        """
+        vals = pc.default_values()
+        vals["sourceTypeFilterMode"] = "include"
+        assert pc.diff_from_default(vals) == {}
+
+    def test_mode_exclude_sans_filtre_non_emis_non_plus(self):
+        """Exclure une liste vide = le comportement par défaut : rien à émettre."""
+        vals = pc.default_values()
+        vals["sourceTypeFilterMode"] = "exclude"
+        vals["sourceTypeFilter"] = "   "
+        assert pc.diff_from_default(vals) == {}
+
     def test_cles_hors_catalogue_ignorees(self):
         vals = pc.default_values()
         vals["optionInventee"] = True

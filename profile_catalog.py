@@ -167,6 +167,15 @@ def diff_from_default(values: dict) -> dict:
         mode = coerce("sourceTypeFilterMode",
                       values.get("sourceTypeFilterMode", OPTIONS["sourceTypeFilterMode"]["default"]))
         emit["sourceTypeFilterMode"] = mode or "exclude"
+    # 🐞 …et RÉCIPROQUEMENT : jamais de mode sans filtre (09/09/2026). Basculer
+    # le combo sur « include » en laissant le champ vide émettait
+    # ``{"sourceTypeFilterMode": "include"}`` tout seul — soit, littéralement,
+    # « n'indexer que rien ». L'erreur ne se verrait qu'après l'import, et
+    # Intella ne permet pas de revoir les réglages d'une source. Un mode sans
+    # filtre n'a de toute façon aucun sens dans l'autre cas non plus (exclure
+    # une liste vide, c'est le comportement par défaut).
+    if "sourceTypeFilterMode" in emit and "sourceTypeFilter" not in emit:
+        del emit["sourceTypeFilterMode"]
     return emit
 
 
