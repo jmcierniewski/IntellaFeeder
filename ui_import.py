@@ -144,6 +144,10 @@ class ImportTab(ttk.Frame):
         frame.pack(fill="both", expand=True, padx=8, pady=4)
         frame.columnconfigure(0, weight=1)
         frame.columnconfigure(1, weight=1)
+        # 🐞 Sans poids sur la LIGNE, réduire « Sources à importer » ne rendait
+        # rien aux deux zones de collage : la grille gardait leur hauteur de
+        # départ et la place gagnée restait vide (rapporté le 09/09/2026).
+        frame.rowconfigure(0, weight=1)
 
         left = ttk.LabelFrame(frame, text=i18n.t(
             "import.images_panel", "Images forensiques (DISK_IMAGE) — 1 chemin/ligne"))
@@ -158,10 +162,15 @@ class ImportTab(ttk.Frame):
         # Les deux panneaux ne traitent PAS un dossier de la même façon : à
         # gauche il est exploré, à droite il devient la source. C'est écrit sous
         # chaque zone, sinon le même geste donne deux résultats sans prévenir.
-        # Descente dans les sous-dossiers : DÉCOCHÉE par défaut (07/09/2026).
-        # Un dossier de scellés voisine souvent avec d'autres cas ou des copies
-        # de travail ; y descendre d'office ramènerait des images étrangères.
-        self.var_recursive = tk.BooleanVar(value=False)
+        # Descente dans les sous-dossiers : décochée **à l'installation**, et
+        # depuis la v2.9 le défaut se règle (Maintenance → Options, mémorisé au
+        # .ini). Un dossier de scellés voisine souvent avec d'autres cas ou des
+        # copies de travail ; y descendre d'office ramènerait des images
+        # étrangères — mais un utilisateur qui range toujours ses images d'un
+        # cran plus bas ne doit pas recocher la case à chaque dépôt.
+        self.var_recursive = tk.BooleanVar(
+            value=self.app.settings.get("recursive_default", "0").strip()
+            in ("1", "true", "oui", "vrai"))
         bar_images = self._panel_footer(left, i18n.t(
             "import.drop_images_hint",
             "Glissez ici des images ou des DOSSIERS : seules les images "

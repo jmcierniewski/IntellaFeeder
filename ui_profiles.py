@@ -185,6 +185,11 @@ class ProfilesTab(ttk.Frame):
                     self.vars[key] = var
                     self._widgets[key] = w
                     gr += 1
+        # Le mode du filtre est créé APRÈS le champ de filtre (ordre du
+        # catalogue) : on ne peut l'écouter qu'ici, formulaire complet.
+        if "sourceTypeFilterMode" in self.vars:
+            self.vars["sourceTypeFilterMode"].trace_add(
+                "write", lambda *_a: self._refresh_mime_summary())
 
     def _add_mime_reader(self, box, row, text_widget) -> int:
         """Résumé du filtre de types + bouton de lecture. Retourne les lignes prises.
@@ -211,12 +216,20 @@ class ProfilesTab(ttk.Frame):
     def _refresh_mime_summary(self):
         if not hasattr(self, "lbl_mime"):
             return
-        self.lbl_mime.config(
-            text=mime_filter_summary(self._get_option("sourceTypeFilter")))
+        self.lbl_mime.config(text=mime_filter_summary(
+            self._get_option("sourceTypeFilter"), self._filter_mode()))
+
+    def _filter_mode(self) -> str:
+        """Mode courant du filtre — sans lui, la liste se lit à l'envers."""
+        try:
+            return self._get_option("sourceTypeFilterMode")
+        except KeyError:
+            return ""
 
     def _show_mime_filter(self):
         show_mime_filter(self, self._get_option("sourceTypeFilter"),
-                         i18n.t("profiles.mime_title", "Types filtrés par ce profil"))
+                         i18n.t("profiles.mime_title", "Types filtrés par ce profil"),
+                         self._filter_mode())
 
     def _attach_tip(self, widget, text):
         widget.bind("<Enter>", lambda e: self.tooltip.show(text, e.x_root + 12, e.y_root + 20))

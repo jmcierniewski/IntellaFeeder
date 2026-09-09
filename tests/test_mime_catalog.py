@@ -190,6 +190,44 @@ def test_learn_from_sources(mimes):
     assert mc.learn_from_sources(sources) == ["a/b", "c/d", "e/f"]
 
 
+# --- Apprentissage depuis un export XML ------------------------------------
+
+def _export_xml(dossier, nom, filtres):
+    """Fabrique un export `-exportSourceList` minimal (jamais un cas réel)."""
+    corps = "".join(
+        f"<source><name>s{i}</name><domainBoundaries>"
+        f"<includeMode>Exclude selected entries</includeMode>"
+        f"<mimeTypes>{f}</mimeTypes></domainBoundaries></source>"
+        for i, f in enumerate(filtres))
+    return _ecrire(dossier, nom, f"<sources>{corps}</sources>", encodage="utf-8")
+
+
+def test_learn_from_xml(mimes, tmp_path):
+    chemin = _export_xml(tmp_path, "export.xml", ["a/b,c/d", "c/d,e/f"])
+    assert mc.learn_from_xml(chemin) == ["a/b", "c/d", "e/f"]
+    assert mc.learn_from_xml(chemin) == []      # déjà connus
+
+
+def test_learn_from_xml_refuse_un_fichier_hors_sujet(mimes, tmp_path):
+    chemin = _ecrire(tmp_path, "autre.xml", "<case><name>x</name></case>",
+                     encodage="utf-8")
+    with pytest.raises(ValueError):
+        mc.learn_from_xml(chemin)
+
+
+def test_learn_from_xml_signale_l_absence_de_filtre(mimes, tmp_path):
+    """« 0 nouveau type » sur un export sans filtre serait un faux négatif."""
+    chemin = _export_xml(tmp_path, "vide.xml", [""])
+    with pytest.raises(ValueError):
+        mc.learn_from_xml(chemin)
+
+
+def test_learn_from_xml_illisible(mimes, tmp_path):
+    chemin = _ecrire(tmp_path, "casse.xml", "<sources><source>", encodage="utf-8")
+    with pytest.raises(ValueError):
+        mc.learn_from_xml(chemin)
+
+
 # --- Import d'un référentiel ----------------------------------------------
 
 def test_import_bilan_ajouts_et_pertes(mimes, tmp_path):

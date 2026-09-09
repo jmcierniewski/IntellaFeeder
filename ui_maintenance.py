@@ -36,10 +36,12 @@ class MaintenanceTab(ttk.Frame):
         nb.pack(fill="both", expand=True, padx=4, pady=4)
 
         self.journal_tab = JournalTab(nb, app)
+        self.options_tab = OptionsTab(nb, app)
         self.mime_tab = MimeTab(nb, app)
         self.files_tab = FilesTab(nb, app)
 
         nb.add(self.journal_tab, text=" " + i18n.t("tabs.journal", "Journal"))
+        nb.add(self.options_tab, text=" " + i18n.t("tabs.options", "Options"))
         nb.add(self.mime_tab, text=" " + i18n.t("tabs.mime", "Types MIME"))
         nb.add(self.files_tab, text=" " + i18n.t("tabs.files", "Fichiers"))
 
@@ -49,6 +51,55 @@ class MaintenanceTab(ttk.Frame):
             return False
         self.notebook.select(widget)
         return True
+
+
+class OptionsTab(ttk.Frame):
+    """Préférences durables, mémorisées au `.ini`.
+
+    Ce qui a sa place ici : un réglage qu'on pose **une fois** et qui vaut pour
+    toutes les sessions. Ce qui n'y a pas sa place : ce qui se décide au coup
+    par coup — la case « Explorer les sous-dossiers » de l'Import reste
+    décochable à chaque dépôt, on ne fixe ici que sa **position de départ**.
+    """
+
+    def __init__(self, parent, app):
+        super().__init__(parent)
+        self.app = app
+
+        box = ttk.LabelFrame(self, text=i18n.t("options.import", "Import de sources"))
+        box.pack(fill="x", padx=10, pady=10)
+
+        self.var_recursive = tk.BooleanVar(
+            value=app.settings.get("recursive_default", "0").strip()
+            in ("1", "true", "oui", "vrai"))
+        ttk.Checkbutton(
+            box, variable=self.var_recursive,
+            command=self._save_recursive,
+            text=i18n.t("options.recursive_default",
+                        "Explorer les sous-dossiers par défaut (dépôt d'images "
+                        "forensiques)")).pack(anchor="w", padx=8, pady=(8, 2))
+        ttk.Label(box, wraplength=880, justify="left", foreground="#475569",
+                  text=i18n.t(
+                      "options.recursive_help",
+                      "Décoché, un dossier déposé n'est exploré qu'au premier niveau : "
+                      "un dossier de scellés voisine souvent avec d'autres cas ou des "
+                      "copies de travail, et descendre d'office ramènerait des images "
+                      "étrangères. Coché si vos images sont systématiquement rangées "
+                      "dans des sous-dossiers. La case reste modifiable à chaque dépôt "
+                      "dans l'onglet Import.")).pack(anchor="w", padx=8, pady=(0, 8))
+
+    def _save_recursive(self):
+        valeur = "1" if self.var_recursive.get() else "0"
+        self.app.settings.set("recursive_default", valeur)
+        self.app.settings.save()
+        # Applique tout de suite à l'onglet Import : attendre le redémarrage
+        # ferait croire que le réglage n'a pas été pris.
+        if hasattr(self.app, "import_tab"):
+            self.app.import_tab.var_recursive.set(self.var_recursive.get())
+        self.app.log.log(i18n.t("options.recursive_saved",
+                                "Exploration récursive par défaut : {v}.",
+                                v=i18n.t("common.yes", "oui") if self.var_recursive.get()
+                                else i18n.t("common.no", "non")))
 
 
 class MimeTab(ttk.Frame):
@@ -76,8 +127,10 @@ class MimeTab(ttk.Frame):
         bar.pack(fill="x", padx=10, pady=(0, 6))
         make_button(bar, i18n.t("mime.import", "Importer un fichier de descriptions…"),
                     self._import).pack(side="left")
+        make_button(bar, i18n.t("mime.learn_xml", "Apprendre depuis un export XML…"),
+                    self._learn_xml).pack(side="left", padx=6)
         make_button(bar, i18n.t("mime.open_folder", "Ouvrir le dossier"),
-                    lambda: open_folder(config.mime_dir())).pack(side="left", padx=6)
+                    lambda: open_folder(config.mime_dir())).pack(side="left")
 
         self.lbl_state = ttk.Label(self, justify="left")
         self.lbl_state.pack(fill="x", padx=10, pady=(0, 8))
@@ -165,6 +218,33 @@ class MimeTab(ttk.Frame):
                                  "{n} clé(s) en double dans le fichier.",
                                  n=len(bilan["duplicates"]))
         self.app.log.log(msg.replace("\n", " "))
+        messagebox.showinfo(titre, msg)
+
+    def _learn_xml(self):
+        """Récolte les noms de types d'un export ``-exportSourceList``.
+
+        La liste livrée avec l'application vient d'une manipulation qu'on ne
+        refait pas par hasard (cocher méthodiquement l'interface d'Intella pour
+        que le XML contienne le complément). C'est ici qu'on la complète quand
+        Intella change de version : refaire la manipulation, exporter, importer.
+        """
+        titre = i18n.t("mime.learn_title", "Apprendre des types depuis un export")
+        chemin = filedialog.askopenfilename(
+            title=titre,
+            filetypes=[(i18n.t("mime.filetype_xml", "Export de sources Intella"), "*.xml"),
+                       (i18n.t("common.filetype_all", "Tous"), "*.*")])
+        if not chemin:
+            return
+        try:
+            nouveaux = mime_catalog.learn_from_xml(chemin)
+        except ValueError as exc:
+            messagebox.showerror(titre, str(exc))
+            return
+        self._refresh_state()
+        msg = (i18n.t("mime.learn_ok", "{n} nouveau(x) type(s) appris.", n=len(nouveaux))
+               if nouveaux else
+               i18n.t("mime.learn_none", "Aucun type nouveau : ils étaient déjà connus."))
+        self.app.log.log(msg)
         messagebox.showinfo(titre, msg)
 
     def _search(self):

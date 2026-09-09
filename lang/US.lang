@@ -487,13 +487,25 @@
     "files.missing": "(missing)",
     "files.open": "Open",
     "mime.untyped": "(untyped)",
-    "mime.filter_none": "No filter (every source type indexed).",
+    "mime.filter_none": "No filter (all types indexed).",
     "mime.filter_summary": "{t} type(s) — {d} described, {o} seen in your cases",
     "mime.filter_unknown": "{n} unknown",
     "mime.filter_title": "Filtered types",
     "common.close": "Close",
     "profiles.mime_view": "View types…",
-    "profiles.mime_title": "Types filtered by this profile"
+    "profiles.mime_title": "Types filtered by this profile",
+    "mime.sense_include": "ONLY these types are indexed (everything else is skipped).",
+    "mime.sense_exclude": "These types are EXCLUDED from indexing; everything else is indexed.",
+    "mime.learn_xml": "Learn from an XML export…",
+    "mime.learn_title": "Learn types from an export",
+    "mime.filetype_xml": "Intella source export",
+    "mime.learn_ok": "{n} new type(s) learned.",
+    "mime.learn_none": "No new type: they were already known.",
+    "tabs.options": "Options",
+    "options.import": "Source import",
+    "options.recursive_default": "Explore subfolders by default (forensic image drop)",
+    "options.recursive_help": "When unchecked, a dropped folder is scanned one level deep only: a seals folder often sits next to other cases or working copies, and descending by default would bring in foreign images. Check it if your images always live in subfolders. The checkbox stays editable for each drop in the Import tab.",
+    "options.recursive_saved": "Recursive exploration by default: {v}."
   },
   "help": [
     [

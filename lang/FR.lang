@@ -487,13 +487,25 @@
     "files.missing": "(absent)",
     "files.open": "Ouvrir",
     "mime.untyped": "(sans type)",
-    "mime.filter_none": "Aucun filtre (toutes les sources indexées).",
+    "mime.filter_none": "Aucun filtre (tous les types indexés).",
     "mime.filter_summary": "{t} type(s) — {d} décrit(s), {o} vu(s) dans vos cas",
     "mime.filter_unknown": "{n} inconnu(s)",
     "mime.filter_title": "Types filtrés",
     "common.close": "Fermer",
     "profiles.mime_view": "Voir les types…",
-    "profiles.mime_title": "Types filtrés par ce profil"
+    "profiles.mime_title": "Types filtrés par ce profil",
+    "mime.sense_include": "SEULS ces types sont indexés (les autres sont écartés).",
+    "mime.sense_exclude": "Ces types sont EXCLUS de l'indexation ; tout le reste est indexé.",
+    "mime.learn_xml": "Apprendre depuis un export XML…",
+    "mime.learn_title": "Apprendre des types depuis un export",
+    "mime.filetype_xml": "Export de sources Intella",
+    "mime.learn_ok": "{n} nouveau(x) type(s) appris.",
+    "mime.learn_none": "Aucun type nouveau : ils étaient déjà connus.",
+    "tabs.options": "Options",
+    "options.import": "Import de sources",
+    "options.recursive_default": "Explorer les sous-dossiers par défaut (dépôt d'images forensiques)",
+    "options.recursive_help": "Décoché, un dossier déposé n'est exploré qu'au premier niveau : un dossier de scellés voisine souvent avec d'autres cas ou des copies de travail, et descendre d'office ramènerait des images étrangères. Coché si vos images sont systématiquement rangées dans des sous-dossiers. La case reste modifiable à chaque dépôt dans l'onglet Import.",
+    "options.recursive_saved": "Exploration récursive par défaut : {v}."
   },
   "help": [
     [

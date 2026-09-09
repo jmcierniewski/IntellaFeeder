@@ -28,10 +28,31 @@ def mime_status_label(etat: str) -> str:
     }.get(etat, etat)
 
 
-def mime_filter_summary(texte: str) -> str:
-    """Résumé d'un filtre en une ligne : « 608 types — 498 décrits, 110 vus… »."""
+def mime_filter_sense(mode: str) -> str:
+    r"""Phrase disant ce que la liste FAIT — sans elle, on la lit à l'envers.
+
+    Le piège est réel et coûteux : dans l'interface d'Intella on coche ce qu'on
+    **veut**, et le XML enregistre le **complément** — d'où
+    ``<includeMode>Exclude selected entries</includeMode>`` suivi de 600 types.
+    Moins on coche, plus la liste est longue. Afficher les types sans dire leur
+    sens laisse croire qu'on regarde ce qui sera indexé, alors que c'est
+    exactement l'inverse.
+    """
+    if (mode or "").strip().lower().startswith("include"):
+        return i18n.t("mime.sense_include",
+                      "SEULS ces types sont indexés (les autres sont écartés).")
+    return i18n.t("mime.sense_exclude",
+                  "Ces types sont EXCLUS de l'indexation ; tout le reste est indexé.")
+
+
+def mime_filter_summary(texte: str, mode: str = "", avec_sens: bool = True) -> str:
+    """Résumé d'un filtre en une ligne, **sens compris** par défaut.
+
+    ``avec_sens=False`` quand l'appelant affiche déjà le sens à part (fenêtre de
+    lecture) : le répéter deux fois à trois lignes d'écart ne l'éclaire pas.
+    """
     if not (texte or "").strip():
-        return i18n.t("mime.filter_none", "Aucun filtre (toutes les sources indexées).")
+        return i18n.t("mime.filter_none", "Aucun filtre (tous les types indexés).")
     r = mime_catalog.summarize_filter(texte)
     resume = i18n.t("mime.filter_summary",
                     "{t} type(s) — {d} décrit(s), {o} vu(s) dans vos cas",
@@ -40,23 +61,29 @@ def mime_filter_summary(texte: str) -> str:
     if r[mime_catalog.STATUS_UNKNOWN]:
         resume += ", " + i18n.t("mime.filter_unknown", "{n} inconnu(s)",
                                 n=r[mime_catalog.STATUS_UNKNOWN])
-    return resume + "."
+    resume += "."
+    return resume + " " + mime_filter_sense(mode) if avec_sens else resume
 
 
-def show_mime_filter(parent, texte: str, titre: str = "") -> None:
+def show_mime_filter(parent, texte: str, titre: str = "", mode: str = "") -> None:
     """Fenêtre de lecture d'un filtre de types : un tableau au lieu d'une chaîne.
 
     Une liste de 600 noms séparés par des virgules n'est pas relisible dans un
     champ de saisie — or c'est exactement ce que produit un « refine » complet
     dans Intella. Lecture seule : le filtre s'édite toujours dans son champ.
+
+    ``mode`` (``include``/``exclude``) est affiché **en tête et en gras** : la
+    liste seule se lit à l'envers une fois sur deux (cf. `mime_filter_sense`).
     """
     win = tk.Toplevel(parent)
     win.title(titre or i18n.t("mime.filter_title", "Types filtrés"))
     win.geometry("860x560")
     win.transient(parent.winfo_toplevel())
 
-    ttk.Label(win, text=mime_filter_summary(texte)).pack(
-        anchor="w", padx=10, pady=(10, 6))
+    ttk.Label(win, text=mime_filter_sense(mode),
+              font=("Segoe UI", 10, "bold")).pack(anchor="w", padx=10, pady=(10, 2))
+    ttk.Label(win, text=mime_filter_summary(texte, avec_sens=False)).pack(
+        anchor="w", padx=10, pady=(0, 6))
 
     holder = ttk.Frame(win)
     holder.pack(fill="both", expand=True, padx=10, pady=(0, 10))

@@ -296,6 +296,39 @@ def learn(noms) -> list[str]:
     return nouveaux
 
 
+def learn_from_xml(chemin: str) -> list[str]:
+    """Apprend les types d'un export ``-exportSourceList``. Retourne les nouveaux.
+
+    C'est le **seul moyen de mettre la liste à jour sans outil tiers** : dans
+    Intella, créer une source en cochant tout ce que l'interface propose,
+    exporter la liste des sources, importer le XML ici. Les noms ainsi récoltés
+    sont ceux qu'Intella écrit réellement — alias compris, que le fichier de
+    descriptions ne connaît pas.
+
+    Lève ``ValueError`` si le fichier n'est pas un export exploitable : mieux
+    vaut le dire que d'annoncer « 0 nouveau type » sur un fichier hors sujet.
+    """
+    import xml.etree.ElementTree as ET
+    try:
+        racine = ET.parse(chemin).getroot()
+    except (OSError, ET.ParseError) as exc:
+        raise ValueError(f"XML illisible : {exc}") from exc
+    sources = racine.findall("source")
+    if not sources:
+        raise ValueError("Ce fichier ne contient aucune <source> "
+                         "(attendu : un export -exportSourceList).")
+    noms: set[str] = set()
+    for src in sources:
+        db = src.find("domainBoundaries")
+        brut = (db.findtext("mimeTypes") or "").strip() if db is not None else ""
+        if brut:
+            noms.update(split_filter(brut))
+    if not noms:
+        raise ValueError("Aucun filtre de types dans cet export : les sources "
+                         "n'en déclarent pas.")
+    return learn(noms)
+
+
 def learn_from_sources(sources) -> list[str]:
     """Apprend les types de tous les filtres d'un inventaire.
 
