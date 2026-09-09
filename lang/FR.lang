@@ -505,7 +505,10 @@
     "options.import": "Import de sources",
     "options.recursive_default": "Explorer les sous-dossiers par défaut (dépôt d'images forensiques)",
     "options.recursive_help": "Décoché, un dossier déposé n'est exploré qu'au premier niveau : un dossier de scellés voisine souvent avec d'autres cas ou des copies de travail, et descendre d'office ramènerait des images étrangères. Coché si vos images sont systématiquement rangées dans des sous-dossiers. La case reste modifiable à chaque dépôt dans l'onglet Import.",
-    "options.recursive_saved": "Exploration récursive par défaut : {v}."
+    "options.recursive_saved": "Exploration récursive par défaut : {v}.",
+    "mime.origin_embedded": "Source : version INTÉGRÉE à l'application. Déposer un fichier .properties dans le dossier ci-dessous la remplacerait.",
+    "mime.origin_external": "Source : FICHIER EXTERNE, qui remplace la version intégrée ({e} descriptions).",
+    "mime.origin_learned": "{n} nom(s) appris de vos cas s'ajoutent à ceux livrés."
   },
   "help": [
     [

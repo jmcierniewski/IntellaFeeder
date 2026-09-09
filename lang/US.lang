@@ -505,7 +505,10 @@
     "options.import": "Source import",
     "options.recursive_default": "Explore subfolders by default (forensic image drop)",
     "options.recursive_help": "When unchecked, a dropped folder is scanned one level deep only: a seals folder often sits next to other cases or working copies, and descending by default would bring in foreign images. Check it if your images always live in subfolders. The checkbox stays editable for each drop in the Import tab.",
-    "options.recursive_saved": "Recursive exploration by default: {v}."
+    "options.recursive_saved": "Recursive exploration by default: {v}.",
+    "mime.origin_embedded": "Source: version BUILT INTO the application. Dropping a .properties file in the folder below would replace it.",
+    "mime.origin_external": "Source: EXTERNAL FILE, replacing the built-in version ({e} descriptions).",
+    "mime.origin_learned": "{n} name(s) learned from your cases add to the shipped ones."
   },
   "help": [
     [

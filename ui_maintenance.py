@@ -165,12 +165,19 @@ class MimeTab(ttk.Frame):
 
     # -- état ---------------------------------------------------------------
     def _refresh_state(self):
+        """Compteurs **et provenance** : intégré à l'exe, ou fichier importé ?
+
+        Les deux situations se ressemblent à l'écran et ne se corrigent pas de
+        la même façon — c'est la première chose à vérifier quand un libellé
+        manque ou surprend.
+        """
         st = mime_catalog.stats()
         if not st["descriptions"]:
             texte = i18n.t(
                 "mime.state_empty",
                 "Aucun référentiel chargé. Les filtres restent lisibles, mais sans "
                 "description. Importez le fichier depuis votre installation d'Intella.")
+            couleur = "#b91c1c"
         else:
             texte = i18n.t(
                 "mime.state",
@@ -178,14 +185,31 @@ class MimeTab(ttk.Frame):
                 "vos cas, dont {s} sans description.",
                 d=st["descriptions"], c=st["categories"], o=st["observed"],
                 s=st["observed_only"])
-            texte += "\n" + i18n.t("mime.state_file", "Fichier : {f}",
-                                   f=st["source"] or "—")
+            if st["external"]:
+                couleur = "#1d4ed8"
+                texte += "\n" + i18n.t(
+                    "mime.origin_external",
+                    "Source : FICHIER EXTERNE, qui remplace la version intégrée "
+                    "({e} descriptions).", e=st["embedded_descriptions"])
+                texte += "\n" + i18n.t("mime.state_file", "Fichier : {f}",
+                                       f=st["source"])
+            else:
+                couleur = "#166534"
+                texte += "\n" + i18n.t(
+                    "mime.origin_embedded",
+                    "Source : version INTÉGRÉE à l'application. Déposer un fichier "
+                    ".properties dans le dossier ci-dessous la remplacerait.")
+            if st["observed_learned"]:
+                texte += "\n" + i18n.t(
+                    "mime.origin_learned",
+                    "{n} nom(s) appris de vos cas s'ajoutent à ceux livrés.",
+                    n=st["observed_learned"])
             if st["duplicates"]:
                 texte += "\n" + i18n.t(
                     "mime.state_duplicates",
                     "{n} clé(s) en double dans le fichier — la dernière valeur "
                     "l'emporte.", n=st["duplicates"])
-        self.lbl_state.config(text=texte)
+        self.lbl_state.config(text=texte, foreground=couleur)
 
     # -- actions ------------------------------------------------------------
     def _import(self):

@@ -525,7 +525,10 @@ BUILTIN = {
             "options.import": "Import de sources",
             "options.recursive_default": "Explorer les sous-dossiers par défaut (dépôt d'images forensiques)",
             "options.recursive_help": "Décoché, un dossier déposé n'est exploré qu'au premier niveau : un dossier de scellés voisine souvent avec d'autres cas ou des copies de travail, et descendre d'office ramènerait des images étrangères. Coché si vos images sont systématiquement rangées dans des sous-dossiers. La case reste modifiable à chaque dépôt dans l'onglet Import.",
-            "options.recursive_saved": "Exploration récursive par défaut : {v}."
+            "options.recursive_saved": "Exploration récursive par défaut : {v}.",
+            "mime.origin_embedded": "Source : version INTÉGRÉE à l'application. Déposer un fichier .properties dans le dossier ci-dessous la remplacerait.",
+            "mime.origin_external": "Source : FICHIER EXTERNE, qui remplace la version intégrée ({e} descriptions).",
+            "mime.origin_learned": "{n} nom(s) appris de vos cas s'ajoutent à ceux livrés."
         },
         "help": [
             [
@@ -1285,7 +1288,10 @@ BUILTIN = {
             "options.import": "Source import",
             "options.recursive_default": "Explore subfolders by default (forensic image drop)",
             "options.recursive_help": "When unchecked, a dropped folder is scanned one level deep only: a seals folder often sits next to other cases or working copies, and descending by default would bring in foreign images. Check it if your images always live in subfolders. The checkbox stays editable for each drop in the Import tab.",
-            "options.recursive_saved": "Recursive exploration by default: {v}."
+            "options.recursive_saved": "Recursive exploration by default: {v}.",
+            "mime.origin_embedded": "Source: version BUILT INTO the application. Dropping a .properties file in the folder below would replace it.",
+            "mime.origin_external": "Source: EXTERNAL FILE, replacing the built-in version ({e} descriptions).",
+            "mime.origin_learned": "{n} name(s) learned from your cases add to the shipped ones."
         },
         "help": [
             [

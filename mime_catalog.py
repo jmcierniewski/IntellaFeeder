@@ -192,13 +192,29 @@ def is_loaded() -> bool:
 
 
 def stats() -> dict:
-    """Compteurs pour l'écran de maintenance."""
+    """Compteurs et **provenance** pour l'écran de maintenance.
+
+    ``external`` dit d'où viennent les descriptions actives : sans lui, deux
+    situations très différentes s'affichent pareil — le référentiel intégré à
+    l'exe, ou un fichier importé qui l'a remplacé. Savoir laquelle est en
+    vigueur est la première chose à vérifier quand un libellé surprend.
+    """
+    embarquees = len(getattr(mime_data, "DESCRIPTIONS", {}))
+    livres = set(getattr(mime_data, "OBSERVED", [])) | set(
+        getattr(mime_data, "DESCRIPTIONS", {}))
     return {
+        # Noms qui ne viennent NI de l'embarqué NI des descriptions actives :
+        # ce sont ceux qu'on a appris des cas lus. Les compter à part montre
+        # que l'apprentissage sert (ou qu'il n'a rien trouvé de neuf).
+        "observed_learned": len(_observed - livres - set(_descriptions)),
         "descriptions": len(_descriptions),
         "categories": sum(1 for k in _descriptions if k.startswith("category/")),
         "observed": len(_observed),
         "observed_only": len(_observed - set(_descriptions)),
+        "observed_embedded": len(getattr(mime_data, "OBSERVED", [])),
         "duplicates": len(_duplicates),
+        "external": bool(_source_file),
+        "embedded_descriptions": embarquees,
         "source": _source_file,
     }
 
