@@ -27,6 +27,7 @@ import mime_catalog
 import path_parser
 import profile_translate
 import sizing
+import ui_widgets
 from ui_widgets import MeasureBar, make_button
 
 # En-têtes affichés du tableau (les clés internes des lignes restent en
@@ -116,6 +117,10 @@ class ExportTab(ttk.Frame):
         # visuellement (réglages de la source sélectionnée → onglet Profils).
         self._mk_btn(actions, i18n.t("inventory.info_profile", "Info Profil →"), self._info_profile,
                      color=config.PROFILE_TAB_COLOR).pack(side="left", padx=6)
+        # Voisin immédiat d'« Info Profil » : il répond à la question que celui-ci
+        # soulève — « qu'est-ce qui n'a PAS été repris ? ».
+        self._mk_btn(actions, i18n.t("inventory.show_settings", "Voir les réglages…"),
+                     self._show_settings, color=config.PROFILE_TAB_COLOR).pack(side="left")
 
         # Bandeau de progression du scan des dossiers à 0 (masqué au repos) :
         # même widget que l'onglet Import (progression + annulation).
@@ -819,22 +824,20 @@ class ExportTab(ttk.Frame):
                 n=len(results), t=config.human_size(total)))
         self._check_size_consistency()
 
-    def _info_profile(self):
-        """Réglages d'indexation de la source sélectionnée → onglet Profils."""
-        inv = self.app.inventory
-        details = (inv or {}).get("sources_detail")
-        title = i18n.t("inventory.info_profile", "Info Profil →")
+    def _selected_source(self, title: str):
+        """Source sélectionnée dans le tableau, ou ``None`` (message affiché)."""
+        details = (self.app.inventory or {}).get("sources_detail")
         if not details:
             messagebox.showinfo(
                 title, i18n.t("inventory.info_profile_no_inventory",
                               "Lisez d'abord les sources du cas (« Lire les sources »)."))
-            return
+            return None
         sel = self.tree.selection()
         if not sel:
             messagebox.showinfo(
                 title, i18n.t("inventory.info_profile_no_selection",
                              "Sélectionnez une source dans le tableau."))
-            return
+            return None
         # `iid` = index d'origine dans `rows` (et donc dans `sources_detail`) :
         # `tree.index()` donnerait la position AFFICHÉE, fausse dès qu'on trie
         # ou qu'on filtre.
@@ -843,8 +846,32 @@ class ExportTab(ttk.Frame):
             messagebox.showerror(
                 title, i18n.t("inventory.info_profile_not_found",
                               "Source introuvable (re-lisez les sources)."))
+            return None
+        return details[idx]
+
+    def _show_settings(self):
+        """Tous les réglages de la source sélectionnée, en trois couleurs.
+
+        Complément indispensable d'« Info Profil » : un profil ne rejoue que ce
+        qu'`-addSourcesFromJson` accepte, et le reste est **perdu** — pas
+        conservé de façon invisible (Étude 3). Cette vue dit lesquels, plutôt
+        que de laisser croire à une fidélité inexistante.
+        """
+        title = i18n.t("inventory.show_settings", "Voir les réglages…")
+        src = self._selected_source(title)
+        if src is None:
             return
-        src = details[idx]
+        nom = src.get("name") or i18n.t("inventory.default_profile_name", "profil")
+        ui_widgets.show_source_settings(
+            self, src,
+            i18n.t("inventory.settings_title", "Réglages de « {n} »", n=nom))
+
+    def _info_profile(self):
+        """Réglages d'indexation de la source sélectionnée → onglet Profils."""
+        title = i18n.t("inventory.info_profile", "Info Profil →")
+        src = self._selected_source(title)
+        if src is None:
+            return
         values = profile_translate.from_xml_source(src)
         name = src.get("name") or i18n.t("inventory.default_profile_name", "profil")
         if not values:
@@ -867,7 +894,9 @@ class ExportTab(ttk.Frame):
         if ignores:
             self.app.log.log(i18n.t(
                 "inventory.info_profile_ignored",
-                "Non repris (non pilotables à l'import) : {k}", k=", ".join(ignores)),
+                "Non repris (non pilotables à l'import) : {k}. "
+                "« Voir les réglages… » les affiche en détail.",
+                k=", ".join(ignores)),
                 level="WARN")
 
     def _export_xml(self):

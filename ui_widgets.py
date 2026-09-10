@@ -1,10 +1,17 @@
-"""Petits widgets réutilisables (infobulle, boutons, lecteur de filtre MIME)."""
+"""Petits widgets réutilisables (infobulle, boutons, lecteurs colorés).
+
+Deux lecteurs y cohabitent, au **même code couleur mais à deux échelles** : le
+filtre de types MIME d'une source (des centaines d'entrées) et les réglages
+d'indexation de cette source (une vingtaine). Ils ne se corrigent pas au même
+endroit — ne pas les fondre en un seul tableau.
+"""
 
 import tkinter as tk
 from tkinter import ttk
 
 import i18n
 import mime_catalog
+import profile_translate
 
 # --- Filtre de types MIME : trois états, trois couleurs ------------------- #
 # Un filtre réel compte plusieurs centaines d'entrées, et **18 % d'entre elles
@@ -119,6 +126,127 @@ def show_mime_filter(parent, texte: str, titre: str = "", mode: str = "") -> Non
 
     make_button(win, i18n.t("common.close", "Fermer"), win.destroy).pack(
         anchor="e", padx=10, pady=(0, 10))
+
+
+# --- Réglages d'une source : trois états, trois couleurs ----------------- #
+# ⚠ **Deux échelles distinctes, même code couleur** : les *réglages* d'une
+# source ici, les *types MIME* d'un filtre plus haut. Ne pas les fondre dans un
+# seul tableau — un filtre compte des centaines d'entrées, un jeu de réglages
+# une vingtaine, et ils ne se corrigent pas au même endroit.
+SETTING_STATUS_COLORS = {
+    profile_translate.STATUS_MAPPED: "#1d4ed8",       # bleu : rejoué par le profil
+    profile_translate.STATUS_UNSUPPORTED: "#111827",  # noir : à refaire dans Intella
+    profile_translate.STATUS_UNKNOWN: "#b91c1c",      # rouge : nom inconnu, à vérifier
+}
+
+
+def setting_status_label(etat: str) -> str:
+    """Libellé traduit d'un état de `profile_translate` (module sans i18n)."""
+    return {
+        profile_translate.STATUS_MAPPED:
+            i18n.t("settings.state_mapped", "rejoué par le profil"),
+        profile_translate.STATUS_UNSUPPORTED:
+            i18n.t("settings.state_unsupported", "à refaire dans Intella"),
+        profile_translate.STATUS_UNKNOWN:
+            i18n.t("settings.state_unknown", "inconnu — à vérifier"),
+    }.get(etat, etat)
+
+
+def setting_reason_label(motif: str) -> str:
+    """Motif de non-rejouabilité, en clair."""
+    return {
+        profile_translate.REASON_NOT_IN_API: i18n.t(
+            "settings.reason_not_in_api",
+            "Intella n'accepte pas ce réglage à l'import automatique."),
+        profile_translate.REASON_SCRIPT_INCOMPLETE: i18n.t(
+            "settings.reason_script",
+            "L'export ne contient pas le fichier de script : le rejouer armerait "
+            "un script absent."),
+    }.get(motif, "")
+
+
+def settings_summary(src: dict) -> str:
+    """Résumé en une ligne des réglages d'une source (pour un bandeau)."""
+    r = profile_translate.summarize_settings(src)
+    if not r["total"]:
+        return i18n.t("settings.summary_none",
+                      "Cette source n'expose aucun réglage dans l'export.")
+    resume = i18n.t(
+        "settings.summary",
+        "{t} réglage(s) — {m} rejoué(s) par le profil, {u} à refaire dans Intella",
+        t=r["total"], m=r[profile_translate.STATUS_MAPPED],
+        u=r[profile_translate.STATUS_UNSUPPORTED])
+    if r[profile_translate.STATUS_UNKNOWN]:
+        resume += ", " + i18n.t("settings.summary_unknown", "{n} inconnu(s)",
+                                n=r[profile_translate.STATUS_UNKNOWN])
+    return resume + "."
+
+
+def show_source_settings(parent, src: dict, titre: str = "") -> None:
+    """Fenêtre de lecture de **tous** les réglages d'une source exportée.
+
+    C'est la vue qui remplace le passe-plat abandonné (Étude 3 du CLAUDE.md) :
+    `-addSourcesFromJson` travaille sur une liste blanche de noms et jette en
+    silence tout le reste — impossible, donc, de rejouer un réglage qu'il ne
+    connaît pas. À défaut de tout rejouer, on **montre** : l'utilisateur voit
+    d'un coup d'œil ce que le profil reprend (bleu) et ce qu'il lui reste à
+    refaire à la main dans Intella (noir).
+
+    Le rouge est le signal d'une version d'Intella plus récente : un nom qui
+    n'est ni au catalogue ni dans la table des non-rejouables est apparu depuis.
+    """
+    win = tk.Toplevel(parent)
+    win.title(titre or i18n.t("settings.title", "Réglages de la source"))
+    win.geometry("940x600")
+    win.transient(parent.winfo_toplevel())
+
+    ttk.Label(win, wraplength=910, justify="left",
+              font=("Segoe UI", 10, "bold"),
+              text=i18n.t(
+                  "settings.header",
+                  "Un profil ne rejoue que les réglages qu'Intella accepte à "
+                  "l'import automatique. Les autres sont à refaire à la main.")
+              ).pack(anchor="w", padx=10, pady=(10, 2))
+    ttk.Label(win, text=settings_summary(src)).pack(anchor="w", padx=10, pady=(0, 6))
+
+    legende = ttk.Frame(win)
+    legende.pack(fill="x", padx=10, pady=(0, 6))
+    for etat in (profile_translate.STATUS_MAPPED,
+                 profile_translate.STATUS_UNSUPPORTED,
+                 profile_translate.STATUS_UNKNOWN):
+        tk.Label(legende, text="■ " + setting_status_label(etat),
+                 fg=SETTING_STATUS_COLORS[etat]).pack(side="left", padx=(0, 16))
+
+    holder = ttk.Frame(win)
+    holder.pack(fill="both", expand=True, padx=10, pady=(0, 10))
+    tree = ttk.Treeview(holder, columns=("key", "label", "value", "state"),
+                        show="headings")
+    for col, entete, largeur in (
+            ("key", i18n.t("settings.col_key", "Réglage (nom Intella)"), 230),
+            ("label", i18n.t("settings.col_label", "Description"), 300),
+            ("value", i18n.t("settings.col_value", "Valeur"), 150),
+            ("state", i18n.t("settings.col_state", "État"), 190)):
+        tree.heading(col, text=entete)
+        tree.column(col, width=largeur, anchor="w")
+    vsb = ttk.Scrollbar(holder, orient="vertical", command=tree.yview)
+    tree.configure(yscrollcommand=vsb.set)
+    tree.pack(side="left", fill="both", expand=True)
+    vsb.pack(side="right", fill="y")
+    for etat, couleur in SETTING_STATUS_COLORS.items():
+        tree.tag_configure(etat, foreground=couleur)
+
+    for ligne in profile_translate.describe_settings(src):
+        etat = setting_status_label(ligne["status"])
+        motif = setting_reason_label(ligne["reason"])
+        if motif:
+            etat += " — " + motif
+        tree.insert("", "end", tags=(ligne["status"],),
+                    values=(ligne["xml_key"], ligne["label"],
+                            ligne["value"] or "—", etat))
+
+    make_button(win, i18n.t("common.close", "Fermer"), win.destroy).pack(
+        anchor="e", padx=10, pady=(0, 10))
+
 
 # --- Boutons : apparence unique pour toute l'application ----------------- #
 # tk.Button (et non ttk.Button) : sous le thème Windows, le FOND d'un ttk.Button

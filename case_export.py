@@ -333,6 +333,39 @@ def _domain_boundaries(elem) -> dict:
     return out
 
 
+# Balises de `<source>` qui ne sont PAS des réglages : identité de la source et
+# **résultats** de l'indexation (taille, nombre de segments, tâches exécutées).
+# `timeZone` est un réglage, mais il est déjà lu à part (`timezone`) et réémis
+# par l'onglet Import : le compter deux fois le ferait passer pour perdu.
+_SOURCE_NON_OPTION_TAGS = {
+    "id", "name", "type", "timeZone", "size", "totalSize", "partsCount",
+    "firstPartName", "lastPartName", "diskImagePath", "path", "tasks",
+    "indexOptions", "domainBoundaries",
+}
+
+
+def _source_options(elem) -> dict:
+    """Réglages portés par ``<source>`` lui-même, hors ``<indexOptions>``.
+
+    Constatés sur des exports réels : ``includeHiddenResources``,
+    ``carveUnallocatedSpace`` (images), ``scriptEnabled``/``scriptValidated``/
+    ``scriptType``/``scriptLogEnabled``. Ils n'étaient **pas lus** jusqu'au
+    10/09/2026, si bien que le décompte des réglages non rejoués annoncé à
+    l'utilisateur était sous-estimé.
+
+    ⚠ **Liste NOIRE, pas liste blanche.** On prend tout ce qui n'est pas
+    identifié comme identité ou résultat : une balise ajoutée par une future
+    version d'Intella doit **apparaître** (en rouge dans le visualiseur), pas
+    disparaître en silence — c'est tout l'intérêt de la vue.
+    """
+    out = {}
+    for child in elem:
+        if child.tag in _SOURCE_NON_OPTION_TAGS or len(child):
+            continue
+        out[child.tag] = (child.text or "").strip()
+    return out
+
+
 def _task_objs(elem) -> list:
     """Définitions de tâches (objets JSON) du bloc ``<tasks>`` — format ``tasks.json``."""
     raw = _text(elem, "tasks")
@@ -427,6 +460,7 @@ def parse_source_list_xml(xml_path: str) -> dict:
             # Réglages d'indexation (pour « Info Profil » → onglet Profils).
             "index_options": _index_options(elem),
             "domain_boundaries": _domain_boundaries(elem),
+            "source_options": _source_options(elem),
             # Volume inconnu = source « dossier/fichier » dont la taille vaut 0
             # (Intella ne reporte pas la taille des dossiers).
             "size_unknown": (not is_image) and size == 0,

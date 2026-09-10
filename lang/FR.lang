@@ -450,7 +450,7 @@
     "import.steps_hide": "⋯ Masquer",
     "import.generated_log": "Fichiers d'import générés dans {p}.",
     "topbar.language_lose_work": "{n} source(s) sont listées dans l'onglet « Import ». Le redémarrage les perd.\n\nExportez la liste d'abord (« Exporter la liste… ») si vous voulez la retrouver.\n\nContinuer quand même ?",
-    "inventory.info_profile_ignored": "Non repris (non pilotables à l'import) : {k}",
+    "inventory.info_profile_ignored": "Non repris (non pilotables à l'import) : {k}. « Voir les réglages… » les affiche en détail.",
     "inventory.mime_learned": "{n} type(s) MIME appris depuis les filtres du cas.",
     "detail.subcase_users": "Utilisateurs ayant ouvert",
     "detail.subcase_users_note": "Les accès du lot sont ceux du cas compound ci-dessus. Un sous-cas ne liste que les utilisateurs qui l'ont déjà ouvert : « — » ne signifie pas qu'il est sans droits.",
@@ -532,7 +532,23 @@
     "picker.applied": "Filtre du profil : {n} catégorie(s), mode include.",
     "inventory.mime_undescribed": "{n} type(s) filtré(s) par ce cas ne sont décrits par aucun référentiel : {ex}…",
     "inventory.mime_stale_title": "Référentiel de types MIME",
-    "inventory.mime_stale": "{n} type(s) filtré(s) par ce cas n'ont pas de description : votre référentiel est peut-être plus ancien que votre version d'Intella.\n\nCes types restent utilisables ; seuls leurs libellés manquent. Pour les obtenir, importez le fichier de descriptions depuis votre installation d'Intella : onglet Maintenance → Types MIME."
+    "inventory.mime_stale": "{n} type(s) filtré(s) par ce cas n'ont pas de description : votre référentiel est peut-être plus ancien que votre version d'Intella.\n\nCes types restent utilisables ; seuls leurs libellés manquent. Pour les obtenir, importez le fichier de descriptions depuis votre installation d'Intella : onglet Maintenance → Types MIME.",
+    "inventory.show_settings": "Voir les réglages…",
+    "inventory.settings_title": "Réglages de « {n} »",
+    "settings.state_mapped": "rejoué par le profil",
+    "settings.state_unsupported": "à refaire dans Intella",
+    "settings.state_unknown": "inconnu — à vérifier",
+    "settings.reason_not_in_api": "Intella n'accepte pas ce réglage à l'import automatique.",
+    "settings.reason_script": "L'export ne contient pas le fichier de script : le rejouer armerait un script absent.",
+    "settings.summary_none": "Cette source n'expose aucun réglage dans l'export.",
+    "settings.summary": "{t} réglage(s) — {m} rejoué(s) par le profil, {u} à refaire dans Intella",
+    "settings.summary_unknown": "{n} inconnu(s)",
+    "settings.title": "Réglages de la source",
+    "settings.header": "Un profil ne rejoue que les réglages qu'Intella accepte à l'import automatique. Les autres sont à refaire à la main.",
+    "settings.col_key": "Réglage (nom Intella)",
+    "settings.col_label": "Description",
+    "settings.col_value": "Valeur",
+    "settings.col_state": "État"
   },
   "help": [
     [
@@ -626,6 +642,30 @@
     [
       "b",
       "Astuce « Info Profil » : réglez une source d'exemple dans Intella, puis dans l'onglet « Inventaire du cas », lisez les sources, sélectionnez cette source et cliquez « Info Profil → ». Ses réglages (y compris le filtre de types) remplissent automatiquement l'onglet Profils : il ne reste qu'à nommer et enregistrer le profil."
+    ],
+    [
+      "h2",
+      "Voir ce qu'un profil ne reprend pas"
+    ],
+    [
+      "p",
+      "Intella enregistre plus de réglages qu'il n'en accepte lors d'un import automatique. Un profil rejoue donc une partie de ce que vous aviez réglé à la main, et pas la totalité : le reste est à refaire dans Intella."
+    ],
+    [
+      "p",
+      "Pour savoir exactement où vous en êtes : onglet « Inventaire du cas », sélectionnez une source, puis « Voir les réglages… ». La fenêtre liste tous les réglages de cette source, avec un code couleur."
+    ],
+    [
+      "b",
+      "En bleu : repris par le profil. Vous n'avez rien à refaire."
+    ],
+    [
+      "b",
+      "En noir : présents dans la source, mais qu'Intella n'accepte pas à l'import automatique. C'est votre liste de choses à refaire à la main."
+    ],
+    [
+      "b",
+      "En rouge : un réglage que le programme ne connaît pas. C'est en général le signe d'une version d'Intella plus récente — vérifiez-le dans Intella."
     ],
     [
       "b",

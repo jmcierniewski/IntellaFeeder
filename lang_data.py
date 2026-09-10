@@ -13,8 +13,9 @@ reconstruire l'exe (voir ``i18n._read``). ``lang/FR.lang`` et ``lang/US.lang``
 peuvent etre conserves a cote du script pour l'edition ; ils sont facultatifs
 une fois l'exe construit.
 
-Genere a partir de ``lang/FR.lang`` et ``lang/US.lang`` -- si ces .lang evoluent
-et que l'evolution doit etre embarquee, regenerer ce module (voir CLAUDE.md).
+Genere par ``outils/gen_lang_data.py`` a partir de ``lang/FR.lang`` et
+``lang/US.lang`` -- si ces .lang evoluent et que l'evolution doit etre
+embarquee, relancer cet outil (voir CLAUDE.md).
 """
 
 BUILTIN = {
@@ -470,7 +471,7 @@ BUILTIN = {
             "import.steps_hide": "⋯ Masquer",
             "import.generated_log": "Fichiers d'import générés dans {p}.",
             "topbar.language_lose_work": "{n} source(s) sont listées dans l'onglet « Import ». Le redémarrage les perd.\n\nExportez la liste d'abord (« Exporter la liste… ») si vous voulez la retrouver.\n\nContinuer quand même ?",
-            "inventory.info_profile_ignored": "Non repris (non pilotables à l'import) : {k}",
+            "inventory.info_profile_ignored": "Non repris (non pilotables à l'import) : {k}. « Voir les réglages… » les affiche en détail.",
             "inventory.mime_learned": "{n} type(s) MIME appris depuis les filtres du cas.",
             "detail.subcase_users": "Utilisateurs ayant ouvert",
             "detail.subcase_users_note": "Les accès du lot sont ceux du cas compound ci-dessus. Un sous-cas ne liste que les utilisateurs qui l'ont déjà ouvert : « — » ne signifie pas qu'il est sans droits.",
@@ -552,7 +553,23 @@ BUILTIN = {
             "picker.applied": "Filtre du profil : {n} catégorie(s), mode include.",
             "inventory.mime_undescribed": "{n} type(s) filtré(s) par ce cas ne sont décrits par aucun référentiel : {ex}…",
             "inventory.mime_stale_title": "Référentiel de types MIME",
-            "inventory.mime_stale": "{n} type(s) filtré(s) par ce cas n'ont pas de description : votre référentiel est peut-être plus ancien que votre version d'Intella.\n\nCes types restent utilisables ; seuls leurs libellés manquent. Pour les obtenir, importez le fichier de descriptions depuis votre installation d'Intella : onglet Maintenance → Types MIME."
+            "inventory.mime_stale": "{n} type(s) filtré(s) par ce cas n'ont pas de description : votre référentiel est peut-être plus ancien que votre version d'Intella.\n\nCes types restent utilisables ; seuls leurs libellés manquent. Pour les obtenir, importez le fichier de descriptions depuis votre installation d'Intella : onglet Maintenance → Types MIME.",
+            "inventory.show_settings": "Voir les réglages…",
+            "inventory.settings_title": "Réglages de « {n} »",
+            "settings.state_mapped": "rejoué par le profil",
+            "settings.state_unsupported": "à refaire dans Intella",
+            "settings.state_unknown": "inconnu — à vérifier",
+            "settings.reason_not_in_api": "Intella n'accepte pas ce réglage à l'import automatique.",
+            "settings.reason_script": "L'export ne contient pas le fichier de script : le rejouer armerait un script absent.",
+            "settings.summary_none": "Cette source n'expose aucun réglage dans l'export.",
+            "settings.summary": "{t} réglage(s) — {m} rejoué(s) par le profil, {u} à refaire dans Intella",
+            "settings.summary_unknown": "{n} inconnu(s)",
+            "settings.title": "Réglages de la source",
+            "settings.header": "Un profil ne rejoue que les réglages qu'Intella accepte à l'import automatique. Les autres sont à refaire à la main.",
+            "settings.col_key": "Réglage (nom Intella)",
+            "settings.col_label": "Description",
+            "settings.col_value": "Valeur",
+            "settings.col_state": "État"
         },
         "help": [
             [
@@ -646,6 +663,30 @@ BUILTIN = {
             [
                 "b",
                 "Astuce « Info Profil » : réglez une source d'exemple dans Intella, puis dans l'onglet « Inventaire du cas », lisez les sources, sélectionnez cette source et cliquez « Info Profil → ». Ses réglages (y compris le filtre de types) remplissent automatiquement l'onglet Profils : il ne reste qu'à nommer et enregistrer le profil."
+            ],
+            [
+                "h2",
+                "Voir ce qu'un profil ne reprend pas"
+            ],
+            [
+                "p",
+                "Intella enregistre plus de réglages qu'il n'en accepte lors d'un import automatique. Un profil rejoue donc une partie de ce que vous aviez réglé à la main, et pas la totalité : le reste est à refaire dans Intella."
+            ],
+            [
+                "p",
+                "Pour savoir exactement où vous en êtes : onglet « Inventaire du cas », sélectionnez une source, puis « Voir les réglages… ». La fenêtre liste tous les réglages de cette source, avec un code couleur."
+            ],
+            [
+                "b",
+                "En bleu : repris par le profil. Vous n'avez rien à refaire."
+            ],
+            [
+                "b",
+                "En noir : présents dans la source, mais qu'Intella n'accepte pas à l'import automatique. C'est votre liste de choses à refaire à la main."
+            ],
+            [
+                "b",
+                "En rouge : un réglage que le programme ne connaît pas. C'est en général le signe d'une version d'Intella plus récente — vérifiez-le dans Intella."
             ],
             [
                 "b",
@@ -1265,7 +1306,7 @@ BUILTIN = {
             "import.steps_hide": "⋯ Hide",
             "import.generated_log": "Import files generated in {p}.",
             "topbar.language_lose_work": "{n} source(s) are listed in the « Import » tab. Restarting loses them.\n\nExport the list first (« Export the list… ») if you want it back.\n\nContinue anyway?",
-            "inventory.info_profile_ignored": "Not carried over (not settable at import): {k}",
+            "inventory.info_profile_ignored": "Not carried over (not drivable at import): {k}. “View settings…” shows them in detail.",
             "inventory.mime_learned": "{n} MIME type(s) learned from the case filters.",
             "detail.subcase_users": "Users who opened it",
             "detail.subcase_users_note": "Access rights for the batch are those of the compound case above. A subcase only lists users who have already opened it: “—” does not mean it has no rights.",
@@ -1347,7 +1388,23 @@ BUILTIN = {
             "picker.applied": "Profile filter: {n} category(ies), include mode.",
             "inventory.mime_undescribed": "{n} type(s) filtered by this case have no description: {ex}…",
             "inventory.mime_stale_title": "MIME type reference",
-            "inventory.mime_stale": "{n} type(s) filtered by this case have no description: your reference may be older than your Intella version.\n\nThese types remain usable; only their labels are missing. To get them, import the description file from your Intella installation: Maintenance tab → MIME types."
+            "inventory.mime_stale": "{n} type(s) filtered by this case have no description: your reference may be older than your Intella version.\n\nThese types remain usable; only their labels are missing. To get them, import the description file from your Intella installation: Maintenance tab → MIME types.",
+            "inventory.show_settings": "View settings…",
+            "inventory.settings_title": "Settings of “{n}”",
+            "settings.state_mapped": "replayed by the profile",
+            "settings.state_unsupported": "to redo in Intella",
+            "settings.state_unknown": "unknown — worth checking",
+            "settings.reason_not_in_api": "Intella does not accept this setting on automatic import.",
+            "settings.reason_script": "The export does not carry the script file: replaying this would arm a missing script.",
+            "settings.summary_none": "This source exposes no setting in the export.",
+            "settings.summary": "{t} setting(s) — {m} replayed by the profile, {u} to redo in Intella",
+            "settings.summary_unknown": "{n} unknown",
+            "settings.title": "Source settings",
+            "settings.header": "A profile only replays the settings Intella accepts on automatic import. The others must be redone by hand.",
+            "settings.col_key": "Setting (Intella name)",
+            "settings.col_label": "Description",
+            "settings.col_value": "Value",
+            "settings.col_state": "State"
         },
         "help": [
             [
@@ -1441,6 +1498,30 @@ BUILTIN = {
             [
                 "b",
                 "« Profile info » tip: set up a sample source in Intella, then in the « Case inventory » tab read the sources, select that source and click « Profile info → ». Its settings (including the type filter) automatically fill in the Profiles tab: all that's left is to name and save the profile."
+            ],
+            [
+                "h2",
+                "Seeing what a profile does not carry over"
+            ],
+            [
+                "p",
+                "Intella stores more settings than it accepts on an automatic import. A profile therefore replays part of what you configured by hand, not all of it: the rest has to be redone in Intella."
+            ],
+            [
+                "p",
+                "To see exactly where you stand: “Case inventory” tab, select a source, then “View settings…”. The window lists every setting of that source, colour-coded."
+            ],
+            [
+                "b",
+                "Blue: carried over by the profile. Nothing to redo."
+            ],
+            [
+                "b",
+                "Black: present in the source, but Intella does not accept them on automatic import. This is your list of things to redo by hand."
+            ],
+            [
+                "b",
+                "Red: a setting the program does not know. Usually the sign of a newer Intella version — check it in Intella."
             ],
             [
                 "b",

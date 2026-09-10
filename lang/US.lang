@@ -450,7 +450,7 @@
     "import.steps_hide": "⋯ Hide",
     "import.generated_log": "Import files generated in {p}.",
     "topbar.language_lose_work": "{n} source(s) are listed in the « Import » tab. Restarting loses them.\n\nExport the list first (« Export the list… ») if you want it back.\n\nContinue anyway?",
-    "inventory.info_profile_ignored": "Not carried over (not settable at import): {k}",
+    "inventory.info_profile_ignored": "Not carried over (not drivable at import): {k}. “View settings…” shows them in detail.",
     "inventory.mime_learned": "{n} MIME type(s) learned from the case filters.",
     "detail.subcase_users": "Users who opened it",
     "detail.subcase_users_note": "Access rights for the batch are those of the compound case above. A subcase only lists users who have already opened it: “—” does not mean it has no rights.",
@@ -532,7 +532,23 @@
     "picker.applied": "Profile filter: {n} category(ies), include mode.",
     "inventory.mime_undescribed": "{n} type(s) filtered by this case have no description: {ex}…",
     "inventory.mime_stale_title": "MIME type reference",
-    "inventory.mime_stale": "{n} type(s) filtered by this case have no description: your reference may be older than your Intella version.\n\nThese types remain usable; only their labels are missing. To get them, import the description file from your Intella installation: Maintenance tab → MIME types."
+    "inventory.mime_stale": "{n} type(s) filtered by this case have no description: your reference may be older than your Intella version.\n\nThese types remain usable; only their labels are missing. To get them, import the description file from your Intella installation: Maintenance tab → MIME types.",
+    "inventory.show_settings": "View settings…",
+    "inventory.settings_title": "Settings of “{n}”",
+    "settings.state_mapped": "replayed by the profile",
+    "settings.state_unsupported": "to redo in Intella",
+    "settings.state_unknown": "unknown — worth checking",
+    "settings.reason_not_in_api": "Intella does not accept this setting on automatic import.",
+    "settings.reason_script": "The export does not carry the script file: replaying this would arm a missing script.",
+    "settings.summary_none": "This source exposes no setting in the export.",
+    "settings.summary": "{t} setting(s) — {m} replayed by the profile, {u} to redo in Intella",
+    "settings.summary_unknown": "{n} unknown",
+    "settings.title": "Source settings",
+    "settings.header": "A profile only replays the settings Intella accepts on automatic import. The others must be redone by hand.",
+    "settings.col_key": "Setting (Intella name)",
+    "settings.col_label": "Description",
+    "settings.col_value": "Value",
+    "settings.col_state": "State"
   },
   "help": [
     [
@@ -626,6 +642,30 @@
     [
       "b",
       "« Profile info » tip: set up a sample source in Intella, then in the « Case inventory » tab read the sources, select that source and click « Profile info → ». Its settings (including the type filter) automatically fill in the Profiles tab: all that's left is to name and save the profile."
+    ],
+    [
+      "h2",
+      "Seeing what a profile does not carry over"
+    ],
+    [
+      "p",
+      "Intella stores more settings than it accepts on an automatic import. A profile therefore replays part of what you configured by hand, not all of it: the rest has to be redone in Intella."
+    ],
+    [
+      "p",
+      "To see exactly where you stand: “Case inventory” tab, select a source, then “View settings…”. The window lists every setting of that source, colour-coded."
+    ],
+    [
+      "b",
+      "Blue: carried over by the profile. Nothing to redo."
+    ],
+    [
+      "b",
+      "Black: present in the source, but Intella does not accept them on automatic import. This is your list of things to redo by hand."
+    ],
+    [
+      "b",
+      "Red: a setting the program does not know. Usually the sign of a newer Intella version — check it in Intella."
     ],
     [
       "b",

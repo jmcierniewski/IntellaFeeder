@@ -7,7 +7,7 @@ from datetime import datetime
 APP_NAME = "IntellaFeeder"
 # Affichée dans le titre de la fenêtre et le journal → à incrémenter à CHAQUE
 # construction d'exe livrée, sinon impossible de savoir quel build tourne.
-APP_VERSION = "2.9"
+APP_VERSION = "2.9a"
 APP_TITLE = "IntellaFeeder — Générateur de sources d'import Intella"
 
 # --- Réglages forensiques par défaut ---
