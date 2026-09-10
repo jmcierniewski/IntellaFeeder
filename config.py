@@ -7,7 +7,7 @@ from datetime import datetime
 APP_NAME = "IntellaFeeder"
 # Affichée dans le titre de la fenêtre et le journal → à incrémenter à CHAQUE
 # construction d'exe livrée, sinon impossible de savoir quel build tourne.
-APP_VERSION = "2.9b"
+APP_VERSION = "2.9c"
 APP_TITLE = "IntellaFeeder — Générateur de sources d'import Intella"
 
 # --- Réglages forensiques par défaut ---
@@ -58,12 +58,23 @@ MIME_DIRNAME = "mimetypes"
 CHECK = "☑"
 UNCHECK = "☐"
 
-# --- Couleurs d'onglets (pastilles + boutons « cross-onglet ») ---
-INVENTORY_TAB_COLOR = "#3b82f6"   # onglet « 1. Inventaire du cas »
-PROFILE_TAB_COLOR = "#8b5cf6"     # onglet « Profils » (bouton « Info Profil »)
-# Vert = étapes du parcours nominal de l'onglet Import (analyser les chemins →
-# calculer la taille → générer les fichiers d'import).
-ACTION_COLOR = "#16a34a"
+# --- Couleurs : UN SIGNAL, PAS UNE DÉCORATION -------------------------------
+# Règle du chantier de lisibilité (proposée le 07/09/2026, acceptée) : quand
+# tout est coloré, plus rien ne ressort et l'œil ne sait plus où est l'action de
+# l'écran. Quatre rôles, et rien d'autre :
+#
+#   VERT   = l'action qui fait avancer le travail. **Une seule par panneau.**
+#   ROUGE  = destructif, ou anomalie à traiter.
+#   ORANGE = attention, il reste quelque chose à faire.
+#   BLEU / VIOLET = renvoi vers un AUTRE onglet (couleur de l'onglet visé).
+#
+# Un bouton qui n'entre dans aucun de ces rôles reste neutre. Avant d'en colorer
+# un nouveau, vérifier qu'aucun autre du même panneau ne porte déjà ce rôle.
+INVENTORY_TAB_COLOR = "#3b82f6"   # bleu : renvoi vers « 1. Inventaire du cas »
+PROFILE_TAB_COLOR = "#8b5cf6"     # violet : renvoi vers « Profils »
+ACTION_COLOR = "#16a34a"          # vert : l'action du panneau
+DANGER_COLOR = "#b91c1c"          # rouge : destructif ou anomalie
+WARN_COLOR = "#b45309"            # orange : attention
 
 
 def glyph(state: bool) -> str:

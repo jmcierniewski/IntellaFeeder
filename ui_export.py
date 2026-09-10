@@ -92,30 +92,40 @@ class ExportTab(ttk.Frame):
         # seule la couleur peut différer.
         actions = ttk.Frame(top)
         actions.grid(row=3, column=1, columnspan=2, sticky="w", padx=6, pady=4)
-        self.btn_run = self._mk_btn(actions, i18n.t("inventory.run", "Lire les sources (IntellaCmd)"),
-                                    self._run)
-        self.btn_run.pack(side="left")
-        self.btn_scan = self._mk_btn(actions, i18n.t("inventory.scan", "Scanner les dossiers à mesurer"),
+        # --- Groupe « Lire » : ce qui fait avancer l'inventaire -------------
+        grp_lire = ttk.LabelFrame(actions, text=i18n.t("inventory.grp_read", "Lire"))
+        grp_lire.pack(side="left", padx=(0, 10))
+        # Vert = l'action de l'ecran (une seule, cf. `config`). C'est par la
+        # qu'on commence, et rien ne le disait.
+        self.btn_run = self._mk_btn(grp_lire, i18n.t("inventory.run", "Lire les sources (IntellaCmd)"),
+                                    self._run, color=config.ACTION_COLOR)
+        self.btn_run.pack(side="left", padx=4, pady=4)
+        self.btn_scan = self._mk_btn(grp_lire, i18n.t("inventory.scan", "Scanner les dossiers à mesurer"),
                                      self._scan_zero)
-        self.btn_scan.pack(side="left", padx=6)
+        self.btn_scan.pack(side="left", padx=(0, 4), pady=4)
         self._scan_btn_default = {
             "bg": self.btn_scan.cget("bg"), "fg": self.btn_scan.cget("fg"),
             "activebackground": self.btn_scan.cget("activebackground"),
             "activeforeground": self.btn_scan.cget("activeforeground"),
         }
-        self._mk_btn(actions, i18n.t("common.export_csv", "Exporter en CSV…"),
-                    self._export_csv).pack(side="left")
-        self.btn_export_xml = self._mk_btn(actions, i18n.t("inventory.export_xml", "Exporter le XML…"),
+        # --- Groupe « Exporter » : les sorties, toutes neutres --------------
+        # Lecture, mesure et exports etaient meles sur une seule rangee de cinq
+        # boutons de trois couleurs. Les separer dit ce qui fait avancer le
+        # travail et ce qui n'en est qu'une sortie.
+        grp_exp = ttk.LabelFrame(actions, text=i18n.t("inventory.grp_export", "Exporter"))
+        grp_exp.pack(side="left", padx=(0, 10))
+        self._mk_btn(grp_exp, i18n.t("inventory.export_csv_short", "CSV…"),
+                    self._export_csv).pack(side="left", padx=4, pady=4)
+        self.btn_export_xml = self._mk_btn(grp_exp, i18n.t("inventory.export_xml_short", "XML…"),
                                            self._export_xml)
-        self.btn_export_xml.pack(side="left", padx=6)
-        # « Exporter les tâches du cas » : recyclage des tâches de l'inventaire
-        # (placé ici, à gauche d'« Info Profil », car il dépend de l'inventaire lu).
-        self._mk_btn(actions, i18n.t("inventory.export_tasks", "Exporter les tâches du cas…"),
-                    self._export_case_tasks).pack(side="left")
-        # « Info Profil » : couleur de l'onglet Profils (violet) pour le rattacher
-        # visuellement (réglages de la source sélectionnée → onglet Profils).
+        self.btn_export_xml.pack(side="left", padx=(0, 4), pady=4)
+        # « Exporter les tâches du cas » : recyclage des tâches de l'inventaire.
+        self._mk_btn(grp_exp, i18n.t("inventory.export_tasks_short", "Tâches du cas…"),
+                    self._export_case_tasks).pack(side="left", padx=(0, 4), pady=4)
+        # « Info Profil » : couleur de l'onglet visé (violet) — c'est un RENVOI
+        # vers un autre onglet, pas une action de celui-ci.
         self._mk_btn(actions, i18n.t("inventory.info_profile", "Info Profil →"), self._info_profile,
-                     color=config.PROFILE_TAB_COLOR).pack(side="left", padx=6)
+                     color=config.PROFILE_TAB_COLOR).pack(side="left")
 
         # Bandeau de progression du scan des dossiers à 0 (masqué au repos) :
         # même widget que l'onglet Import (progression + annulation).
@@ -506,9 +516,15 @@ class ExportTab(ttk.Frame):
         return applied
 
     def _set_scan_alert(self, on: bool):
+        """Orange quand des dossiers restent a mesurer.
+
+        Etait vert jusqu'au 10/09/2026 — la couleur de l'action du moment, alors
+        qu'il s'agit d'un RESTE A FAIRE. Deux verts sur la meme rangee ne
+        disaient plus par ou commencer (cf. la regle dans `config`).
+        """
         if on:
-            self.btn_scan.config(bg="#16a34a", fg="white",
-                                 activebackground="#15803d", activeforeground="white")
+            self.btn_scan.config(bg=config.WARN_COLOR, fg="white",
+                                 activebackground="#92400e", activeforeground="white")
         else:
             self.btn_scan.config(**self._scan_btn_default)
 

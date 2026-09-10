@@ -9,6 +9,7 @@ endroit — ne pas les fondre en un seul tableau.
 import tkinter as tk
 from tkinter import ttk
 
+import config
 import i18n
 import mime_catalog
 import profile_translate
@@ -229,9 +230,10 @@ def show_mime_filter(parent, texte: str, titre: str = "", mode: str = "",
             on_change(",".join(courant))
 
         make_button(bas, i18n.t("mime.add", "◀ Ajouter au filtre"), _ajouter,
-                    color="#16a34a").pack(side="left")
+                    color=config.ACTION_COLOR).pack(side="left")
+        # Neutre : retirer un type se refait d'un clic, ce n'est pas destructeur.
         make_button(bas, i18n.t("mime.remove", "Retirer du filtre"),
-                    _retirer, color="#b45309").pack(side="left", padx=6)
+                    _retirer).pack(side="left", padx=6)
         ttk.Label(bas, foreground="#64748b", wraplength=560, justify="left",
                   text=i18n.t(
                       "mime.edit_hint",
@@ -424,7 +426,7 @@ class MeasureBar(ttk.Frame):
         self.lbl = ttk.Label(self, text="", foreground="#1e40af")
         self.lbl.pack(side="left", padx=8)
         self.btn_cancel = make_button(
-            self, "✕", None, color="#b91c1c", padx=6, pady=0)
+            self, "✕", None, color=config.DANGER_COLOR, padx=6, pady=0)
         self._packed = False
         self._on_cancel = None
 

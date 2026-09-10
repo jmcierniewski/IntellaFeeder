@@ -498,8 +498,12 @@ class ImportTab(ttk.Frame):
         self.btn_analyze = make_button(toolbar, i18n.t("import.summarize", "▼ Analyser les chemins"),
                                        self.recapituler, color=config.ACTION_COLOR)
         self.btn_analyze.pack(side="left")
+        # Neutre depuis le 10/09/2026 : « Analyser les chemins » mesure desormais
+        # les lignes qui n'ont pas de taille, donc ce bouton n'est plus une etape
+        # du parcours mais un rattrapage (remesurer une source allegee). Deux
+        # verts cote a cote dans la meme barre ne disaient plus lequel cliquer.
         self.btn_size = make_button(toolbar, i18n.t("import.compute_size", "Calculer la taille"),
-                                    self.calculer_taille, color=config.ACTION_COLOR)
+                                    self.calculer_taille)
         self.btn_size.pack(side="left", padx=6)
         make_button(toolbar, i18n.t("import.export_list", "Exporter la liste…"),
                    self._export_recap).pack(side="left")
@@ -509,7 +513,7 @@ class ImportTab(ttk.Frame):
         # Vider d'un coup : retirer 40 lignes une croix à la fois n'était pas
         # tenable. Rouge = geste destructeur, et il demande confirmation.
         self.btn_clear = make_button(toolbar, i18n.t("import.clear_list", "Vider la liste"),
-                                     self.vider_liste, color="#b91c1c")
+                                     self.vider_liste, color=config.DANGER_COLOR)
         self.btn_clear.pack(side="left")
         ttk.Separator(toolbar, orient="vertical").pack(side="left", fill="y", padx=8)
         self.btn_check_all = make_button(toolbar, i18n.t("import.check_all", "Imp. : tout cocher"),

@@ -590,7 +590,13 @@ BUILTIN = {
             "mime.catalog_count": "{n} type(s) affiché(s) à droite.",
             "mime.add": "◀ Ajouter au filtre",
             "mime.remove": "Retirer du filtre",
-            "mime.edit_hint": "Ajouter ou retirer modifie le champ du profil ; « Enregistrer » reste nécessaire pour le conserver."
+            "mime.edit_hint": "Ajouter ou retirer modifie le champ du profil ; « Enregistrer » reste nécessaire pour le conserver.",
+            "inventory.grp_read": "Lire",
+            "inventory.grp_export": "Exporter",
+            "inventory.export_csv_short": "CSV…",
+            "inventory.export_xml_short": "XML…",
+            "inventory.export_tasks_short": "Tâches du cas…",
+            "help.toc": "Aller à :"
         },
         "help": [
             [
@@ -746,7 +752,7 @@ BUILTIN = {
                 "Par défaut, Intella indexe tout ce qu'il trouve. Vous pouvez restreindre l'indexation d'une source à certaines familles de fichiers — utile quand un scellé contient surtout des données sans intérêt pour l'enquête."
             ],
             [
-                "b",
+                "warn",
                 "Dans Intella, vous cochez ce que vous voulez, mais le cas enregistre la liste INVERSE — tout ce que vous n'avez pas coché, souvent des centaines d'entrées. IntellaFeeder, lui, vous fait cocher ce que vous voulez garder."
             ],
             [
@@ -806,7 +812,7 @@ BUILTIN = {
                 "Images en plusieurs morceaux : intégrité"
             ],
             [
-                "p",
+                "warn",
                 "Une anomalie connue de l'éditeur (Vound) peut faire échouer la vérification d'intégrité des images forensiques découpées en plusieurs fichiers. En attendant un correctif, l'onglet Import propose une case « Ne pas vérifier l'intégrité des sources »."
             ],
             [
@@ -834,7 +840,7 @@ BUILTIN = {
                 "Si le total tient sous la limite : un seul import, dans le cas existant."
             ],
             [
-                "b",
+                "warn",
                 "Si le total dépasse la limite : l'outil PRÉVIENT, décoche automatiquement les dernières sources pour ne garder que ce qui tient, et SUSPEND la génération (rien n'est écrit). Aucun sous-cas n'est créé automatiquement."
             ],
             [
@@ -1458,7 +1464,13 @@ BUILTIN = {
             "mime.catalog_count": "{n} type(s) shown on the right.",
             "mime.add": "◀ Add to filter",
             "mime.remove": "Remove from filter",
-            "mime.edit_hint": "Adding or removing changes the profile field; “Save” is still needed to keep it."
+            "mime.edit_hint": "Adding or removing changes the profile field; “Save” is still needed to keep it.",
+            "inventory.grp_read": "Read",
+            "inventory.grp_export": "Export",
+            "inventory.export_csv_short": "CSV…",
+            "inventory.export_xml_short": "XML…",
+            "inventory.export_tasks_short": "Case tasks…",
+            "help.toc": "Go to:"
         },
         "help": [
             [
@@ -1614,7 +1626,7 @@ BUILTIN = {
                 "By default Intella indexes everything it finds. You can restrict a source to certain families of files — useful when an exhibit mostly holds data of no interest to the case."
             ],
             [
-                "b",
+                "warn",
                 "In Intella you tick what you want, but the case stores the OPPOSITE list — everything you did not tick, often hundreds of entries. IntellaFeeder instead lets you tick what you want to keep."
             ],
             [
@@ -1674,7 +1686,7 @@ BUILTIN = {
                 "Multi-segment images: integrity"
             ],
             [
-                "p",
+                "warn",
                 "A known issue in the vendor's software (Vound) can cause integrity verification to fail for forensic images split into several files. Until a fix is released, the Import tab offers a « Do not verify source integrity » checkbox."
             ],
             [
@@ -1702,7 +1714,7 @@ BUILTIN = {
                 "If the total stays under the limit: a single import, into the existing case."
             ],
             [
-                "b",
+                "warn",
                 "If the total exceeds the limit: the tool WARNS, automatically unchecks the last sources so only what fits remains, and SUSPENDS generation (nothing is written). No sub-case is created automatically."
             ],
             [

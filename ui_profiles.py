@@ -31,9 +31,13 @@ _UNIT_KEYS = {"Mo": "unit.mb", "Go": "unit.gb"}
 # qu'en champ d'une ligne — ex. le filtre de types MIME.
 MULTILINE_KEYS = {"sourceTypeFilter"}
 
+# Largeur (px) de la colonne des intitules du formulaire : la meme dans tous les
+# groupes, pour que les champs s'alignent verticalement d'une section a l'autre.
+LARGEUR_LIBELLE = 280
+
 # Rouge du « Mode du filtre » : le seul réglage dont l'oubli inverse le sens de
 # tout le filtre (défaut « exclude »).
-MODE_WARN_COLOR = "#b91c1c"
+MODE_WARN_COLOR = config.DANGER_COLOR
 
 
 class ReferenceTab(ttk.Frame):
@@ -170,10 +174,10 @@ class ProfilesTab(ttk.Frame):
         make_button(btns, i18n.t("profiles.set_default", "★ Définir par défaut"),
                     self._set_default).pack(fill="x", pady=1)
         make_button(btns, i18n.t("common.save", "Enregistrer"), self._save,
-                   color="#16a34a").pack(fill="x", pady=1)
+                   color=config.ACTION_COLOR).pack(fill="x", pady=1)
         make_button(btns, i18n.t("profiles.rename", "Renommer…"), self._rename).pack(fill="x", pady=1)
         make_button(btns, i18n.t("common.delete", "Supprimer"), self._delete,
-                   color="#b91c1c").pack(fill="x", pady=1)
+                   color=config.DANGER_COLOR).pack(fill="x", pady=1)
 
         # --- Colonne droite : commentaires + formulaire thématique défilant --- #
         rightcol = ttk.Frame(body)
@@ -197,7 +201,7 @@ class ProfilesTab(ttk.Frame):
         # endroit, sur le chemin de l'import qui doit rester dégagé.
         self.btn_settings = make_button(
             cbox, i18n.t("profiles.view_settings", "Voir les réglages de la source…"),
-            self._show_source_settings, color=config.PROFILE_TAB_COLOR)
+            self._show_source_settings)
         self.btn_settings.grid(row=1, column=0, columnspan=2, sticky="w",
                                padx=6, pady=(0, 6))
         self.lbl_settings = ttk.Label(cbox, foreground="#64748b", wraplength=700,
@@ -267,6 +271,10 @@ class ProfilesTab(ttk.Frame):
             group_key = profile_catalog.GROUP_KEYS.get(group, "")
             box = ttk.LabelFrame(form, text=i18n.t(group_key, group))
             box.pack(fill="x", expand=True, padx=6, pady=4)
+            # Intitules alignes d'un groupe a l'autre : sans `minsize`, chaque
+            # LabelFrame calait sa colonne 0 sur son plus long libelle, donc les
+            # champs repartaient d'une abscisse differente a chaque section.
+            box.columnconfigure(0, minsize=LARGEUR_LIBELLE)
             box.columnconfigure(1, weight=1)
             gr = 0  # ligne de grille courante (un multi-ligne en consomme 2)
             for o in opts:
@@ -314,13 +322,26 @@ class ProfilesTab(ttk.Frame):
                                       font=("Segoe UI", 9, "bold"))
                     lbl.grid(row=gr, column=0, sticky="w", padx=6, pady=2)
                     var = tk.StringVar(value=str(o["default"]))
+                    # Une liste deroulante ou un compteur n'a pas besoin de
+                    # 1 400 px pour afficher vingt caracteres : `sticky="w"` les
+                    # laisse a leur largeur utile. Seuls les champs de texte
+                    # libre (chemins, filtres) s'etirent.
                     if o["type"] == "enum":
-                        w = ttk.Combobox(box, textvariable=var, values=o["choices"], width=28)
+                        # PAS `readonly` : le domaine d'une valeur peut etre plus
+                        # large que ce qu'on connait (constate sur `splitMode`,
+                        # dont l'interface d'Intella propose plus que l'aide CLI).
+                        # Interdire la saisie fermerait la porte a une version
+                        # future sans rien gagner.
+                        w = ttk.Combobox(box, textvariable=var, values=o["choices"],
+                                         width=30)
+                        colle = "w"
                     elif o["type"] == "int":
                         w = ttk.Spinbox(box, textvariable=var, from_=0, to=10_000_000, width=12)
+                        colle = "w"
                     else:
                         w = ttk.Entry(box, textvariable=var)
-                    w.grid(row=gr, column=1, sticky="ew", padx=6, pady=2)
+                        colle = "ew"
+                    w.grid(row=gr, column=1, sticky=colle, padx=6, pady=2)
                     if key == "fileNameFilters":
                         self._attach_tip(w, i18n.t(
                             "profiles.filename_filter_tip",

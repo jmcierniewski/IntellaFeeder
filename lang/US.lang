@@ -569,7 +569,13 @@
     "mime.catalog_count": "{n} type(s) shown on the right.",
     "mime.add": "◀ Add to filter",
     "mime.remove": "Remove from filter",
-    "mime.edit_hint": "Adding or removing changes the profile field; “Save” is still needed to keep it."
+    "mime.edit_hint": "Adding or removing changes the profile field; “Save” is still needed to keep it.",
+    "inventory.grp_read": "Read",
+    "inventory.grp_export": "Export",
+    "inventory.export_csv_short": "CSV…",
+    "inventory.export_xml_short": "XML…",
+    "inventory.export_tasks_short": "Case tasks…",
+    "help.toc": "Go to:"
   },
   "help": [
     [
@@ -725,7 +731,7 @@
       "By default Intella indexes everything it finds. You can restrict a source to certain families of files — useful when an exhibit mostly holds data of no interest to the case."
     ],
     [
-      "b",
+      "warn",
       "In Intella you tick what you want, but the case stores the OPPOSITE list — everything you did not tick, often hundreds of entries. IntellaFeeder instead lets you tick what you want to keep."
     ],
     [
@@ -785,7 +791,7 @@
       "Multi-segment images: integrity"
     ],
     [
-      "p",
+      "warn",
       "A known issue in the vendor's software (Vound) can cause integrity verification to fail for forensic images split into several files. Until a fix is released, the Import tab offers a « Do not verify source integrity » checkbox."
     ],
     [
@@ -813,7 +819,7 @@
       "If the total stays under the limit: a single import, into the existing case."
     ],
     [
-      "b",
+      "warn",
       "If the total exceeds the limit: the tool WARNS, automatically unchecks the last sources so only what fits remains, and SUSPENDS generation (nothing is written). No sub-case is created automatically."
     ],
     [

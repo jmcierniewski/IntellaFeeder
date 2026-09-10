@@ -19,6 +19,7 @@ vues dans des filtres réels) et non du type (~600, dont 121 alias sans libellé
 import tkinter as tk
 from tkinter import messagebox, ttk
 
+import config
 import i18n
 import mime_catalog
 from ui_widgets import make_button
@@ -48,7 +49,7 @@ class CategoryPicker(ttk.Frame):
         bar = ttk.Frame(self)
         bar.pack(fill="x", padx=10, pady=(0, 6))
         make_button(bar, i18n.t("picker.apply", "Appliquer au profil"),
-                    self._apply, color="#16a34a").pack(side="left")
+                    self._apply, color=config.ACTION_COLOR).pack(side="left")
         make_button(bar, i18n.t("picker.reload", "Relire le profil"),
                     self.refresh).pack(side="left", padx=6)
         make_button(bar, i18n.t("picker.none", "Tout décocher"),
