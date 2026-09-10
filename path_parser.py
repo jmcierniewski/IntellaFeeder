@@ -56,7 +56,7 @@ def align_unc_host(path: str, reference: str) -> str:
     r"""Réécrit l'hôte UNC de ``path`` sur celui de ``reference``, même partage.
 
     Windows ouvre **une session SMB par nom de serveur** : ``\\NAS\part`` et
-    ``\\192.168.0.1\part`` sont deux serveurs distincts, avec des identifiants —
+    ``\\192.0.2.1\part`` sont deux serveurs distincts, avec des identifiants —
     donc des droits — potentiellement différents. Un cas compound ouvert par le
     nom d'hôte peut déclarer ses sous-cas par IP : joignables en **lecture**, mais
     refusés en **écriture**, ce qui fait échouer ``-exportSourceList`` sur le

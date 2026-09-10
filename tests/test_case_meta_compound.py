@@ -201,9 +201,9 @@ class TestHoteUncDesSousCas:
     écriture → ``-exportSourceList`` échouait sur ``case.xml.lock``. On préfère
     donc l'hôte du compound, à condition qu'il désigne bien un dossier.
     """
-    COMPOUND = "\\\\NAS_LABO_4\\partage\\CAS CP"
-    DECLARE = "\\\\192.168.0.174\\partage\\CAS (2)"
-    ALIGNE = "\\\\NAS_LABO_4\\partage\\CAS (2)"
+    COMPOUND = "\\\\SERVEUR_CAS\\partage\\CAS CP"
+    DECLARE = "\\\\192.0.2.174\\partage\\CAS (2)"
+    ALIGNE = "\\\\SERVEUR_CAS\\partage\\CAS (2)"
 
     def _isdir(self, monkeypatch, presents):
         """Faux système de fichiers : ces UNC n'existent nulle part.
@@ -227,8 +227,8 @@ class TestHoteUncDesSousCas:
         assert entry["path"] == self.DECLARE
 
     def test_partage_different_non_realigne(self, monkeypatch):
-        autre = "\\\\192.168.0.174\\autre\\CAS (2)"
+        autre = "\\\\192.0.2.174\\autre\\CAS (2)"
         self._isdir(monkeypatch, {self.COMPOUND, autre,
-                                  "\\\\NAS_LABO_4\\autre\\CAS (2)"})
+                                  "\\\\SERVEUR_CAS\\autre\\CAS (2)"})
         (entry,) = case_meta.read_subcases(self.COMPOUND, [autre])
         assert entry["path"] == autre

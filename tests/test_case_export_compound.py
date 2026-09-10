@@ -238,7 +238,7 @@ class TestDiagnosticSansXml:
     """
     TRACE_LOCK = (
         "java.nio.file.AccessDeniedException: "
-        "\\\\192.168.0.174\\part\\CAS (2)\\case.xml.lock\n"
+        "\\\\192.0.2.174\\part\\CAS (2)\\case.xml.lock\n"
         "\tat com.vound.intella.util.LockFile.lock(LockFile.java:131)"
     )
 

@@ -41,7 +41,7 @@ class TestDeriveName:
 class TestUncParts:
     @pytest.mark.parametrize("path,expected", [
         ("\\\\NAS\\partage\\Cas\\sous", ("NAS", "partage", "Cas\\sous")),
-        ("\\\\192.168.0.174\\partage\\Cas", ("192.168.0.174", "partage", "Cas")),
+        ("\\\\192.0.2.174\\partage\\Cas", ("192.0.2.174", "partage", "Cas")),
         ("\\\\NAS\\partage", ("NAS", "partage", "")),
         ("//NAS/partage/Cas", ("NAS", "partage", "Cas")),      # séparateurs unix
     ])
@@ -63,19 +63,19 @@ class TestAlignUncHost:
     ``case.xml.lock``. Windows ouvrant une session SMB par NOM de serveur, la
     seule parade côté outil est de réécrire l'hôte quand le partage est le même.
     """
-    COMPOUND = "\\\\NAS_LABO_4\\partage\\CAS CP"
+    COMPOUND = "\\\\SERVEUR_CAS\\partage\\CAS CP"
 
     def test_ip_remplacee_par_le_nom_du_compound(self):
-        out = path_parser.align_unc_host("\\\\192.168.0.174\\partage\\CAS (2)",
+        out = path_parser.align_unc_host("\\\\192.0.2.174\\partage\\CAS (2)",
                                          self.COMPOUND)
-        assert out == "\\\\NAS_LABO_4\\partage\\CAS (2)"
+        assert out == "\\\\SERVEUR_CAS\\partage\\CAS (2)"
 
     def test_partage_different_laisse_intact(self):
-        sub = "\\\\192.168.0.174\\autre_partage\\CAS (2)"
+        sub = "\\\\192.0.2.174\\autre_partage\\CAS (2)"
         assert path_parser.align_unc_host(sub, self.COMPOUND) == sub
 
     def test_meme_hote_casse_ignoree(self):
-        sub = "\\\\nas_labo_4\\PARTAGE\\CAS (2)"
+        sub = "\\\\serveur_cas\\PARTAGE\\CAS (2)"
         assert path_parser.align_unc_host(sub, self.COMPOUND) == sub
 
     @pytest.mark.parametrize("sub,ref", [
@@ -87,7 +87,7 @@ class TestAlignUncHost:
 
     def test_racine_de_partage(self):
         assert (path_parser.align_unc_host("\\\\10.0.0.1\\partage", self.COMPOUND)
-                == "\\\\NAS_LABO_4\\partage")
+                == "\\\\SERVEUR_CAS\\partage")
 
 
 class TestIsNonFirstSegment:
