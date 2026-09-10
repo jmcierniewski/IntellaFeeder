@@ -117,7 +117,7 @@ def test_alias_non_decrit_reste_valide(mimes):
     # …et il n'est PAS compté comme inconnu dans un filtre.
     resume = mc.summarize_filter("application/vnd.ms-word,application/msword")
     assert resume == {mc.STATUS_DESCRIBED: 1, mc.STATUS_OBSERVED: 1,
-                      mc.STATUS_UNKNOWN: 0, "total": 2}
+                      mc.STATUS_UNKNOWN: 0, mc.STATUS_USER: 0, "total": 2}
 
 
 def test_describe_replis(mimes):
@@ -371,3 +371,50 @@ def test_descriptions_path_prend_le_plus_recent(mimes):
     os.utime(os.path.join(str(mimes), "neuf.properties"), None)
     mc.load()
     assert mc.label("a/b") == "Recent"
+
+
+class TestDescriptionsUtilisateur:
+    """Décrire soi-même un type que Vound ne nomme pas (v2.9d).
+
+    Le besoin : sur un filtre réel, 121 noms n'ont aucun libellé. Ce sont des
+    alias parfaitement valides, mais illisibles — et personne d'autre que
+    l'utilisateur ne peut dire ce qu'ils désignent dans SON contexte.
+    """
+
+    def test_ecriture_et_relecture(self, mimes):
+        mc.load()
+        mc.set_user_label("application/x-truc", "Export du logiciel maison")
+        mc.load()                      # relance : la description doit survivre
+        assert mc.label("application/x-truc") == "Export du logiciel maison"
+        assert mc.status("application/x-truc") == mc.STATUS_USER
+
+    def test_un_type_decrit_par_nous_n_est_plus_inconnu(self, mimes):
+        """Sinon il resterait en ROUGE à côté du libellé qu'on vient d'écrire."""
+        mc.load()
+        assert mc.status("a/inedit") == mc.STATUS_UNKNOWN
+        mc.set_user_label("a/inedit", "Mon libellé")
+        assert mc.status("a/inedit") != mc.STATUS_UNKNOWN
+
+    def test_vound_prime_sur_nous(self, mimes):
+        """Une description officielle ÉCRASE la nôtre — c'est le contrat voulu."""
+        mc.load()
+        mc.set_user_label("a/b", "Ce que j'en pensais")
+        _ecrire(mimes, "descr.properties", "a/b=Le vrai libellé\n")
+        mc.load()
+        assert mc.label("a/b") == "Le vrai libellé"
+        assert mc.status("a/b") == mc.STATUS_DESCRIBED
+        # …mais la nôtre n'est pas PERDUE : elle reviendrait avec un référentiel
+        # plus ancien. L'effacer serait une perte silencieuse.
+        assert mc.user_label("a/b") == "Ce que j'en pensais"
+
+    def test_effacer(self, mimes):
+        mc.load()
+        mc.set_user_label("a/b", "Un texte")
+        mc.set_user_label("a/b", "   ")
+        assert mc.user_label("a/b") == ""
+        assert "a/b" not in mc.user_labels()
+
+    def test_fichier_illisible_ne_leve_pas(self, mimes):
+        _ecrire(mimes, mc.USER_FILENAME, "{ ceci n'est pas du JSON")
+        mc.load()
+        assert mc.user_labels() == {}

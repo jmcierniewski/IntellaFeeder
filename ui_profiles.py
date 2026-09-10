@@ -62,14 +62,28 @@ class ReferenceTab(ttk.Frame):
         self.lbl_case.pack(anchor="w", padx=10, pady=(0, 6))
 
         holder = ttk.Frame(self)
-        holder.pack(fill="both", expand=True, padx=10, pady=(0, 10))
-        self.tree = ttk.Treeview(holder, columns=("name",), show="headings", height=8)
+        holder.pack(fill="both", expand=True, padx=10, pady=(0, 4))
+        self.tree = ttk.Treeview(holder, columns=("name", "desc"),
+                                 show="headings", height=8)
         self.tree.heading("name", text=i18n.t("profiles.ref_col", "Type sans description"))
-        self.tree.column("name", width=520, anchor="w")
+        self.tree.heading("desc", text=i18n.t("profiles.ref_col_user", "Votre description"))
+        self.tree.column("name", width=420, anchor="w")
+        self.tree.column("desc", width=380, anchor="w")
         vsb = ttk.Scrollbar(holder, orient="vertical", command=self.tree.yview)
         self.tree.configure(yscrollcommand=vsb.set)
         self.tree.pack(side="left", fill="both", expand=True)
         vsb.pack(side="right", fill="y")
+        self.tree.tag_configure("user", foreground="#0f766e")
+        # Double-clic = éditer. Le bouton dit la même chose pour qui ne devine
+        # pas qu'une ligne de tableau puisse s'ouvrir.
+        self.tree.bind("<Double-1>", lambda _e: self._editer())
+        barre = ttk.Frame(self)
+        barre.pack(fill="x", padx=10, pady=(0, 6))
+        make_button(barre, i18n.t("profiles.ref_edit", "Décrire ce type…"),
+                    self._editer).pack(side="left")
+        ttk.Label(barre, foreground="#64748b", text=i18n.t(
+            "profiles.ref_edit_hint",
+            "(ou double-cliquez une ligne)")).pack(side="left", padx=8)
 
         ttk.Label(self, wraplength=900, justify="left", foreground="#64748b",
                   text=i18n.t(
@@ -102,20 +116,67 @@ class ReferenceTab(ttk.Frame):
                                  n=s["observed_learned"])
         self.lbl_state.config(text=etat, foreground=couleur)
 
+        # Les types du dernier cas SANS libellé, plus ceux qu'on a déjà décrits
+        # soi-même : sans eux, on ne pourrait plus retrouver ni corriger une
+        # description écrite pour un cas précédent.
         inedits = list(getattr(self.app, "undescribed_types", []) or [])
+        miens = [n for n in mime_catalog.user_labels() if n not in inedits]
+        lignes = inedits + sorted(miens)
         self.tree.delete(*self.tree.get_children())
+        self._iids = {}
+        for i, nom in enumerate(lignes):
+            perso = mime_catalog.user_label(nom)
+            iid = f"r{i}"          # nom potentiellement vide → jamais comme iid
+            self._iids[iid] = nom
+            self.tree.insert("", "end", iid=iid,
+                             tags=("user",) if perso else (),
+                             values=(nom or i18n.t("mime.untyped", "(sans type)"),
+                                     perso))
         if not inedits:
             self.lbl_case.config(text=i18n.t(
                 "profiles.ref_case_ok",
                 "Aucun type sans description dans le dernier cas lu."),
                 foreground="#166534")
+        else:
+            self.lbl_case.config(text=i18n.t(
+                "profiles.ref_case",
+                "{n} type(s) filtré(s) par le dernier cas lu n'ont pas de "
+                "description :", n=len(inedits)), foreground="#475569")
+
+    def _editer(self):
+        """Saisit la description d'un type que Vound ne nomme pas."""
+        sel = self.tree.selection()
+        titre = i18n.t("profiles.ref_edit_title", "Décrire un type")
+        if not sel:
+            messagebox.showinfo(titre, i18n.t(
+                "profiles.ref_edit_none", "Sélectionnez d'abord un type."))
             return
-        self.lbl_case.config(text=i18n.t(
-            "profiles.ref_case",
-            "{n} type(s) filtré(s) par le dernier cas lu n'ont pas de "
-            "description :", n=len(inedits)), foreground="#475569")
-        for nom in inedits:
-            self.tree.insert("", "end", values=(nom,))
+        nom = self._iids.get(sel[0], "")
+        actuel = mime_catalog.user_label(nom)
+        officiel = mime_catalog.label(nom) if not actuel else None
+        invite = i18n.t("profiles.ref_edit_prompt",
+                        "Description de « {n} » :", n=nom or "(sans type)")
+        if officiel:
+            # Le cas se produit si Intella a fini par nommer ce type : autant le
+            # dire, plutôt que de laisser saisir un texte qui ne s'affichera pas.
+            invite += "\n\n" + i18n.t(
+                "profiles.ref_edit_official",
+                "Attention : Intella décrit désormais ce type « {d} ». Sa "
+                "description restera prioritaire sur la vôtre.", d=officiel)
+        texte = simpledialog.askstring(titre, invite, initialvalue=actuel, parent=self)
+        if texte is None:
+            return
+        try:
+            mime_catalog.set_user_label(nom, texte)
+        except OSError as exc:
+            messagebox.showerror(titre, i18n.t(
+                "profiles.ref_edit_failed",
+                "Impossible d'enregistrer : {e}", e=exc))
+            return
+        self.app.log.log(i18n.t(
+            "profiles.ref_edit_log", "Description personnelle : {n} → « {d} »",
+            n=nom or "(sans type)", d=texte.strip() or "—"))
+        self.refresh()
 
 
 class ProfilesTab(ttk.Frame):

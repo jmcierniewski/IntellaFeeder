@@ -67,6 +67,7 @@ class ImportTab(ttk.Frame):
         # allégée entre-temps → une taille mise en cache trop tôt serait fausse).
         self._pending_sizes = {}   # chemin (tel que saisi) -> octets
         self._import_proc = None   # Popen du .bat en cours (auto-validation à la fin)
+        self._apres_mesure = None  # suite à exécuter à la fin d'une mesure
         self._auto_validate = True  # prérequis (exe + user) vérifiés au lancement
 
         self._build_params()
@@ -689,6 +690,27 @@ class ImportTab(ttk.Frame):
         la main : l'enchaînement s'arrête de lui-même si la génération échoue
         (limite dépassée, tailles manquantes), avec son message habituel.
         """
+        if self._compound_blocked() or self._busy_measuring():
+            return
+        # La génération EXIGE une taille par source cochée. Sans cette mesure
+        # préalable, le bouton « tout faire » s'arrêtait net sur « Tailles non
+        # calculées » — l'utilisateur devait aller cliquer « Calculer la taille »
+        # puis revenir, ce qui vide le bouton de son sens (demande du
+        # 10/09/2026). On mesure les manquantes, PUIS on enchaîne.
+        manquantes = [s for s in self.sources
+                      if s.import_selected and s.size_bytes is None]
+        if manquantes:
+            self.app.log.log(i18n.t(
+                "import.autosize_log",
+                "Import complet : mesure préalable de {n} source(s) sans taille.",
+                n=len(manquantes)))
+            self._apres_mesure = self._enchainer_import
+            self.calculer_taille(only_missing=True, silencieux=True)
+            return
+        self._enchainer_import()
+
+    def _enchainer_import(self):
+        """Générer → Importer, une fois les tailles connues."""
         if self._compound_blocked() or self._busy_measuring():
             return
         if not self.generer(auto=True):
@@ -1532,6 +1554,13 @@ class ImportTab(ttk.Frame):
             self.btn_size.config(state="normal")
             self.size_bar.stop()
             self._set_busy(False)
+        # Suite éventuelle (« Lancer l'import complet » qui attendait les
+        # tailles). Posée APRÈS le déverrouillage de l'UI, sinon la génération
+        # partirait sur des boutons encore grisés. Abandonnée si l'utilisateur a
+        # interrompu la mesure : il a dit non, on ne le contourne pas.
+        suite, self._apres_mesure = getattr(self, "_apres_mesure", None), None
+        if suite and not cancelled:
+            self.after(50, suite)
 
     def _size_finish(self, results, cached_keys, cancelled=False):
         # Seules les sources mesurées ce tour-ci sont à persister : celles reprises

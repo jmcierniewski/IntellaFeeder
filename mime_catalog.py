@@ -36,6 +36,7 @@ Module sans interface et sans i18n : ``STATUS_*`` sont des identifiants, c'est
 l'UI qui les traduit (même contrat que ``forensic_scan.REASON_*``).
 """
 
+import json
 import os
 import re
 
@@ -46,6 +47,11 @@ import mime_data
 STATUS_DESCRIBED = "described"
 STATUS_OBSERVED = "observed"
 STATUS_UNKNOWN = "unknown"
+# Décrit **par l'utilisateur**, pas par Vound (v2.9d). Un état à part, et non un
+# `described` déguisé : il faut pouvoir distinguer ce qui vient d'Intella de ce
+# qu'on a écrit soi-même — ne serait-ce que pour savoir ce qu'on perdra le jour
+# où Vound publiera enfin le libellé.
+STATUS_USER = "user"
 
 # Le référentiel porte une entrée à **clé vide** (`=Untyped`) : c'est un type
 # filtrable à part entière, celui des items dont le type n'a pas été déterminé.
@@ -54,12 +60,15 @@ UNTYPED = ""
 
 DESCRIPTIONS_GLOB = ".properties"
 OBSERVED_FILENAME = "noms_observes.txt"
+# Descriptions écrites par l'utilisateur pour les types que Vound ne nomme pas.
+USER_FILENAME = "descriptions_utilisateur.json"
 
 _RE_UNICODE = re.compile(r"\\u([0-9a-fA-F]{4})")
 
 # État chargé (vide tant que `load()` n'a pas tourné).
 _descriptions: dict[str, str] = {}
 _observed: set[str] = set()
+_user: dict[str, str] = {}      # descriptions saisies par l'utilisateur
 _source_file: str = ""
 _duplicates: list[str] = []
 
@@ -149,6 +158,11 @@ def observed_path() -> str:
     return os.path.join(config.mime_dir(), OBSERVED_FILENAME)
 
 
+def user_path() -> str:
+    """Fichier des descriptions écrites par l'utilisateur."""
+    return os.path.join(config.mime_dir(), USER_FILENAME)
+
+
 # --- Chargement ------------------------------------------------------------
 
 def load() -> None:
@@ -161,7 +175,7 @@ def load() -> None:
     Les noms observés, eux, **s'ajoutent** : ce sont des constats, pas une
     version, et en perdre reviendrait à réafficher des alias comme « inconnus ».
     """
-    global _descriptions, _observed, _source_file, _duplicates
+    global _descriptions, _observed, _user, _source_file, _duplicates
     _descriptions = dict(getattr(mime_data, "DESCRIPTIONS", {}))
     _observed = set(getattr(mime_data, "OBSERVED", []))
     _duplicates = []
@@ -184,6 +198,55 @@ def load() -> None:
             _observed |= {ligne.strip() for ligne in fh}
     except OSError:
         pass
+    _user = _read_user()
+    # Un nom qu'on a pris la peine de décrire est un nom qui existe : il rejoint
+    # les observés, sinon il resterait affiché « inconnu » (rouge) juste à côté
+    # de la description qu'on vient d'en donner.
+    _observed |= set(_user)
+
+
+def _read_user() -> dict:
+    """Descriptions utilisateur, ou ``{}``. Ne lève jamais."""
+    try:
+        with open(user_path(), encoding="utf-8") as fh:
+            data = json.load(fh)
+    except (OSError, ValueError):
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    return {str(k): str(v) for k, v in data.items() if str(v).strip()}
+
+
+def set_user_label(nom: str, texte: str) -> None:
+    """Écrit (ou efface, si ``texte`` est vide) la description d'un type.
+
+    ⚠ **Elle ne prime jamais sur Vound** : le jour où une version d'Intella
+    décrit ce type, c'est sa description qui s'affiche (voir `label`). La nôtre
+    n'est pas supprimée pour autant — elle redeviendrait visible si l'on
+    revenait à un référentiel plus ancien, et l'effacer serait une perte
+    silencieuse.
+    """
+    global _user
+    cle = (nom or "").strip()
+    valeur = (texte or "").strip()
+    if valeur:
+        _user[cle] = valeur
+    else:
+        _user.pop(cle, None)
+    _observed.add(cle)
+    os.makedirs(config.mime_dir(), exist_ok=True)
+    with open(user_path(), "w", encoding="utf-8") as fh:
+        json.dump(_user, fh, ensure_ascii=False, indent=2, sort_keys=True)
+
+
+def user_labels() -> dict:
+    """Copie des descriptions écrites par l'utilisateur."""
+    return dict(_user)
+
+
+def user_label(nom: str) -> str:
+    """Description utilisateur d'un type, ou ``""``."""
+    return _user.get((nom or "").strip(), "")
 
 
 def is_loaded() -> bool:
@@ -222,8 +285,14 @@ def stats() -> dict:
 # --- Interrogation ---------------------------------------------------------
 
 def label(nom: str) -> str | None:
-    """Libellé lisible d'un type, ou ``None`` s'il n'est pas décrit."""
-    return _descriptions.get((nom or "").strip())
+    """Libellé lisible d'un type, ou ``None`` s'il n'est décrit nulle part.
+
+    **Vound d'abord, nous ensuite** : une description officielle écrase la
+    nôtre, ce qui est exactement ce qu'on veut d'un référentiel qui se met à
+    jour (demande du 10/09/2026).
+    """
+    cle = (nom or "").strip()
+    return _descriptions.get(cle) or _user.get(cle) or None
 
 
 def status(nom: str) -> str:
@@ -231,6 +300,8 @@ def status(nom: str) -> str:
     cle = (nom or "").strip()
     if cle in _descriptions:
         return STATUS_DESCRIBED
+    if cle in _user:
+        return STATUS_USER
     if cle in _observed:
         return STATUS_OBSERVED
     return STATUS_UNKNOWN
@@ -243,7 +314,7 @@ def describe(nom: str) -> str:
     laisse son libellé de référentiel, ou à défaut un texte explicite.
     """
     cle = (nom or "").strip()
-    lib = _descriptions.get(cle)
+    lib = _descriptions.get(cle) or _user.get(cle)
     if lib:
         return lib
     return cle if cle else "(sans type)"
@@ -336,7 +407,8 @@ def search(motif: str, limit: int = 500) -> list[tuple[str, str, str]]:
 
 def summarize_filter(texte: str) -> dict:
     """Compte par état — de quoi écrire « 600 types, dont 121 non décrits »."""
-    resume = {STATUS_DESCRIBED: 0, STATUS_OBSERVED: 0, STATUS_UNKNOWN: 0}
+    resume = {STATUS_DESCRIBED: 0, STATUS_OBSERVED: 0, STATUS_UNKNOWN: 0,
+              STATUS_USER: 0}
     noms = split_filter(texte)
     for nom in noms:
         resume[status(nom)] += 1

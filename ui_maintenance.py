@@ -317,7 +317,7 @@ class FilesTab(ttk.Frame):
         etat = "" if os.path.exists(chemin) else "  " + i18n.t("files.missing", "(absent)")
         ttk.Label(ligne, text=chemin + etat).pack(side="left")
         make_button(ligne, i18n.t("files.open", "Ouvrir"),
-                    lambda c=chemin: open_folder(c)).pack(side="right")
+                    lambda c=chemin: open_target(c)).pack(side="right")
 
 
 # --- Utilitaires partagés --------------------------------------------------
@@ -334,3 +334,22 @@ def open_folder(chemin: str) -> None:
         subprocess.Popen(["explorer", os.path.normpath(cible)])
     except OSError:
         pass
+
+
+def open_target(chemin: str) -> None:
+    """Ouvre un FICHIER avec son application par défaut ; un dossier sinon.
+
+    Corrigé le 10/09/2026 : « Ouvrir » ouvrait le dossier parent même quand la
+    ligne désignait un fichier (`intellafeeder.ini`). Il fallait ensuite le
+    retrouver à l'œil dans le dossier — alors que le bouton est en face de son
+    chemin. Un dossier, lui, s'ouvre toujours dans l'Explorateur.
+    """
+    try:
+        if os.path.isfile(chemin):
+            os.startfile(os.path.normpath(chemin))   # noqa: S606 (Windows only)
+            return
+    except OSError:
+        # Pas d'association pour cette extension (un .ini sans éditeur associé,
+        # par exemple) : on retombe sur le dossier, qui vaut mieux que rien.
+        pass
+    open_folder(chemin)

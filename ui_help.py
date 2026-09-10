@@ -24,9 +24,18 @@ from tkinter import ttk
 import config
 import i18n
 
-# Largeur de la colonne de texte, en pixels. ~90 caractères en Segoe UI 10 :
-# au-delà, l'œil rate le retour à la ligne ; en deçà, on hache les phrases.
-LARGEUR_LECTURE = 760
+# Largeur MAXIMALE de la colonne de texte, en pixels. Le texte l'occupe
+# entièrement tant que la fenêtre est plus étroite ; au-delà, les marges
+# absorbent le surplus plutôt que d'étirer les lignes.
+#
+# ⚠ Passé de 760 à 1100 le 10/09/2026 : à 760, l'aide « ne prenait que le milieu
+# de l'écran » sur un grand moniteur — le remède était devenu pire que le mal.
+# Le but reste d'éviter les lignes de 200 caractères, pas d'imposer une colonne
+# étroite.
+LARGEUR_LECTURE = 1100
+
+# Largeur (px) de la colonne du sommaire, à gauche.
+LARGEUR_SOMMAIRE = 230
 
 # Repli minimal si AUCUNE langue n'est disponible (ni ``lang\``, ni les langues
 # embarquées) — situation qui ne se produit pas sur un exe normalement
@@ -48,12 +57,22 @@ class HelpTab(ttk.Frame):
         self.app = app
         self._marques = []      # (titre, nom de marque) des sections de 1er niveau
 
-        # --- Sommaire : une rangée de libellés cliquables ------------------ #
-        self.sommaire = ttk.Frame(self)
-        self.sommaire.pack(fill="x", padx=12, pady=(8, 4))
+        # --- Sommaire VERTICAL, à gauche (demandé le 10/09/2026) ----------- #
+        # En rangée horizontale, il passait à la ligne dès que la fenêtre
+        # rétrécissait et volait de la hauteur au texte. En colonne, chaque
+        # section tient sur une ligne et le sommaire reste visible pendant la
+        # lecture.
+        corps = ttk.Frame(self)
+        corps.pack(fill="both", expand=True)
 
-        holder = ttk.Frame(self)
-        holder.pack(fill="both", expand=True, padx=8, pady=(0, 8))
+        colonne = ttk.LabelFrame(corps, text=i18n.t("help.toc", "Aller à :"))
+        colonne.pack(side="left", fill="y", padx=(10, 4), pady=8)
+        self.sommaire = ttk.Frame(colonne, width=LARGEUR_SOMMAIRE)
+        self.sommaire.pack(fill="both", expand=True, padx=6, pady=6)
+        self.sommaire.pack_propagate(False)
+
+        holder = ttk.Frame(corps)
+        holder.pack(side="left", fill="both", expand=True, padx=(4, 8), pady=8)
         text = tk.Text(holder, wrap="word", state="disabled", padx=10, pady=10,
                        relief="flat", cursor="arrow")
         vsb = ttk.Scrollbar(holder, orient="vertical", command=text.yview)
@@ -114,17 +133,22 @@ class HelpTab(ttk.Frame):
         for w in self.sommaire.winfo_children():
             w.destroy()
         if len(self._marques) < 3:
-            return          # deux sections : un sommaire n'apporte rien
-        ttk.Label(self.sommaire, text=i18n.t("help.toc", "Aller à :"),
-                  foreground="#475569").pack(side="left", padx=(0, 6))
-        # Enveloppe qui passe à la ligne toute seule quand la fenêtre rétrécit.
-        rangee = ttk.Frame(self.sommaire)
-        rangee.pack(side="left", fill="x", expand=True)
+            # Deux sections : un sommaire n'apporte rien, et la colonne prendrait
+            # de la place pour rien.
+            self.sommaire.master.pack_forget()
+            return
+        if not self.sommaire.master.winfo_ismapped():
+            self.sommaire.master.pack(side="left", fill="y", padx=(10, 4), pady=8)
         for titre, marque in self._marques:
-            lien = tk.Label(rangee, text=titre, fg="#1d4ed8", cursor="hand2",
+            lien = tk.Label(self.sommaire, text=titre, fg="#1d4ed8", cursor="hand2",
+                            anchor="w", justify="left",
+                            wraplength=LARGEUR_SOMMAIRE - 16,
                             font=("Segoe UI", 9, "underline"))
-            lien.pack(side="left", padx=(0, 12))
+            lien.pack(fill="x", pady=1)
             lien.bind("<Button-1>", lambda _e, m=marque: self._aller_a(m))
+            # Survol : sans retour visuel, rien ne dit que c'est cliquable.
+            lien.bind("<Enter>", lambda _e, w=lien: w.config(fg="#1e3a8a"))
+            lien.bind("<Leave>", lambda _e, w=lien: w.config(fg="#1d4ed8"))
 
     def _render(self):
         content = i18n.help_content() or _DEFAULT_CONTENT

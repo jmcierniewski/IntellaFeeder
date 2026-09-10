@@ -24,6 +24,9 @@ MIME_STATUS_COLORS = {
     mime_catalog.STATUS_DESCRIBED: "#1d4ed8",   # bleu : nommé par le référentiel
     mime_catalog.STATUS_OBSERVED: "#111827",    # noir : vu chez Intella, non décrit
     mime_catalog.STATUS_UNKNOWN: "#b91c1c",     # rouge : jamais vu, à vérifier
+    # Turquoise : décrit par VOUS, pas par Vound. Distinct du bleu pour qu'on
+    # sache d'un coup d'œil ce qui vient du référentiel et ce qu'on a écrit.
+    mime_catalog.STATUS_USER: "#0f766e",
 }
 
 
@@ -33,6 +36,7 @@ def mime_status_label(etat: str) -> str:
         mime_catalog.STATUS_DESCRIBED: i18n.t("mime.state_described", "décrit"),
         mime_catalog.STATUS_OBSERVED: i18n.t("mime.state_observed", "vu dans vos cas"),
         mime_catalog.STATUS_UNKNOWN: i18n.t("mime.state_unknown", "inconnu"),
+        mime_catalog.STATUS_USER: i18n.t("mime.state_user", "décrit par vous"),
     }.get(etat, etat)
 
 

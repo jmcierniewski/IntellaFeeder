@@ -596,7 +596,18 @@ BUILTIN = {
             "inventory.export_csv_short": "CSV…",
             "inventory.export_xml_short": "XML…",
             "inventory.export_tasks_short": "Tâches du cas…",
-            "help.toc": "Aller à :"
+            "help.toc": "Aller à :",
+            "import.autosize_log": "Import complet : mesure préalable de {n} source(s) sans taille.",
+            "mime.state_user": "décrit par vous",
+            "profiles.ref_col_user": "Votre description",
+            "profiles.ref_edit": "Décrire ce type…",
+            "profiles.ref_edit_hint": "(ou double-cliquez une ligne)",
+            "profiles.ref_edit_title": "Décrire un type",
+            "profiles.ref_edit_none": "Sélectionnez d'abord un type.",
+            "profiles.ref_edit_prompt": "Description de « {n} » :",
+            "profiles.ref_edit_official": "Attention : Intella décrit désormais ce type « {d} ». Sa description restera prioritaire sur la vôtre.",
+            "profiles.ref_edit_failed": "Impossible d'enregistrer : {e}",
+            "profiles.ref_edit_log": "Description personnelle : {n} → « {d} »"
         },
         "help": [
             [
@@ -782,6 +793,22 @@ BUILTIN = {
             [
                 "p",
                 "Les noms sont colorés : en bleu ceux que le référentiel sait nommer, en noir ceux qu'Intella écrit sans les décrire (ce sont des synonymes, c'est normal), en rouge ceux qui n'ont jamais été rencontrés — à vérifier."
+            ],
+            [
+                "h2",
+                "Nommer vous-même un type que le référentiel ignore"
+            ],
+            [
+                "p",
+                "Certains types que filtre un cas n'ont aucune description : ce sont des synonymes qu'Intella écrit sans les nommer. Vous pouvez leur donner votre propre libellé : onglet « Profils » → sous-onglet « Référentiel », double-cliquez une ligne."
+            ],
+            [
+                "b",
+                "Votre description apparaît ensuite partout où le type est affiché, en turquoise pour la distinguer de celles d'Intella."
+            ],
+            [
+                "b",
+                "Si une future version d'Intella décrit ce type, c'est SA description qui s'affichera. La vôtre n'est pas perdue pour autant."
             ],
             [
                 "h1",
@@ -1470,7 +1497,18 @@ BUILTIN = {
             "inventory.export_csv_short": "CSV…",
             "inventory.export_xml_short": "XML…",
             "inventory.export_tasks_short": "Case tasks…",
-            "help.toc": "Go to:"
+            "help.toc": "Go to:",
+            "import.autosize_log": "Full import: measuring {n} source(s) with no size first.",
+            "mime.state_user": "described by you",
+            "profiles.ref_col_user": "Your description",
+            "profiles.ref_edit": "Describe this type…",
+            "profiles.ref_edit_hint": "(or double-click a row)",
+            "profiles.ref_edit_title": "Describe a type",
+            "profiles.ref_edit_none": "Select a type first.",
+            "profiles.ref_edit_prompt": "Description of “{n}”:",
+            "profiles.ref_edit_official": "Careful: Intella now describes this type “{d}”. Its description will keep priority over yours.",
+            "profiles.ref_edit_failed": "Could not save: {e}",
+            "profiles.ref_edit_log": "Personal description: {n} → “{d}”"
         },
         "help": [
             [
@@ -1656,6 +1694,22 @@ BUILTIN = {
             [
                 "p",
                 "Names are colour-coded: blue for those the reference can name, black for those Intella writes without describing (they are synonyms, this is normal), red for those never seen before — worth checking."
+            ],
+            [
+                "h2",
+                "Naming a type the reference does not know"
+            ],
+            [
+                "p",
+                "Some types filtered by a case have no description: they are synonyms Intella writes without naming. You can give them your own label: “Profiles” tab → “Reference” sub-tab, double-click a row."
+            ],
+            [
+                "b",
+                "Your description then appears wherever the type is shown, in teal so it stands apart from Intella's."
+            ],
+            [
+                "b",
+                "If a future Intella version describes that type, ITS description wins. Yours is not lost for all that."
             ],
             [
                 "h1",
