@@ -531,10 +531,6 @@
     "picker.confirm_replace": "Ce profil a déjà un filtre. Le remplacer par les {n} catégorie(s) cochée(s) ?",
     "picker.applied": "Filtre du profil : {n} catégorie(s), mode include.",
     "inventory.mime_undescribed": "{n} type(s) filtré(s) par ce cas ne sont décrits par aucun référentiel : {ex}…",
-    "inventory.mime_stale_title": "Référentiel de types MIME",
-    "inventory.mime_stale": "{n} type(s) filtré(s) par ce cas n'ont pas de description : votre référentiel est peut-être plus ancien que votre version d'Intella.\n\nCes types restent utilisables ; seuls leurs libellés manquent. Pour les obtenir, importez le fichier de descriptions depuis votre installation d'Intella : onglet Maintenance → Types MIME.",
-    "inventory.show_settings": "Voir les réglages…",
-    "inventory.settings_title": "Réglages de « {n} »",
     "settings.state_mapped": "rejoué par le profil",
     "settings.state_unsupported": "à refaire dans Intella",
     "settings.state_unknown": "inconnu — à vérifier",
@@ -548,7 +544,32 @@
     "settings.col_key": "Réglage (nom Intella)",
     "settings.col_label": "Description",
     "settings.col_value": "Valeur",
-    "settings.col_state": "État"
+    "settings.col_state": "État",
+    "import.clear_list": "Vider la liste",
+    "import.clear_empty": "La liste est déjà vide.",
+    "import.clear_confirm": "Retirer les {n} source(s) de la liste ?\n\nLes chemins collés au-dessus sont conservés : « Analyser les chemins » les remettra.",
+    "import.clear_log": "Liste des sources vidée ({n} retirée(s)).",
+    "profiles.view_settings": "Voir les réglages de la source…",
+    "profiles.settings_from": "Réglages repris de la source « {n} ». {r}",
+    "profiles.settings_none": "Pour voir ce qu'un profil reprend d'une source réglée dans Intella : onglet « Inventaire du cas », sélectionnez la source, « Info Profil → ».",
+    "profiles.settings_title": "Réglages de « {n} »",
+    "profiles.provenance": "Repris de la source « {n} » le {d}.",
+    "profiles.provenance_lost": "Non rejoué (à refaire dans Intella) : {k}",
+    "profiles.tab_reference": "Référentiel",
+    "profiles.ref_col": "Type sans description",
+    "profiles.ref_hint": "Un type sans description reste parfaitement utilisable : seul son libellé manque. Ce sont le plus souvent des synonymes qu'Intella écrit sans les nommer. Si votre version d'Intella est plus récente que le référentiel, vous pouvez l'actualiser depuis Maintenance → Types MIME.",
+    "profiles.ref_external": "Descriptions : FICHIER EXTERNE ({n} entrées) — {p}",
+    "profiles.ref_builtin": "Descriptions : version intégrée à l'application ({n} entrées).",
+    "profiles.ref_learned": "{n} nom(s) appris de vos cas.",
+    "profiles.ref_case": "{n} type(s) filtré(s) par le dernier cas lu n'ont pas de description :",
+    "profiles.ref_case_ok": "Aucun type sans description dans le dernier cas lu.",
+    "mime.pane_current": "Types de ce filtre",
+    "mime.pane_catalog": "Types disponibles (référentiel)",
+    "mime.only_categories": "Catégories seules",
+    "mime.catalog_count": "{n} type(s) affiché(s) à droite.",
+    "mime.add": "◀ Ajouter au filtre",
+    "mime.remove": "Retirer du filtre",
+    "mime.edit_hint": "Ajouter ou retirer modifie le champ du profil ; « Enregistrer » reste nécessaire pour le conserver."
   },
   "help": [
     [
@@ -574,6 +595,14 @@
     [
       "b",
       "3. Cliquez « Analyser les chemins » : le tableau liste les sources à importer. Les sources déjà présentes dans le cas (d'après l'inventaire) sont surlignées."
+    ],
+    [
+      "b",
+      "« Analyser les chemins » calcule aussi la taille des lignes qui n'en ont pas encore : vous pouvez relancer l'analyse sans tout remesurer."
+    ],
+    [
+      "b",
+      "« Vider la liste » retire toutes les sources d'un coup. Les chemins collés au-dessus sont conservés."
     ],
     [
       "b",
@@ -633,6 +662,10 @@
     ],
     [
       "b",
+      "Le parcours normal tient en trois gestes : réglez une source à la main dans Intella, récupérez ses réglages avec « Info Profil », enregistrez-les sous un nom. Ce profil se rejoue ensuite sur toutes les sources que vous importez. En pratique deux ou trois profils définis une fois pour toutes suffisent."
+    ],
+    [
+      "b",
       "Dans l'onglet « Profils » : choisissez un profil dans la liste pour voir ses options, ou « Nouveau » pour partir des réglages par défaut. Cochez les options voulues, donnez un nom, puis « Enregistrer »."
     ],
     [
@@ -653,7 +686,7 @@
     ],
     [
       "p",
-      "Pour savoir exactement où vous en êtes : onglet « Inventaire du cas », sélectionnez une source, puis « Voir les réglages… ». La fenêtre liste tous les réglages de cette source, avec un code couleur."
+      "Pour savoir exactement où vous en êtes : onglet « Profils », bouton « Voir les réglages de la source… » (actif après un « Info Profil »). La fenêtre liste tous les réglages de la source d'origine, avec un code couleur."
     ],
     [
       "b",
@@ -677,7 +710,7 @@
     ],
     [
       "b",
-      "Filtre de types MIME : c'est une longue liste ; la zone s'agrandit quand vous cliquez dedans pour copier/coller plus facilement."
+      "Filtre de types MIME : le bouton « Voir les types… » ouvre deux panneaux — à gauche les types de ce profil, à droite tous les types possibles, avec une recherche. Vous pouvez faire passer une sélection de droite à gauche : inutile de connaître les noms par cœur."
     ],
     [
       "b",

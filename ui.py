@@ -317,9 +317,13 @@ class MainWindow:
         except tk.TclError:
             pass
 
-    def open_profiles_with(self, values, suggested_name=""):
-        """Bascule sur l'onglet Profils et pré-remplit le formulaire (Info Profil)."""
-        self.profiles_tab.load_from_values(values, suggested_name)
+    def open_profiles_with(self, values, suggested_name="", src=None):
+        """Bascule sur l'onglet Profils et pré-remplit le formulaire (Info Profil).
+
+        ``src`` = la source de l'export dont viennent les valeurs : elle suit,
+        pour que « Voir les réglages… » puisse dire ce qui n'est PAS repris.
+        """
+        self.profiles_tab.load_from_values(values, suggested_name, src)
         self.aller_a(self.profiles_tab)
 
     def clear_case_meta(self):

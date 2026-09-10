@@ -24,6 +24,7 @@ import dnd_windows
 import forensic_scan
 import generator
 import i18n
+import json_builder
 import models
 import op_validation
 import path_parser
@@ -505,6 +506,11 @@ class ImportTab(ttk.Frame):
         self.btn_import_list = make_button(toolbar, i18n.t("import.import_list", "Importer une liste…"),
                                            self._import_recap)
         self.btn_import_list.pack(side="left", padx=4)
+        # Vider d'un coup : retirer 40 lignes une croix à la fois n'était pas
+        # tenable. Rouge = geste destructeur, et il demande confirmation.
+        self.btn_clear = make_button(toolbar, i18n.t("import.clear_list", "Vider la liste"),
+                                     self.vider_liste, color="#b91c1c")
+        self.btn_clear.pack(side="left")
         ttk.Separator(toolbar, orient="vertical").pack(side="left", fill="y", padx=8)
         self.btn_check_all = make_button(toolbar, i18n.t("import.check_all", "Imp. : tout cocher"),
                                          lambda: self._set_all_import(True))
@@ -622,9 +628,9 @@ class ImportTab(ttk.Frame):
         n'ont pas de sens tant que les tailles ne sont pas connues.
         """
         state = "disabled" if busy else "normal"
-        for w in (self.btn_analyze, self.btn_import_list, self.btn_check_all,
-                  self.btn_uncheck_all, self.btn_generate, self.btn_import,
-                  self.btn_run_all):
+        for w in (self.btn_analyze, self.btn_import_list, self.btn_clear,
+                  self.btn_check_all, self.btn_uncheck_all, self.btn_generate,
+                  self.btn_import, self.btn_run_all):
             w.config(state=state)
         self.cb_default_profile.config(state="disabled" if busy else "readonly")
 
@@ -914,6 +920,11 @@ class ImportTab(ttk.Frame):
         if removed:
             msg += " " + i18n.t("import.summary_removed_log", "{n} déjà dans le cas, retirée(s).", n=removed)
         self.app.log.log(msg)
+        # La génération EXIGE une taille par source cochée : sans mesure, le
+        # parcours s'arrête sur un refus. On enchaîne donc directement, mais
+        # **uniquement sur les lignes non mesurées** — analyser deux fois de
+        # suite ne doit pas relancer le scan de tout ce qui est déjà connu.
+        self.calculer_taille(only_missing=True, silencieux=True)
 
     def _size_text(self, s):
         return config.human_size(s.size_bytes) if s.size_bytes is not None else "—"
@@ -1316,6 +1327,36 @@ class ImportTab(ttk.Frame):
             s.import_selected = state
         self._refresh_tree()
 
+    def vider_liste(self):
+        """Retire toutes les sources de « Sources à importer ».
+
+        Les zones de collage ne sont PAS touchées : elles gardent la trace de ce
+        qu'on a fourni, et c'est souvent d'elles qu'on repart pour relancer une
+        analyse. Vider les deux d'un même bouton ferait perdre le travail de
+        constitution de la liste, qui est le plus long.
+        """
+        if self._compound_blocked() or self._busy_measuring():
+            return
+        titre = i18n.t("import.clear_list", "Vider la liste")
+        if not self.sources:
+            messagebox.showinfo(titre, i18n.t("import.clear_empty",
+                                              "La liste est déjà vide."))
+            return
+        if not messagebox.askyesno(titre, i18n.t(
+                "import.clear_confirm",
+                "Retirer les {n} source(s) de la liste ?\n\nLes chemins collés "
+                "au-dessus sont conservés : « Analyser les chemins » les "
+                "remettra.", n=len(self.sources))):
+            return
+        n = len(self.sources)
+        self.sources = []
+        self._pending_sizes = {}
+        self._resume_sizes = {}
+        self._sort_col = None
+        self._refresh_tree()
+        self.app.log.log(i18n.t("import.clear_log",
+                                "Liste des sources vidée ({n} retirée(s)).", n=n))
+
     def _toggle_column(self, task_idx, state):
         if not (0 <= task_idx < len(self.tasks)):
             return
@@ -1368,11 +1409,24 @@ class ImportTab(ttk.Frame):
     # ------------------------------------------------------------------ #
     # Calcul de taille (thread)                                          #
     # ------------------------------------------------------------------ #
-    def calculer_taille(self):
+    def calculer_taille(self, only_missing: bool = False, silencieux: bool = False):
+        """Mesure les sources cochées.
+
+        ``only_missing`` : ne mesurer que celles qui n'ont **pas** de taille —
+        c'est l'enchaînement automatique depuis « Analyser les chemins ».
+        Remesurer tout à chaque analyse serait ruineux (un scellé réseau prend
+        des dizaines de minutes) et effacerait le travail déjà fait.
+        ``silencieux`` : pas de message quand il n'y a rien à mesurer, l'appel
+        n'ayant pas été demandé explicitement par l'utilisateur.
+        """
         if self._size_running:
             return                       # déjà en cours : le bouton est grisé, on ignore
         checked = [s for s in self.sources if s.import_selected]
+        if only_missing:
+            checked = [s for s in checked if s.size_bytes is None]
         if not checked:
+            if silencieux:
+                return
             messagebox.showinfo(
                 i18n.t("import.size_title", "Taille"),
                 i18n.t("import.no_checked",
@@ -1823,8 +1877,11 @@ class ImportTab(ttk.Frame):
             # Popen (et non os.startfile) : il faut le handle du processus pour
             # savoir QUAND l'import se termine et enchaîner sur la validation.
             # CREATE_NEW_CONSOLE conserve la console de progression d'IntellaCmd.
+            # L'argument `auto` supprime la pause finale du .bat : sans lui, la
+            # console attendait un clic et l'enchaînement restait suspendu.
             self._import_proc = subprocess.Popen(
-                ["cmd", "/c", bat], cwd=os.path.dirname(bat),
+                ["cmd", "/c", bat, json_builder.BAT_AUTO_FLAG],
+                cwd=os.path.dirname(bat),
                 creationflags=getattr(subprocess, "CREATE_NEW_CONSOLE", 0))
             self.app.log.log(i18n.t("import.launched_log", "Import lancé : {b}", b=bat))
         except OSError as exc:

@@ -552,10 +552,6 @@ BUILTIN = {
             "picker.confirm_replace": "Ce profil a déjà un filtre. Le remplacer par les {n} catégorie(s) cochée(s) ?",
             "picker.applied": "Filtre du profil : {n} catégorie(s), mode include.",
             "inventory.mime_undescribed": "{n} type(s) filtré(s) par ce cas ne sont décrits par aucun référentiel : {ex}…",
-            "inventory.mime_stale_title": "Référentiel de types MIME",
-            "inventory.mime_stale": "{n} type(s) filtré(s) par ce cas n'ont pas de description : votre référentiel est peut-être plus ancien que votre version d'Intella.\n\nCes types restent utilisables ; seuls leurs libellés manquent. Pour les obtenir, importez le fichier de descriptions depuis votre installation d'Intella : onglet Maintenance → Types MIME.",
-            "inventory.show_settings": "Voir les réglages…",
-            "inventory.settings_title": "Réglages de « {n} »",
             "settings.state_mapped": "rejoué par le profil",
             "settings.state_unsupported": "à refaire dans Intella",
             "settings.state_unknown": "inconnu — à vérifier",
@@ -569,7 +565,32 @@ BUILTIN = {
             "settings.col_key": "Réglage (nom Intella)",
             "settings.col_label": "Description",
             "settings.col_value": "Valeur",
-            "settings.col_state": "État"
+            "settings.col_state": "État",
+            "import.clear_list": "Vider la liste",
+            "import.clear_empty": "La liste est déjà vide.",
+            "import.clear_confirm": "Retirer les {n} source(s) de la liste ?\n\nLes chemins collés au-dessus sont conservés : « Analyser les chemins » les remettra.",
+            "import.clear_log": "Liste des sources vidée ({n} retirée(s)).",
+            "profiles.view_settings": "Voir les réglages de la source…",
+            "profiles.settings_from": "Réglages repris de la source « {n} ». {r}",
+            "profiles.settings_none": "Pour voir ce qu'un profil reprend d'une source réglée dans Intella : onglet « Inventaire du cas », sélectionnez la source, « Info Profil → ».",
+            "profiles.settings_title": "Réglages de « {n} »",
+            "profiles.provenance": "Repris de la source « {n} » le {d}.",
+            "profiles.provenance_lost": "Non rejoué (à refaire dans Intella) : {k}",
+            "profiles.tab_reference": "Référentiel",
+            "profiles.ref_col": "Type sans description",
+            "profiles.ref_hint": "Un type sans description reste parfaitement utilisable : seul son libellé manque. Ce sont le plus souvent des synonymes qu'Intella écrit sans les nommer. Si votre version d'Intella est plus récente que le référentiel, vous pouvez l'actualiser depuis Maintenance → Types MIME.",
+            "profiles.ref_external": "Descriptions : FICHIER EXTERNE ({n} entrées) — {p}",
+            "profiles.ref_builtin": "Descriptions : version intégrée à l'application ({n} entrées).",
+            "profiles.ref_learned": "{n} nom(s) appris de vos cas.",
+            "profiles.ref_case": "{n} type(s) filtré(s) par le dernier cas lu n'ont pas de description :",
+            "profiles.ref_case_ok": "Aucun type sans description dans le dernier cas lu.",
+            "mime.pane_current": "Types de ce filtre",
+            "mime.pane_catalog": "Types disponibles (référentiel)",
+            "mime.only_categories": "Catégories seules",
+            "mime.catalog_count": "{n} type(s) affiché(s) à droite.",
+            "mime.add": "◀ Ajouter au filtre",
+            "mime.remove": "Retirer du filtre",
+            "mime.edit_hint": "Ajouter ou retirer modifie le champ du profil ; « Enregistrer » reste nécessaire pour le conserver."
         },
         "help": [
             [
@@ -595,6 +616,14 @@ BUILTIN = {
             [
                 "b",
                 "3. Cliquez « Analyser les chemins » : le tableau liste les sources à importer. Les sources déjà présentes dans le cas (d'après l'inventaire) sont surlignées."
+            ],
+            [
+                "b",
+                "« Analyser les chemins » calcule aussi la taille des lignes qui n'en ont pas encore : vous pouvez relancer l'analyse sans tout remesurer."
+            ],
+            [
+                "b",
+                "« Vider la liste » retire toutes les sources d'un coup. Les chemins collés au-dessus sont conservés."
             ],
             [
                 "b",
@@ -654,6 +683,10 @@ BUILTIN = {
             ],
             [
                 "b",
+                "Le parcours normal tient en trois gestes : réglez une source à la main dans Intella, récupérez ses réglages avec « Info Profil », enregistrez-les sous un nom. Ce profil se rejoue ensuite sur toutes les sources que vous importez. En pratique deux ou trois profils définis une fois pour toutes suffisent."
+            ],
+            [
+                "b",
                 "Dans l'onglet « Profils » : choisissez un profil dans la liste pour voir ses options, ou « Nouveau » pour partir des réglages par défaut. Cochez les options voulues, donnez un nom, puis « Enregistrer »."
             ],
             [
@@ -674,7 +707,7 @@ BUILTIN = {
             ],
             [
                 "p",
-                "Pour savoir exactement où vous en êtes : onglet « Inventaire du cas », sélectionnez une source, puis « Voir les réglages… ». La fenêtre liste tous les réglages de cette source, avec un code couleur."
+                "Pour savoir exactement où vous en êtes : onglet « Profils », bouton « Voir les réglages de la source… » (actif après un « Info Profil »). La fenêtre liste tous les réglages de la source d'origine, avec un code couleur."
             ],
             [
                 "b",
@@ -698,7 +731,7 @@ BUILTIN = {
             ],
             [
                 "b",
-                "Filtre de types MIME : c'est une longue liste ; la zone s'agrandit quand vous cliquez dedans pour copier/coller plus facilement."
+                "Filtre de types MIME : le bouton « Voir les types… » ouvre deux panneaux — à gauche les types de ce profil, à droite tous les types possibles, avec une recherche. Vous pouvez faire passer une sélection de droite à gauche : inutile de connaître les noms par cœur."
             ],
             [
                 "b",
@@ -1387,10 +1420,6 @@ BUILTIN = {
             "picker.confirm_replace": "This profile already has a filter. Replace it with the {n} checked category(ies)?",
             "picker.applied": "Profile filter: {n} category(ies), include mode.",
             "inventory.mime_undescribed": "{n} type(s) filtered by this case have no description: {ex}…",
-            "inventory.mime_stale_title": "MIME type reference",
-            "inventory.mime_stale": "{n} type(s) filtered by this case have no description: your reference may be older than your Intella version.\n\nThese types remain usable; only their labels are missing. To get them, import the description file from your Intella installation: Maintenance tab → MIME types.",
-            "inventory.show_settings": "View settings…",
-            "inventory.settings_title": "Settings of “{n}”",
             "settings.state_mapped": "replayed by the profile",
             "settings.state_unsupported": "to redo in Intella",
             "settings.state_unknown": "unknown — worth checking",
@@ -1404,7 +1433,32 @@ BUILTIN = {
             "settings.col_key": "Setting (Intella name)",
             "settings.col_label": "Description",
             "settings.col_value": "Value",
-            "settings.col_state": "State"
+            "settings.col_state": "State",
+            "import.clear_list": "Clear the list",
+            "import.clear_empty": "The list is already empty.",
+            "import.clear_confirm": "Remove the {n} source(s) from the list?\n\nThe paths pasted above are kept: “Analyse paths” will bring them back.",
+            "import.clear_log": "Source list cleared ({n} removed).",
+            "profiles.view_settings": "View the source settings…",
+            "profiles.settings_from": "Settings taken from source “{n}”. {r}",
+            "profiles.settings_none": "To see what a profile takes from a source configured in Intella: “Case inventory” tab, select the source, “Profile info →”.",
+            "profiles.settings_title": "Settings of “{n}”",
+            "profiles.provenance": "Taken from source “{n}” on {d}.",
+            "profiles.provenance_lost": "Not replayed (redo in Intella): {k}",
+            "profiles.tab_reference": "Reference",
+            "profiles.ref_col": "Type with no description",
+            "profiles.ref_hint": "A type with no description is still perfectly usable: only its label is missing. These are usually synonyms Intella writes without naming them. If your Intella version is newer than the reference, you can refresh it from Maintenance → MIME types.",
+            "profiles.ref_external": "Descriptions: EXTERNAL FILE ({n} entries) — {p}",
+            "profiles.ref_builtin": "Descriptions: version built into the application ({n} entries).",
+            "profiles.ref_learned": "{n} name(s) learnt from your cases.",
+            "profiles.ref_case": "{n} type(s) filtered by the last case read have no description:",
+            "profiles.ref_case_ok": "No undescribed type in the last case read.",
+            "mime.pane_current": "Types in this filter",
+            "mime.pane_catalog": "Available types (reference)",
+            "mime.only_categories": "Categories only",
+            "mime.catalog_count": "{n} type(s) shown on the right.",
+            "mime.add": "◀ Add to filter",
+            "mime.remove": "Remove from filter",
+            "mime.edit_hint": "Adding or removing changes the profile field; “Save” is still needed to keep it."
         },
         "help": [
             [
@@ -1430,6 +1484,14 @@ BUILTIN = {
             [
                 "b",
                 "3. Click « Analyse paths »: the table lists the sources to import. Sources already present in the case (per the inventory) are highlighted."
+            ],
+            [
+                "b",
+                "“Analyse paths” also computes the size of rows that do not have one yet: you can re-run the analysis without measuring everything again."
+            ],
+            [
+                "b",
+                "“Clear the list” removes every source at once. The paths pasted above are kept."
             ],
             [
                 "b",
@@ -1489,6 +1551,10 @@ BUILTIN = {
             ],
             [
                 "b",
+                "The normal route takes three steps: configure one source by hand in Intella, pick up its settings with “Profile info”, save them under a name. That profile is then replayed on every source you import. In practice two or three profiles defined once are enough."
+            ],
+            [
+                "b",
                 "In the « Profiles » tab: pick a profile from the list to see its options, or click « New » to start from the defaults. Check the options you want, give it a name, then « Save »."
             ],
             [
@@ -1509,7 +1575,7 @@ BUILTIN = {
             ],
             [
                 "p",
-                "To see exactly where you stand: “Case inventory” tab, select a source, then “View settings…”. The window lists every setting of that source, colour-coded."
+                "To see exactly where you stand: “Profiles” tab, “View the source settings…” button (active after a “Profile info”). The window lists every setting of the original source, colour-coded."
             ],
             [
                 "b",
@@ -1533,7 +1599,7 @@ BUILTIN = {
             ],
             [
                 "b",
-                "MIME type filter: it's a long list; the box grows when you click inside it, to make copy/paste easier."
+                "MIME type filter: the “View types…” button opens two panes — this profile's types on the left, every possible type on the right, with a search box. You can move a selection from right to left: no need to know the names by heart."
             ],
             [
                 "b",

@@ -531,10 +531,6 @@
     "picker.confirm_replace": "This profile already has a filter. Replace it with the {n} checked category(ies)?",
     "picker.applied": "Profile filter: {n} category(ies), include mode.",
     "inventory.mime_undescribed": "{n} type(s) filtered by this case have no description: {ex}…",
-    "inventory.mime_stale_title": "MIME type reference",
-    "inventory.mime_stale": "{n} type(s) filtered by this case have no description: your reference may be older than your Intella version.\n\nThese types remain usable; only their labels are missing. To get them, import the description file from your Intella installation: Maintenance tab → MIME types.",
-    "inventory.show_settings": "View settings…",
-    "inventory.settings_title": "Settings of “{n}”",
     "settings.state_mapped": "replayed by the profile",
     "settings.state_unsupported": "to redo in Intella",
     "settings.state_unknown": "unknown — worth checking",
@@ -548,7 +544,32 @@
     "settings.col_key": "Setting (Intella name)",
     "settings.col_label": "Description",
     "settings.col_value": "Value",
-    "settings.col_state": "State"
+    "settings.col_state": "State",
+    "import.clear_list": "Clear the list",
+    "import.clear_empty": "The list is already empty.",
+    "import.clear_confirm": "Remove the {n} source(s) from the list?\n\nThe paths pasted above are kept: “Analyse paths” will bring them back.",
+    "import.clear_log": "Source list cleared ({n} removed).",
+    "profiles.view_settings": "View the source settings…",
+    "profiles.settings_from": "Settings taken from source “{n}”. {r}",
+    "profiles.settings_none": "To see what a profile takes from a source configured in Intella: “Case inventory” tab, select the source, “Profile info →”.",
+    "profiles.settings_title": "Settings of “{n}”",
+    "profiles.provenance": "Taken from source “{n}” on {d}.",
+    "profiles.provenance_lost": "Not replayed (redo in Intella): {k}",
+    "profiles.tab_reference": "Reference",
+    "profiles.ref_col": "Type with no description",
+    "profiles.ref_hint": "A type with no description is still perfectly usable: only its label is missing. These are usually synonyms Intella writes without naming them. If your Intella version is newer than the reference, you can refresh it from Maintenance → MIME types.",
+    "profiles.ref_external": "Descriptions: EXTERNAL FILE ({n} entries) — {p}",
+    "profiles.ref_builtin": "Descriptions: version built into the application ({n} entries).",
+    "profiles.ref_learned": "{n} name(s) learnt from your cases.",
+    "profiles.ref_case": "{n} type(s) filtered by the last case read have no description:",
+    "profiles.ref_case_ok": "No undescribed type in the last case read.",
+    "mime.pane_current": "Types in this filter",
+    "mime.pane_catalog": "Available types (reference)",
+    "mime.only_categories": "Categories only",
+    "mime.catalog_count": "{n} type(s) shown on the right.",
+    "mime.add": "◀ Add to filter",
+    "mime.remove": "Remove from filter",
+    "mime.edit_hint": "Adding or removing changes the profile field; “Save” is still needed to keep it."
   },
   "help": [
     [
@@ -574,6 +595,14 @@
     [
       "b",
       "3. Click « Analyse paths »: the table lists the sources to import. Sources already present in the case (per the inventory) are highlighted."
+    ],
+    [
+      "b",
+      "“Analyse paths” also computes the size of rows that do not have one yet: you can re-run the analysis without measuring everything again."
+    ],
+    [
+      "b",
+      "“Clear the list” removes every source at once. The paths pasted above are kept."
     ],
     [
       "b",
@@ -633,6 +662,10 @@
     ],
     [
       "b",
+      "The normal route takes three steps: configure one source by hand in Intella, pick up its settings with “Profile info”, save them under a name. That profile is then replayed on every source you import. In practice two or three profiles defined once are enough."
+    ],
+    [
+      "b",
       "In the « Profiles » tab: pick a profile from the list to see its options, or click « New » to start from the defaults. Check the options you want, give it a name, then « Save »."
     ],
     [
@@ -653,7 +686,7 @@
     ],
     [
       "p",
-      "To see exactly where you stand: “Case inventory” tab, select a source, then “View settings…”. The window lists every setting of that source, colour-coded."
+      "To see exactly where you stand: “Profiles” tab, “View the source settings…” button (active after a “Profile info”). The window lists every setting of the original source, colour-coded."
     ],
     [
       "b",
@@ -677,7 +710,7 @@
     ],
     [
       "b",
-      "MIME type filter: it's a long list; the box grows when you click inside it, to make copy/paste easier."
+      "MIME type filter: the “View types…” button opens two panes — this profile's types on the left, every possible type on the right, with a search box. You can move a selection from right to left: no need to know the names by heart."
     ],
     [
       "b",

@@ -80,52 +80,166 @@ def mime_filter_summary(texte: str, mode: str = "", avec_sens: bool = True) -> s
     return resume + " " + mime_filter_sense(mode) if avec_sens else resume
 
 
-def show_mime_filter(parent, texte: str, titre: str = "", mode: str = "") -> None:
-    """Fenêtre de lecture d'un filtre de types : un tableau au lieu d'une chaîne.
+def show_mime_filter(parent, texte: str, titre: str = "", mode: str = "",
+                    on_change=None) -> None:
+    """Fenêtre du filtre de types : ce qu'il contient, et ce qu'on peut y mettre.
 
-    Une liste de 600 noms séparés par des virgules n'est pas relisible dans un
-    champ de saisie — or c'est exactement ce que produit un « refine » complet
-    dans Intella. Lecture seule : le filtre s'édite toujours dans son champ.
+    **Deux panneaux**, parce qu'un seul ne suffisait pas (retour du
+    10/09/2026) : à gauche le filtre courant, à droite **tout le catalogue**.
+    « Un utilisateur ne peut pas les inventer » — sans la liste des noms
+    possibles, composer un filtre à la main revenait à deviner l'orthographe
+    exacte de ``application/vnd.openxmlformats-officedocument.wordprocessingml.document``.
 
     ``mode`` (``include``/``exclude``) est affiché **en tête et en gras** : la
     liste seule se lit à l'envers une fois sur deux (cf. `mime_filter_sense`).
+    ``on_change`` : appelé avec le nouveau filtre quand l'utilisateur ajoute ou
+    retire des types. Absent → fenêtre en lecture seule.
     """
     win = tk.Toplevel(parent)
     win.title(titre or i18n.t("mime.filter_title", "Types filtrés"))
-    win.geometry("860x560")
+    win.geometry("1120x620")
     win.transient(parent.winfo_toplevel())
 
-    ttk.Label(win, text=mime_filter_sense(mode),
-              font=("Segoe UI", 10, "bold")).pack(anchor="w", padx=10, pady=(10, 2))
-    ttk.Label(win, text=mime_filter_summary(texte, avec_sens=False)).pack(
-        anchor="w", padx=10, pady=(0, 6))
+    lbl_sense = ttk.Label(win, text=mime_filter_sense(mode),
+                          font=("Segoe UI", 10, "bold"))
+    lbl_sense.pack(anchor="w", padx=10, pady=(10, 2))
+    lbl_resume = ttk.Label(win, text=mime_filter_summary(texte, avec_sens=False))
+    lbl_resume.pack(anchor="w", padx=10, pady=(0, 6))
 
-    holder = ttk.Frame(win)
-    holder.pack(fill="both", expand=True, padx=10, pady=(0, 10))
-    tree = ttk.Treeview(holder, columns=("name", "label", "state"),
-                        show="headings")
+    split = ttk.PanedWindow(win, orient="horizontal")
+    split.pack(fill="both", expand=True, padx=10, pady=(0, 6))
+
+    # --- Gauche : le filtre courant -------------------------------------- #
+    gauche = ttk.LabelFrame(split, text=i18n.t("mime.pane_current",
+                                               "Types de ce filtre"))
+    split.add(gauche, weight=1)
+    tree = ttk.Treeview(gauche, columns=("name", "label", "state"),
+                        show="headings", selectmode="extended")
     for col, entete, largeur in (
-            ("name", i18n.t("mime.col_name", "Type"), 350),
-            ("label", i18n.t("mime.col_label", "Description"), 330),
-            ("state", i18n.t("mime.col_state", "État"), 130)):
+            ("name", i18n.t("mime.col_name", "Type"), 240),
+            ("label", i18n.t("mime.col_label", "Description"), 200),
+            ("state", i18n.t("mime.col_state", "État"), 110)):
         tree.heading(col, text=entete)
         tree.column(col, width=largeur, anchor="w")
-    vsb = ttk.Scrollbar(holder, orient="vertical", command=tree.yview)
+    vsb = ttk.Scrollbar(gauche, orient="vertical", command=tree.yview)
     tree.configure(yscrollcommand=vsb.set)
     tree.pack(side="left", fill="both", expand=True)
     vsb.pack(side="right", fill="y")
     for etat, couleur in MIME_STATUS_COLORS.items():
         tree.tag_configure(etat, foreground=couleur)
 
-    if (texte or "").strip():
-        for nom, etat, libelle in mime_catalog.classify_filter(texte):
-            tree.insert("", "end",
-                        values=(nom or i18n.t("mime.untyped", "(sans type)"),
-                                libelle, mime_status_label(etat)),
-                        tags=(etat,))
+    # --- Droite : tout le catalogue, cherchable -------------------------- #
+    droite = ttk.LabelFrame(split, text=i18n.t("mime.pane_catalog",
+                                               "Types disponibles (référentiel)"))
+    split.add(droite, weight=1)
+    barre = ttk.Frame(droite)
+    barre.pack(fill="x", padx=6, pady=(6, 2))
+    ttk.Label(barre, text=i18n.t("mime.search", "Rechercher")).pack(side="left")
+    var_search = tk.StringVar()
+    ttk.Entry(barre, textvariable=var_search).pack(side="left", fill="x",
+                                                   expand=True, padx=6)
+    var_cats = tk.BooleanVar(value=True)
+    ttk.Checkbutton(barre, variable=var_cats, text=i18n.t(
+        "mime.only_categories", "Catégories seules")).pack(side="left")
 
-    make_button(win, i18n.t("common.close", "Fermer"), win.destroy).pack(
-        anchor="e", padx=10, pady=(0, 10))
+    catalogue = ttk.Treeview(droite, columns=("name", "label"),
+                             show="headings", selectmode="extended")
+    catalogue.heading("name", text=i18n.t("mime.col_name", "Type"))
+    catalogue.heading("label", text=i18n.t("mime.col_label", "Description"))
+    catalogue.column("name", width=260, anchor="w")
+    catalogue.column("label", width=220, anchor="w")
+    cvsb = ttk.Scrollbar(droite, orient="vertical", command=catalogue.yview)
+    catalogue.configure(yscrollcommand=cvsb.set)
+    catalogue.pack(side="left", fill="both", expand=True, padx=(6, 0), pady=(0, 6))
+    cvsb.pack(side="right", fill="y", pady=(0, 6))
+    for etat, couleur in MIME_STATUS_COLORS.items():
+        catalogue.tag_configure(etat, foreground=couleur)
+
+    lbl_count = ttk.Label(win, foreground="#475569")
+    lbl_count.pack(anchor="w", padx=10)
+
+    # --- État courant, et son rendu -------------------------------------- #
+    # Liste vivante du filtre : la fenêtre édite CETTE liste, et n'écrit dans le
+    # profil qu'au travers de `on_change` — l'appelant reste maître du champ.
+    courant = mime_catalog.split_filter(texte) if (texte or "").strip() else []
+
+    # ⚠ `iid=nom` serait piégeux : le référentiel porte une entrée à nom VIDE
+    # (« Untyped », le type des items non reconnus) et un iid vide désigne la
+    # RACINE du Treeview — l'insertion échouerait. On indexe donc par position.
+    iid_filtre: dict = {}
+    iid_catalogue: dict = {}
+
+    def _peindre_filtre():
+        tree.delete(*tree.get_children())
+        iid_filtre.clear()
+        for i, nom in enumerate(courant):
+            etat = mime_catalog.status(nom)
+            iid = f"f{i}"
+            iid_filtre[iid] = nom
+            tree.insert("", "end", iid=iid, tags=(etat,),
+                        values=(nom or i18n.t("mime.untyped", "(sans type)"),
+                                mime_catalog.describe(nom),
+                                mime_status_label(etat)))
+        courant_txt = ",".join(courant)
+        lbl_resume.config(text=mime_filter_summary(courant_txt, avec_sens=False))
+        lbl_sense.config(text=mime_filter_sense(mode))
+
+    def _peindre_catalogue(*_a):
+        catalogue.delete(*catalogue.get_children())
+        motif = var_search.get()
+        n = 0
+        iid_catalogue.clear()
+        for nom, etat, libelle in mime_catalog.search(motif, limit=2000):
+            if var_cats.get() and not nom.startswith(mime_catalog.CATEGORY_PREFIX):
+                continue
+            iid = f"c{n}"
+            iid_catalogue[iid] = nom
+            catalogue.insert("", "end", iid=iid, tags=(etat,),
+                             values=(nom or i18n.t("mime.untyped", "(sans type)"),
+                                     libelle))
+            n += 1
+        lbl_count.config(text=i18n.t("mime.catalog_count",
+                                     "{n} type(s) affiché(s) à droite.", n=n))
+
+    var_search.trace_add("write", _peindre_catalogue)
+    var_cats.trace_add("write", _peindre_catalogue)
+    _peindre_filtre()
+    _peindre_catalogue()
+
+    # --- Édition (seulement si l'appelant l'accepte) --------------------- #
+    bas = ttk.Frame(win)
+    bas.pack(fill="x", padx=10, pady=(4, 10))
+
+    if on_change is not None:
+        def _ajouter():
+            ajoutes = [iid_catalogue[i] for i in catalogue.selection()
+                       if iid_catalogue.get(i) not in courant]
+            if not ajoutes:
+                return
+            courant.extend(ajoutes)
+            _peindre_filtre()
+            on_change(",".join(courant))
+
+        def _retirer():
+            for iid in tree.selection():
+                nom = iid_filtre.get(iid)
+                if nom in courant:
+                    courant.remove(nom)
+            _peindre_filtre()
+            on_change(",".join(courant))
+
+        make_button(bas, i18n.t("mime.add", "◀ Ajouter au filtre"), _ajouter,
+                    color="#16a34a").pack(side="left")
+        make_button(bas, i18n.t("mime.remove", "Retirer du filtre"),
+                    _retirer, color="#b45309").pack(side="left", padx=6)
+        ttk.Label(bas, foreground="#64748b", wraplength=560, justify="left",
+                  text=i18n.t(
+                      "mime.edit_hint",
+                      "Ajouter ou retirer modifie le champ du profil ; "
+                      "« Enregistrer » reste nécessaire pour le conserver.")
+                  ).pack(side="left", padx=10)
+
+    make_button(bas, i18n.t("common.close", "Fermer"), win.destroy).pack(side="right")
 
 
 # --- Réglages d'une source : trois états, trois couleurs ----------------- #

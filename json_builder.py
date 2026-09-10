@@ -75,6 +75,11 @@ def import_one_command(exe: str, user: str, case_path: str, case_name: str,
     return cmd
 
 
+# Argument passé au .bat par l'application pour supprimer la pause finale.
+# Un .bat lancé à la main (double-clic) ne le reçoit pas et garde sa pause.
+BAT_AUTO_FLAG = "auto"
+
+
 def _echo_safe(text: str) -> str:
     """Neutralise les caractères spéciaux cmd pour un ``echo``."""
     for ch in '&<>|^()%"':
@@ -99,7 +104,16 @@ def write_resilient_bat(entries, output_dir: str, filename: str,
         lines.append(cmd)
         lines.append('if errorlevel 1 (echo    [ECHEC] code %errorlevel%) else (echo    [OK])')
         lines.append("")
-    lines += ["echo.", "echo Termine.", "pause"]
+    # 🐞 Le « Appuyez sur une touche… » BLOQUAIT « Lancer l'import complet »
+    # (rapporté le 10/09/2026) : la fenêtre restait ouverte à attendre un clic,
+    # donc `_poll_import` ne voyait jamais le processus finir et la validation
+    # n'arrivait qu'après intervention. Mais le retirer tout court ferait
+    # disparaître la console avant qu'on ait pu lire le bilan quand le .bat est
+    # **double-cliqué depuis l'Explorateur** — un usage prévu par le contrat.
+    # D'où la pause CONDITIONNELLE : l'application passe l'argument `auto`,
+    # l'Explorateur n'en passe aucun.
+    lines += ["echo.", "echo Termine.",
+              f'if /i not "%~1"=="{BAT_AUTO_FLAG}" pause']
 
     path = os.path.join(output_dir, filename)
     with open(path, "w", encoding="utf-8", newline="\r\n") as f:

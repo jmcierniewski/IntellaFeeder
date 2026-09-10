@@ -27,7 +27,6 @@ import mime_catalog
 import path_parser
 import profile_translate
 import sizing
-import ui_widgets
 from ui_widgets import MeasureBar, make_button
 
 # En-têtes affichés du tableau (les clés internes des lignes restent en
@@ -117,10 +116,6 @@ class ExportTab(ttk.Frame):
         # visuellement (réglages de la source sélectionnée → onglet Profils).
         self._mk_btn(actions, i18n.t("inventory.info_profile", "Info Profil →"), self._info_profile,
                      color=config.PROFILE_TAB_COLOR).pack(side="left", padx=6)
-        # Voisin immédiat d'« Info Profil » : il répond à la question que celui-ci
-        # soulève — « qu'est-ce qui n'a PAS été repris ? ».
-        self._mk_btn(actions, i18n.t("inventory.show_settings", "Voir les réglages…"),
-                     self._show_settings, color=config.PROFILE_TAB_COLOR).pack(side="left")
 
         # Bandeau de progression du scan des dossiers à 0 (masqué au repos) :
         # même widget que l'onglet Import (progression + annulation).
@@ -418,6 +413,13 @@ class ExportTab(ttk.Frame):
                 n=len(nouveaux)))
         if inedits:
             self._warn_stale_reference(inedits)
+        else:
+            # Cas suivant entièrement décrit : effacer, sinon l'onglet Profils
+            # continuerait d'afficher la liste du cas précédent.
+            self.app.undescribed_types = []
+            tab = getattr(self.app, "profiles_tab", None)
+            if tab is not None:
+                tab.refresh_reference()
 
     @staticmethod
     def _undescribed_types(sources) -> list:
@@ -431,33 +433,29 @@ class ExportTab(ttk.Frame):
         return sorted(n for n in vus if n and mime_catalog.label(n) is None)
 
     def _warn_stale_reference(self, inedits) -> None:
-        """Signale un référentiel probablement plus ancien que l'Intella du poste.
+        """Consigne les types filtrés qu'aucune description ne nomme.
 
-        C'est le seul chaînon qui restait manuel : sans ce rappel, la mise à
-        jour du référentiel dépendait de ce que l'utilisateur pensait à faire —
-        et rien ne lui disait qu'il y avait lieu d'y penser.
-        ⚠ Un nom non décrit n'est **pas** une erreur : 121 alias d'un filtre
-        réel sont dans ce cas. On informe (journal + une fois par session), on
-        n'alerte pas.
+        🔴 **Plus de popup** (retiré le 10/09/2026, à la demande de
+        l'utilisateur). Il s'ouvrait à chaque lecture de cas pour annoncer une
+        situation sur laquelle il n'y a **rien à faire** quand on a déjà la
+        dernière version d'Intella — un nom non décrit n'est pas une erreur,
+        ce sont des alias qu'Intella écrit sans les nommer (121 sur un filtre
+        réel). Une fenêtre qu'on ferme sans la lire n'informe personne et coûte
+        un clic à chaque fois.
+
+        L'information reste disponible là où elle sert : au journal, et dans
+        l'onglet Profils → « Référentiel », **avec la liste**.
         """
         self.app.log.log(i18n.t(
             "inventory.mime_undescribed",
             "{n} type(s) filtré(s) par ce cas ne sont décrits par aucun "
             "référentiel : {ex}…",
             n=len(inedits), ex=", ".join(inedits[:5])), level="WARN")
-        if getattr(self.app, "_mime_stale_warned", False):
-            return
-        self.app._mime_stale_warned = True
-        messagebox.showinfo(
-            i18n.t("inventory.mime_stale_title", "Référentiel de types MIME"),
-            i18n.t(
-                "inventory.mime_stale",
-                "{n} type(s) filtré(s) par ce cas n'ont pas de description : votre "
-                "référentiel est peut-être plus ancien que votre version d'Intella.\n\n"
-                "Ces types restent utilisables ; seuls leurs libellés manquent. Pour "
-                "les obtenir, importez le fichier de descriptions depuis votre "
-                "installation d'Intella : onglet Maintenance → Types MIME.",
-                n=len(inedits)))
+        # Publié pour l'onglet Profils, qui l'affiche avec la liste complète.
+        self.app.undescribed_types = list(inedits)
+        tab = getattr(self.app, "profiles_tab", None)
+        if tab is not None:
+            tab.refresh_reference()
 
     def _apply_cached_folder_sizes(self, inventory) -> int:
         """Applique les tailles de dossiers déjà mémorisées (IF_<cas>.info).
@@ -849,23 +847,6 @@ class ExportTab(ttk.Frame):
             return None
         return details[idx]
 
-    def _show_settings(self):
-        """Tous les réglages de la source sélectionnée, en trois couleurs.
-
-        Complément indispensable d'« Info Profil » : un profil ne rejoue que ce
-        qu'`-addSourcesFromJson` accepte, et le reste est **perdu** — pas
-        conservé de façon invisible (Étude 3). Cette vue dit lesquels, plutôt
-        que de laisser croire à une fidélité inexistante.
-        """
-        title = i18n.t("inventory.show_settings", "Voir les réglages…")
-        src = self._selected_source(title)
-        if src is None:
-            return
-        nom = src.get("name") or i18n.t("inventory.default_profile_name", "profil")
-        ui_widgets.show_source_settings(
-            self, src,
-            i18n.t("inventory.settings_title", "Réglages de « {n} »", n=nom))
-
     def _info_profile(self):
         """Réglages d'indexation de la source sélectionnée → onglet Profils."""
         title = i18n.t("inventory.info_profile", "Info Profil →")
@@ -881,7 +862,7 @@ class ExportTab(ttk.Frame):
                     "La source « {n} » n'expose aucun réglage exploitable "
                     "(indexOptions/domainBoundaries vides).", n=name))
             return
-        self.app.open_profiles_with(values, name)
+        self.app.open_profiles_with(values, name, src)
         self.app.log.log(i18n.t(
             "inventory.info_profile_log",
             "Info Profil : réglages de « {n} » transférés à l'onglet Profils ({c} option(s)).",

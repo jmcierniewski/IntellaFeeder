@@ -14,11 +14,15 @@ de l'onglet Import (colonne « Profil »).
 import tkinter as tk
 from tkinter import messagebox, simpledialog, ttk
 
+import config
 import i18n
+import mime_catalog
 import profile_catalog
+import profile_translate
 import profiles
 from ui_category_picker import CategoryPicker
-from ui_widgets import Tooltip, make_button, mime_filter_summary, show_mime_filter
+from ui_widgets import (Tooltip, make_button, mime_filter_summary,
+                        settings_summary, show_mime_filter, show_source_settings)
 
 # Unités d'option traduites via les clés i18n générales (unit.mb, unit.gb…).
 _UNIT_KEYS = {"Mo": "unit.mb", "Go": "unit.gb"}
@@ -26,6 +30,88 @@ _UNIT_KEYS = {"Mo": "unit.mb", "Go": "unit.gb"}
 # Options rendues en zone de texte multi-ligne (valeurs très longues) plutôt
 # qu'en champ d'une ligne — ex. le filtre de types MIME.
 MULTILINE_KEYS = {"sourceTypeFilter"}
+
+# Rouge du « Mode du filtre » : le seul réglage dont l'oubli inverse le sens de
+# tout le filtre (défaut « exclude »).
+MODE_WARN_COLOR = "#b91c1c"
+
+
+class ReferenceTab(ttk.Frame):
+    """Sous-onglet « Référentiel » : état des descriptions de types MIME.
+
+    🔴 **Il remplace un popup** (10/09/2026). L'ancien s'ouvrait à chaque lecture
+    de cas pour annoncer « n types filtrés n'ont pas de description » — une
+    information sur laquelle il n'y a **rien à faire** quand on a déjà la
+    dernière version d'Intella, et qui coûtait un clic à chaque fois. Ici, elle
+    est consultable quand on la cherche, **avec la liste** : sans les noms,
+    l'utilisateur ne pouvait même pas juger si le manque le concernait.
+    """
+
+    def __init__(self, parent, app):
+        super().__init__(parent)
+        self.app = app
+
+        self.lbl_state = ttk.Label(self, wraplength=900, justify="left")
+        self.lbl_state.pack(anchor="w", padx=10, pady=(10, 4))
+
+        self.lbl_case = ttk.Label(self, wraplength=900, justify="left")
+        self.lbl_case.pack(anchor="w", padx=10, pady=(0, 6))
+
+        holder = ttk.Frame(self)
+        holder.pack(fill="both", expand=True, padx=10, pady=(0, 10))
+        self.tree = ttk.Treeview(holder, columns=("name",), show="headings", height=8)
+        self.tree.heading("name", text=i18n.t("profiles.ref_col", "Type sans description"))
+        self.tree.column("name", width=520, anchor="w")
+        vsb = ttk.Scrollbar(holder, orient="vertical", command=self.tree.yview)
+        self.tree.configure(yscrollcommand=vsb.set)
+        self.tree.pack(side="left", fill="both", expand=True)
+        vsb.pack(side="right", fill="y")
+
+        ttk.Label(self, wraplength=900, justify="left", foreground="#64748b",
+                  text=i18n.t(
+                      "profiles.ref_hint",
+                      "Un type sans description reste parfaitement utilisable : "
+                      "seul son libellé manque. Ce sont le plus souvent des "
+                      "synonymes qu'Intella écrit sans les nommer. Si votre "
+                      "version d'Intella est plus récente que le référentiel, "
+                      "vous pouvez l'actualiser depuis Maintenance → Types MIME.")
+                  ).pack(anchor="w", padx=10, pady=(0, 10))
+        self.refresh()
+
+    def refresh(self):
+        s = mime_catalog.stats()
+        if s.get("external"):
+            etat = i18n.t(
+                "profiles.ref_external",
+                "Descriptions : FICHIER EXTERNE ({n} entrées) — {p}",
+                n=s["descriptions"], p=s.get("source", ""))
+            couleur = "#1d4ed8"
+        else:
+            etat = i18n.t(
+                "profiles.ref_builtin",
+                "Descriptions : version intégrée à l'application ({n} entrées).",
+                n=s["descriptions"])
+            couleur = "#166534"
+        if s.get("observed_learned"):
+            etat += " " + i18n.t("profiles.ref_learned",
+                                 "{n} nom(s) appris de vos cas.",
+                                 n=s["observed_learned"])
+        self.lbl_state.config(text=etat, foreground=couleur)
+
+        inedits = list(getattr(self.app, "undescribed_types", []) or [])
+        self.tree.delete(*self.tree.get_children())
+        if not inedits:
+            self.lbl_case.config(text=i18n.t(
+                "profiles.ref_case_ok",
+                "Aucun type sans description dans le dernier cas lu."),
+                foreground="#166534")
+            return
+        self.lbl_case.config(text=i18n.t(
+            "profiles.ref_case",
+            "{n} type(s) filtré(s) par le dernier cas lu n'ont pas de "
+            "description :", n=len(inedits)), foreground="#475569")
+        for nom in inedits:
+            self.tree.insert("", "end", values=(nom,))
 
 
 class ProfilesTab(ttk.Frame):
@@ -105,6 +191,21 @@ class ProfilesTab(ttk.Frame):
         self.txt_comment.grid(row=0, column=0, sticky="ew", padx=(6, 0), pady=6)
         cvsb.grid(row=0, column=1, sticky="ns", pady=6)
 
+        # « Voir les réglages » : déplacé de l'Inventaire vers ici le 10/09/2026.
+        # Il parle du PROFIL (ce qu'il rejoue, ce qui reste à refaire dans
+        # Intella), pas de l'inventaire du cas — il était rangé au mauvais
+        # endroit, sur le chemin de l'import qui doit rester dégagé.
+        self.btn_settings = make_button(
+            cbox, i18n.t("profiles.view_settings", "Voir les réglages de la source…"),
+            self._show_source_settings, color=config.PROFILE_TAB_COLOR)
+        self.btn_settings.grid(row=1, column=0, columnspan=2, sticky="w",
+                               padx=6, pady=(0, 6))
+        self.lbl_settings = ttk.Label(cbox, foreground="#64748b", wraplength=700,
+                                      justify="left")
+        self.lbl_settings.grid(row=2, column=0, columnspan=2, sticky="w",
+                               padx=6, pady=(0, 6))
+        self._refresh_source_settings()
+
         # Sous-onglets : le formulaire d'options, et le sélecteur de catégories
         # (deux façons de remplir le MÊME profil — la liste de gauche et les
         # boutons restent communs, sinon on perdrait le fil de ce qu'on édite).
@@ -141,6 +242,14 @@ class ProfilesTab(ttk.Frame):
         subnb.add(right, text=" " + i18n.t("profiles.tab_options", "Réglages"))
         subnb.add(self.picker, text=" " + i18n.t("profiles.tab_types",
                                                  "Types de fichiers à indexer"))
+        self.reference = ReferenceTab(subnb, self.app)
+        subnb.add(self.reference, text=" " + i18n.t("profiles.tab_reference",
+                                                    "Référentiel"))
+
+    def refresh_reference(self):
+        """Rafraîchit le sous-onglet « Référentiel » (appelé par l'Inventaire)."""
+        if hasattr(self, "reference"):
+            self.reference.refresh()
 
     def _set_filter_from_picker(self, filtre: str, mode: str):
         """Écrit ce que le sélecteur a composé — le profil reste à enregistrer.
@@ -194,7 +303,16 @@ class ProfilesTab(ttk.Frame):
                         # séparés par des virgules : illisible dans un champ.
                         gr += self._add_mime_reader(box, gr, w)
                 else:
-                    ttk.Label(box, text=label).grid(row=gr, column=0, sticky="w", padx=6, pady=2)
+                    lbl = ttk.Label(box, text=label)
+                    if key == "sourceTypeFilterMode":
+                        # 🔴 GRAS ET ROUGE, demandé le 10/09/2026. Le défaut est
+                        # « exclude » : une liste saisie comme « ce que je veux »
+                        # ferait alors exactement l'inverse — indexer tout SAUF
+                        # ça. L'erreur ne se voit qu'après l'import, et Intella
+                        # ne permet pas de revoir les réglages d'une source.
+                        lbl.configure(foreground=MODE_WARN_COLOR,
+                                      font=("Segoe UI", 9, "bold"))
+                    lbl.grid(row=gr, column=0, sticky="w", padx=6, pady=2)
                     var = tk.StringVar(value=str(o["default"]))
                     if o["type"] == "enum":
                         w = ttk.Combobox(box, textvariable=var, values=o["choices"], width=28)
@@ -256,7 +374,47 @@ class ProfilesTab(ttk.Frame):
     def _show_mime_filter(self):
         show_mime_filter(self, self._get_option("sourceTypeFilter"),
                          i18n.t("profiles.mime_title", "Types filtrés par ce profil"),
-                         self._filter_mode())
+                         self._filter_mode(),
+                         on_change=self._set_filter_text)
+
+    def _set_filter_text(self, texte: str):
+        """Réécrit le champ de filtre depuis la fenêtre de lecture/composition."""
+        self._set_option("sourceTypeFilter", texte)
+        self._refresh_mime_summary()
+        if hasattr(self, "picker"):
+            self.picker.refresh()
+
+    # ------------------------------------------------------------------ #
+    # Réglages de la source d'origine (« Info Profil »)                  #
+    # ------------------------------------------------------------------ #
+    def _refresh_source_settings(self):
+        """Active le bouton seulement si un profil vient d'une source lue.
+
+        Un profil saisi à la main n'a pas de source d'origine : proposer le
+        bouton quand même donnerait une fenêtre vide, et laisserait croire que
+        la fonction est en panne.
+        """
+        src = getattr(self, "_source_xml", None)
+        self.btn_settings.config(state="normal" if src else "disabled")
+        if src:
+            self.lbl_settings.config(text=i18n.t(
+                "profiles.settings_from",
+                "Réglages repris de la source « {n} ». {r}",
+                n=src.get("name") or "?", r=settings_summary(src)))
+        else:
+            self.lbl_settings.config(text=i18n.t(
+                "profiles.settings_none",
+                "Pour voir ce qu'un profil reprend d'une source réglée dans "
+                "Intella : onglet « Inventaire du cas », sélectionnez la source, "
+                "« Info Profil → »."))
+
+    def _show_source_settings(self):
+        src = getattr(self, "_source_xml", None)
+        if not src:
+            return
+        show_source_settings(self, src, i18n.t(
+            "profiles.settings_title", "Réglages de « {n} »",
+            n=src.get("name") or "?"))
 
     def _attach_tip(self, widget, text):
         widget.bind("<Enter>", lambda e: self.tooltip.show(text, e.x_root + 12, e.y_root + 20))
@@ -296,6 +454,10 @@ class ProfilesTab(ttk.Frame):
         self._load_values(profiles.get_values(name))
         self._set_comment(profiles.get_comment(name))
         self._set_form_state(name != profiles.DEFAULT_NAME)
+        # On change de profil : les réglages de la source affichée ne sont plus
+        # ceux de celui-ci. Les garder ferait lire le tableau du mauvais profil.
+        self._source_xml = None
+        self._refresh_source_settings()
 
     def _set_form_state(self, editable: bool):
         state = "normal" if editable else "disabled"
@@ -425,9 +587,12 @@ class ProfilesTab(ttk.Frame):
                                 "Profil « {s} » dupliqué en « {n} ».",
                                 s=profiles.display_name(source), n=cible.strip()))
 
-    def load_from_values(self, values: dict, suggested_name: str = ""):
+    def load_from_values(self, values: dict, suggested_name: str = "", src: dict = None):
         """Pré-remplit le formulaire avec ``values`` (fusionnés sur les défauts) en
         tant que **nouveau profil non enregistré**. Utilisé par « Info Profil ».
+
+        ``src`` : la source de l'export dont viennent ces valeurs. Gardée pour
+        « Voir les réglages… », qui dit ce que le profil **ne** reprend pas.
         """
         self.listbox.selection_clear(0, "end")
         merged = profile_catalog.default_values()
@@ -435,9 +600,33 @@ class ProfilesTab(ttk.Frame):
             if k in merged:
                 merged[k] = profile_catalog.coerce(k, v)
         self._load_values(merged)
-        self._set_comment("")
+        self._set_comment(self._provenance_comment(src))
         self._set_form_state(True)
         self.var_name.set(suggested_name or "")
+        self._source_xml = src
+        self._refresh_source_settings()
+
+    @staticmethod
+    def _provenance_comment(src: dict) -> str:
+        """Commentaire pré-rempli : d'où vient le profil, et ce qu'il ne rejoue pas.
+
+        Le champ restait vide, si bien que la provenance était perdue dès
+        l'enregistrement — or c'est la seule information qu'on veuille retrouver
+        en rouvrant un profil trois mois plus tard. Éditable, comme tout
+        commentaire.
+        """
+        if not src:
+            return ""
+        lignes = [i18n.t(
+            "profiles.provenance",
+            "Repris de la source « {n} » le {d}.",
+            n=src.get("name") or "?", d=config.now_str("%d/%m/%Y"))]
+        perdus = profile_translate.unsupported_keys(src)
+        if perdus:
+            lignes.append(i18n.t(
+                "profiles.provenance_lost",
+                "Non rejoué (à refaire dans Intella) : {k}", k=", ".join(perdus)))
+        return "\n".join(lignes)
 
     def _save(self):
         title = i18n.t("common.save", "Enregistrer")
