@@ -15,6 +15,15 @@ dist/
 *.spec
 *.exe
 
+# Profils de build PyPak — NE PLUS VERSIONNER (retirés du suivi le 10/09/2026).
+# Ils étaient committés, et leur champ `venv_path` porte le chemin absolu du
+# venv de la machine de développement : l'outil de build le réécrit à chaque
+# construction, si bien que le chemin personnel repartait dans un commit après
+# chaque « vidage » manuel. Un fichier déjà SUIVI ignore le .gitignore — d'où
+# le `git rm --cached` qui accompagne cette ligne. Dépôt public : le chemin
+# n'a rien à y faire, et le fichier est propre à chaque poste de toute façon.
+exeprofil.ini
+
 # Données locales générées à l'exécution (pas de code, pas à versionner)
 Cas/
 profils/*.json
