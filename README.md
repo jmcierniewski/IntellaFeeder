@@ -11,6 +11,14 @@ Avoids the repetitive clicks of the Intella web wizard: paste lists of paths
 tool generates the JSON files plus a resilient `.bat` script (one IntellaCmd
 command per source, continues after a failure) ready to run.
 
+## Interface (v3)
+
+The window is a **two-step trail** — ① the case, ② import sources — with four
+tools alongside it (case detail, profiles, maintenance, help). Each step
+carries a state computed from real progress. Density and text scale are
+adjustable from Maintenance → Options, so the same window works on a 13″
+laptop and on a 27″ desk screen.
+
 ## Features
 
 - **Case inventory**: reads sources already indexed in a case (`-exportSourceList`),
@@ -21,8 +29,17 @@ command per source, continues after a failure) ready to run.
 - **Analysis profiles**: named sets of indexing options (MIME filters, archives,
   deleted-file recovery, VSS…), reusable across cases, importable from a source
   already configured in Intella ("Info Profil").
+- **MIME type reference**: 679 descriptions and 800 type names built into the
+  executable, enriched automatically from every case you read. A source's type
+  filter is shown with what it actually *does* (exclude vs. include, in
+  colour), and four states tell a valid-but-unlabelled synonym apart from a
+  genuinely unknown name — 18 % of a real filter is the former.
+- **Maintenance**: activity log (searchable, All / Warnings / Errors),
+  preferences, MIME reference, and a "Files" screen telling you where
+  everything lives.
 - **Bilingual**: French and English built into the executable; adding a language
-  requires no rebuild (see `lang/`).
+  requires no rebuild (see `lang/`, which is optional — Maintenance → Files →
+  "Write the languages here…" seeds it).
 - **Known Vound multi-segment image bug — built-in workaround**: Intella's own
   integrity check can fail on forensic images split into multiple segments
   (`.E01/.E02…`, `.ad1/.ad2…`). The Import tab exposes a "Do not verify source
@@ -64,11 +81,22 @@ python -m pip install -r requirements-dev.txt
 python -m pytest
 ```
 
-The suite covers the non-GUI modules only (path parsing, sizing, task files,
-import JSON, profile catalog and XML translation, log analysis, case info file,
-upfront validation): no tkinter, no IntellaCmd, no network. pytest is a
-**development** dependency — the application itself needs the standard library
-only.
+432 tests, about 3 seconds. The suite covers the non-GUI modules only (path
+parsing, sizing, task files, import JSON, profile catalog and XML translation,
+log analysis, case info file, upfront validation, MIME reference): no
+IntellaCmd, no network. pytest is a **development** dependency — the
+application itself needs the standard library only.
+
+The GUI is checked by two scripts instead, since pytest covers no widget:
+
+```powershell
+python tests\manuel_construction.py        # builds the window WITHOUT showing it
+python tests\manuel_fumee_v3.py <screen>   # opens it on one screen, to look at
+```
+
+`manuel_construction.py` never steals focus, so it is usable while someone is
+working on the machine — it is what caught a profile filter silently losing its
+value.
 
 ## Architecture
 
@@ -97,6 +125,14 @@ d'analyse à appliquer par source, et l'outil génère les fichiers JSON et un
 script `.bat` résilient (1 commande IntellaCmd par source, poursuit après un
 échec) prêt à lancer.
 
+## Interface (v3)
+
+La fenêtre est un **fil de deux étapes** — ① le cas, ② l'import des sources —
+avec quatre outils à côté (détail du cas, profils, maintenance, aide). Chaque
+étape porte un état calculé sur l'avancement réel. La densité et la taille du
+texte se règlent dans Maintenance → Options : la même fenêtre sert sur un
+portable 13″ comme sur un écran de bureau de 27″.
+
 ## Fonctionnalités
 
 - **Inventaire du cas** : lit les sources déjà indexées (`-exportSourceList`),
@@ -107,8 +143,18 @@ script `.bat` résilient (1 commande IntellaCmd par source, poursuit après un
 - **Profils d'analyse** : jeux de paramètres d'indexation nommés (filtres MIME,
   archives, VSS…), réutilisables entre cas, importables depuis une source déjà
   réglée dans Intella (« Info Profil »).
+- **Référentiel de types MIME** : 679 descriptions et 800 noms de types
+  embarqués dans l'exécutable, enrichis automatiquement à chaque cas lu. Le
+  filtre de types d'une source est affiché avec ce qu'il **fait** réellement
+  (exclure ou inclure, en couleur), et quatre états distinguent un synonyme
+  valide mais sans libellé d'un nom réellement inconnu — 18 % d'un filtre réel
+  relèvent du premier cas.
+- **Maintenance** : journal d'activité (cherchable, Tout / Alertes / Erreurs),
+  préférences, référentiel MIME, et un écran « Fichiers » qui dit où tout se
+  range.
 - **Multi-langue** : français et anglais intégrés à l'exécutable ; ajout d'une
-  langue possible sans recompiler (voir `lang/`).
+  langue possible sans recompiler (voir `lang/`, facultatif — Maintenance →
+  Fichiers → « Écrire les langues ici… » le remplit).
 - **Bug connu Vound sur les images multi-tronçons — contournement intégré** : la
   vérification d'intégrité d'Intella peut échouer sur des images forensiques
   découpées en plusieurs fichiers (`.E01/.E02…`, `.ad1/.ad2…`). L'onglet Import
@@ -152,11 +198,24 @@ python -m pip install -r requirements-dev.txt
 python -m pytest
 ```
 
-La suite couvre uniquement les modules **sans interface** (analyse de chemins,
-calcul de tailles, fichiers de tâches, JSON d'import, catalogue de profils et
-traduction XML, analyse des logs, fichier d'info du cas, validation amont) :
-pas de tkinter, pas d'IntellaCmd, pas de réseau. pytest est une dépendance de
-**développement** — l'application, elle, n'utilise que la bibliothèque standard.
+432 tests, environ 3 secondes. La suite couvre uniquement les modules **sans
+interface** (analyse de chemins, calcul de tailles, fichiers de tâches, JSON
+d'import, catalogue de profils et traduction XML, analyse des logs, fichier
+d'info du cas, validation amont, référentiel MIME) : pas d'IntellaCmd, pas de
+réseau. pytest est une dépendance de **développement** — l'application, elle,
+n'utilise que la bibliothèque standard.
+
+L'interface se vérifie par deux scripts, puisqu'aucun widget n'est couvert par
+pytest :
+
+```powershell
+python tests\manuel_construction.py        # construit la fenêtre SANS l'afficher
+python tests\manuel_fumee_v3.py <écran>    # l'ouvre sur un écran, pour regarder
+```
+
+`manuel_construction.py` ne vole jamais le focus : il reste utilisable pendant
+que quelqu'un travaille sur le poste — c'est lui qui a attrapé un filtre de
+profil qui perdait sa valeur en silence.
 
 ## Architecture
 

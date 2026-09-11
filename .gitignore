@@ -26,7 +26,11 @@ exeprofil.ini
 
 # Données locales générées à l'exécution (pas de code, pas à versionner)
 Cas/
-profils/*.json
+# ⚠ Le dossier ENTIER, et pas seulement `profils/*.json` : une capture d'écran
+# s'y était égarée (sortie d'un script de contrôle mal paramétré) et n'était
+# couverte par aucune règle. Rien dans ce dossier n'est du code — il est créé à
+# l'exécution.
+profils/
 intellafeeder.ini
 
 # Référentiel de types MIME : le contenu est EMBARQUÉ dans `mime_data.py`

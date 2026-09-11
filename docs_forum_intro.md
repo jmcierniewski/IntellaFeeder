@@ -20,6 +20,11 @@ configured in Intella's own GUI), and a workaround for the known integrity-check
 issue on multi-segment images (`.E01/.E02…`). Windows only, packaged as a
 single portable `.exe`, no install needed, bilingual FR/EN.
 
+Version 3 reworked the interface around the actual job: a two-step trail
+(read the case → import the sources) instead of a row of tabs, a searchable
+log, an illustrated in-app help, and adjustable density and text size so the
+same window is usable on a laptop and on a large desk screen.
+
 It's open source (MIT): https://github.com/jmcierniewski/IntellaFeeder
 
 Happy to hear feedback, bug reports, or feature ideas.
@@ -47,6 +52,12 @@ Intella elle-même), et un contournement du problème connu de vérification
 d'intégrité sur les images multi-tronçons (`.E01/.E02…`). Windows uniquement,
 packagé en un seul exécutable portable, aucune installation nécessaire,
 bilingue FR/EN.
+
+La version 3 a refondu l'interface autour du travail réel : un fil de deux
+étapes (lire le cas → importer les sources) plutôt qu'une rangée d'onglets, un
+journal cherchable, une aide intégrée illustrée, et une densité et une taille
+de texte réglables — la même fenêtre sert sur un portable comme sur un grand
+écran de bureau.
 
 C'est open source (MIT) : https://github.com/jmcierniewski/IntellaFeeder
 

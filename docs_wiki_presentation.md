@@ -30,28 +30,36 @@ click "Generate" → run the resulting `.bat`.
 
 ## Core workflow
 
-1. **Case inventory** (tab 1): point the tool at an existing case folder. It
-   reads `case.xml` for identity/size, then calls `IntellaCmd.exe
-   -exportSourceList` to list sources already indexed — used both to display
-   the case's current content and to avoid double-indexing.
-2. **Case detail** (tab 2): a read-only, human-friendly view of `case.xml`,
-   `case.prefs` and the case's task list (`tasks2.json`).
-3. **Import** (tab 3, the main tab): paste one path per line (forensic images
-   on one side, folders/files on the other). Click "Analyse paths" to build the
-   list of sources to import — already-indexed ones are flagged automatically. Tick
-   which annex tasks to run per source (dynamic T1/T2… columns, one per task
-   found in the loaded task file), pick an analysis profile per source, then
-   click "Générer".
-4. **Profiles** (tab 4): named sets of Intella indexing options (mail
-   archives, chat processing, embedded images, MIME/file-name filters, VSS,
-   deleted-item recovery…), stored as one JSON file per profile, shared across
-   cases. A profile can be authored from scratch or reverse-engineered from a
-   source already configured inside Intella's own GUI ("Info Profil" button
-   on the inventory tab translates its exported indexing options into a
-   ready-to-save profile).
-5. **Journal** (tab 5) and **Help** (tab 6): activity log with export, and an
-   in-app, end-user-oriented help screen (workflow, tips, size-limit
-   behaviour, the multi-segment integrity workaround, MIME filter reference).
+Since v3 the window is organised as a **two-step trail** — the actual job —
+with four **tools** kept to one side. Each step carries a state (to do / in
+progress / done) computed from real progress, so the trail is a map of where
+you are, not a row of tabs in disguise.
+
+1. **① The case**: point the tool at an existing case folder. It reads
+   `case.xml` for identity/size, then calls `IntellaCmd.exe -exportSourceList`
+   to list sources already indexed — used both to display the case's current
+   content and to avoid double-indexing. Reading a case also teaches the tool
+   the MIME type names Intella writes in that case's filters.
+2. **② Import sources**: paste one path per line (forensic images on one side,
+   folders/files on the other). "Analyse paths" builds the list of sources to
+   import and measures the ones with no size yet — already-indexed sources are
+   struck through rather than removed. Tick which annex tasks to run per source
+   (dynamic T1/T2… columns, one per task in the loaded task file; the real task
+   name is in the column's tooltip), pick an analysis profile per source, then
+   run the whole import with one button.
+
+The tools, on the right of the trail:
+
+- **Case detail**: a read-only, human-friendly view of `case.xml`,
+  `case.prefs` and the case's task list (`tasks2.json`).
+- **Profiles**: named sets of Intella indexing options, in two sub-tabs —
+  *Settings* (the thematic form) and *File types to index* (the MIME filter,
+  composed by picking entries from the reference list; see below).
+- **Maintenance**: the activity log (searchable, filtered by All / Warnings /
+  Errors), the preferences (language, density, text scale), the MIME type
+  reference list, and a "Files" screen saying where everything lives.
+- **Help**: end-user oriented, searchable, with drawn diagrams (the trail, the
+  include/exclude filter, a multi-segment image).
 
 ## What gets generated
 
@@ -110,6 +118,30 @@ without the `lang/` folder). Adding a new language only requires dropping a
 new `lang/<CODE>.lang` file — it appears in the language selector without a
 rebuild.
 
+## MIME type reference
+
+Intella identifies what it indexes by MIME type name, and a source's type
+filter is a plain list of those names. Two things make that list hard to read,
+and IntellaFeeder handles both:
+
+- **A filter is read backwards if its mode is left unsaid.** In Intella's GUI
+  you tick what you *want*; the export records the *complement*, so
+  `Exclude selected entries` followed by six hundred types means those six
+  hundred are the ones left out. IntellaFeeder always states, in colour, what
+  the list actually does — red for "these types are excluded", green for "only
+  these types are indexed".
+- **Intella writes synonyms it never describes.** Measured on a near-exhaustive
+  real filter: 18 % of the names have no label anywhere in Vound's description
+  file (five different names for a Word document alone). Treating those as
+  errors would paint a hundred lines red on a normal source, so the reference
+  list has **four states** — described by Vound, described by you, known but
+  unlabelled, and genuinely unknown.
+
+679 descriptions and 800 observed names ship **inside the executable**; the
+tool learns new names from every case it reads, and an Intella
+`.properties` file can be imported to add its labels (imports accumulate,
+they never replace what is already known).
+
 ## Analysis profiles in depth
 
 A profile is a named, reusable subset of the options accepted by
@@ -124,6 +156,14 @@ written into the generated JSON — a profile named "default" always means
 Profiles are stored as individual JSON files in a `profils/` folder next to
 the executable, so they can be backed up or shared between installations
 independently of the `.ini` settings file.
+
+**What a profile cannot do, and says so.** `-addSourcesFromJson` accepts a
+white list of option names and silently drops everything else — a setting
+Intella can store is not necessarily a setting its automatic import can
+replay. Rather than pretend otherwise, the "Source settings" viewer shows every
+setting of an exported source in three colours: replayed by the profile,
+known but to be redone by hand in Intella, and unknown (which almost always
+means your Intella is newer than the tool's catalogue).
 
 ## Technical notes
 
@@ -174,32 +214,39 @@ cocher des cases → cliquer « Générer » → lancer le `.bat` produit.
 
 ## Déroulé général
 
-1. **Inventaire du cas** (onglet 1) : on pointe l'outil vers un dossier de cas
-   existant. Il lit `case.xml` (identité/taille) puis appelle `IntellaCmd.exe
-   -exportSourceList` pour lister les sources déjà indexées — utilisé à la
-   fois pour afficher le contenu actuel du cas et pour éviter la double
-   indexation.
-2. **Détail du cas** (onglet 2) : vue lecture seule et humanisée de
-   `case.xml`, `case.prefs` et de la liste des tâches du cas (`tasks2.json`).
-3. **Import** (onglet 3, l'onglet principal) : on colle un chemin par ligne
-   (images forensiques d'un côté, dossiers/fichiers de l'autre). « Analyser les
-   chemins » construit la liste des sources à importer — celles déjà indexées sont signalées
-   automatiquement. On coche, pour chaque source, les tâches annexes à
-   exécuter (colonnes dynamiques T1, T2…, une par tâche du fichier de tâches
-   chargé), on choisit un profil d'analyse par source, puis on clique
-   « Générer ».
-4. **Profils** (onglet 4) : jeux nommés d'options d'indexation Intella
-   (archives de messagerie, traitement des conversations, images intégrées,
-   filtres MIME/nom de fichier, VSS, récupération d'éléments supprimés…),
-   stockés en un fichier JSON par profil, partagés entre les cas. Un profil
-   peut être créé de toutes pièces ou déduit d'une source déjà réglée dans la
-   GUI Intella elle-même (le bouton « Info Profil » de l'onglet Inventaire
-   traduit ses options d'indexation exportées en un profil prêt à enregistrer).
-5. **Journal** (onglet 5) et **Aide** (onglet 6) : journal d'activité
-   exportable, et un écran d'aide intégré destiné à l'utilisateur final
-   (déroulé, astuces, comportement en cas de dépassement de volume,
-   contournement du bug d'intégrité multi-tronçons, référence des filtres
-   MIME).
+Depuis la v3, la fenêtre s'organise en un **fil de deux étapes** — le travail
+lui-même — et quatre **outils** rangés à côté. Chaque étape porte un état
+(à faire / en cours / fait) calculé sur l'avancement réel : le fil dit où l'on
+en est, il n'est pas une barre d'onglets déguisée.
+
+1. **① Le cas** : on pointe l'outil vers un dossier de cas existant. Il lit
+   `case.xml` (identité/taille) puis appelle `IntellaCmd.exe
+   -exportSourceList` pour lister les sources déjà indexées — utilisé à la fois
+   pour afficher le contenu actuel du cas et pour éviter la double indexation.
+   Lire un cas apprend aussi à l'outil les noms de types MIME qu'Intella écrit
+   dans les filtres de ce cas.
+2. **② Import des sources** : on colle un chemin par ligne (images forensiques
+   d'un côté, dossiers/fichiers de l'autre). « Analyser les chemins » construit
+   la liste des sources à importer et mesure celles qui n'ont pas encore de
+   taille — les sources déjà indexées sont **barrées** plutôt que retirées. On
+   coche, pour chaque source, les tâches annexes à exécuter (colonnes
+   dynamiques T1, T2…, une par tâche du fichier chargé ; le nom réel de la
+   tâche est dans l'infobulle de la colonne), on choisit un profil d'analyse
+   par source, puis un seul bouton enchaîne tout l'import.
+
+Les outils, à droite du fil :
+
+- **Détail du cas** : vue lecture seule et humanisée de `case.xml`,
+  `case.prefs` et de la liste des tâches du cas (`tasks2.json`).
+- **Profils** : jeux nommés d'options d'indexation Intella, en deux
+  sous-onglets — *Réglages* (le formulaire thématique) et *Types de fichiers à
+  indexer* (le filtre MIME, composé en prenant des entrées dans le
+  référentiel ; voir plus bas).
+- **Maintenance** : le journal d'activité (cherchable, filtré Tout / Alertes /
+  Erreurs), les préférences (langue, densité, taille du texte), le référentiel
+  de types MIME, et un écran « Fichiers » qui dit où tout se range.
+- **Aide** : destinée à l'utilisateur final, cherchable, avec des schémas
+  dessinés (le parcours, le filtre include/exclude, une image multi-tronçons).
 
 ## Ce qui est généré
 
@@ -262,6 +309,30 @@ reste bilingue même sans le dossier `lang/`). Ajouter une langue ne demande que
 de déposer un fichier `lang/<CODE>.lang` — il apparaît dans le sélecteur de
 langue sans recompiler.
 
+## Le référentiel de types MIME
+
+Intella désigne ce qu'il indexe par des noms de types MIME, et le filtre de
+types d'une source n'est qu'une liste de ces noms. Deux choses rendent cette
+liste difficile à lire, et l'outil traite les deux :
+
+- **Un filtre se lit à l'envers si l'on tait son mode.** Dans l'interface
+  d'Intella on coche ce qu'on **veut**, et l'export enregistre le
+  **complément** : `Exclude selected entries` suivi de six cents types signifie
+  que ces six cents-là sont écartés. IntellaFeeder dit toujours, en couleur, ce
+  que la liste fait réellement — rouge pour « ces types sont exclus », vert
+  pour « seuls ces types sont indexés ».
+- **Intella écrit des synonymes qu'il ne décrit nulle part.** Mesuré sur un
+  filtre réel quasi exhaustif : 18 % des noms n'ont de libellé nulle part dans
+  le fichier de descriptions de Vound (cinq noms différents pour le seul
+  document Word). Les traiter comme des erreurs peindrait cent lignes en rouge
+  sur une source normale — d'où **quatre états** au référentiel : décrit par
+  Vound, décrit par vous, connu sans libellé, et réellement inconnu.
+
+679 descriptions et 800 noms observés sont **embarqués dans l'exécutable** ;
+l'outil apprend de nouveaux noms à chaque cas lu, et un fichier `.properties`
+d'Intella peut être importé pour ajouter ses libellés (les imports
+s'accumulent, ils ne remplacent jamais ce qui est déjà connu).
+
 ## Les profils d'analyse en détail
 
 Un profil est un sous-ensemble nommé et réutilisable des options acceptées par
@@ -278,6 +349,15 @@ changer, utiliser les défauts d'Intella ».
 Les profils sont stockés en fichiers JSON individuels dans un dossier
 `profils/` à côté de l'exécutable, ce qui permet de les sauvegarder ou de les
 partager entre installations indépendamment du fichier de réglages `.ini`.
+
+**Ce qu'un profil ne peut pas faire, et le dit.** `-addSourcesFromJson` ne
+connaît qu'une liste blanche de noms d'options et jette le reste **en
+silence** : un réglage qu'Intella sait enregistrer n'est pas forcément un
+réglage que son import automatique sait rejouer. Plutôt que de laisser croire
+le contraire, le visualiseur « Réglages de la source » montre tous les réglages
+d'une source exportée en trois couleurs : rejoué par le profil, connu mais à
+refaire à la main dans Intella, et inconnu (ce qui signale presque toujours un
+Intella plus récent que le catalogue de l'outil).
 
 ## Notes techniques
 

@@ -1,7 +1,7 @@
 """Onglet Import : collage des sources, récapitulatif (tailles + tâches), génération.
 
 Le cas cible (emplacement + nom + utilisateur) est **verrouillé** : il provient de
-l'onglet « 1. Inventaire du cas » (lecture de ``case.xml``). La sortie est
+l'étape « 1. Le cas » (lecture de ``case.xml``). La sortie est
 automatique : ``Script\\Cas\\<nom>\\scripts`` (+ ``logs``). Le bouton « Valider les
 opérations » recroise un re-scan du cas et l'analyse des logs d'import.
 """
@@ -31,8 +31,9 @@ import path_parser
 import profiles
 import sizing
 import task_builder
+import ui_theme
 import validation
-from ui_widgets import MeasureBar, Tooltip, make_button
+from ui_widgets import MeasureBar, Tooltip, make_button, make_dialog
 
 _LEAD_COLS = ("import",)            # case à cocher « Importer »
 _BASE_COLS = ("name", "type", "size", "profile")
@@ -69,6 +70,10 @@ class ImportTab(ttk.Frame):
         self._import_proc = None   # Popen du .bat en cours (auto-validation à la fin)
         self._apres_mesure = None  # suite à exécuter à la fin d'une mesure
         self._auto_validate = True  # prérequis (exe + user) vérifiés au lancement
+        # Alimente l'étape 3 du fil de navigation (cf. ui_nav) : tant qu'aucune
+        # validation n'a confirmé les sources dans le cas, l'import n'est pas
+        # « fait ».
+        self._last_validation_ok = False
 
         self._build_params()
         self._build_panels()
@@ -79,12 +84,22 @@ class ImportTab(ttk.Frame):
 
     # ------------------------------------------------------------------ #
     def _build_params(self):
+        """Paramètres du cas cible : **une ligne de rappel, un volet replié** (D3).
+
+        Ces cinq lignes — cas, emplacement, limite, fuseau, fichier de tâches,
+        arguments, intégrité — sont fixées pour toute une session de travail et
+        occupaient ~148 px en permanence, soit un cinquième d'un écran de
+        portable, au-dessus des deux zones où l'on travaille réellement. Elles
+        restent toutes là, derrière « Modifier ▾ » ; ce qu'on lit en permanence
+        est leur résumé.
+        """
         s = self.app.settings
-        frame = ttk.LabelFrame(self, text=i18n.t(
-            "import.target_case_frame", "Cas cible (défini par l'onglet « 1. Inventaire du cas »)"))
-        frame.pack(fill="x", padx=8, pady=(8, 4))
-        frame.columnconfigure(1, weight=1)
-        frame.columnconfigure(3, weight=2)
+        theme = self.app.theme
+
+        bandeau = ttk.Frame(self, style="Surface.TFrame")
+        bandeau.pack(fill="x", padx=0, pady=(0, theme.gap))
+        self.params_line = ttk.Frame(bandeau, style="Surface.TFrame")
+        self.params_line.pack(fill="x", padx=theme.pad, pady=4)
 
         # Verrouillés : renseignés depuis case.xml via apply_case_meta().
         self.var_case = tk.StringVar(value=s.get("last_case"))
@@ -94,6 +109,23 @@ class ImportTab(ttk.Frame):
         self.var_tz = tk.StringVar(value=s.get("timezone") or config.DEFAULT_TIMEZONE)
         self.var_limit = tk.StringVar(value=s.get("limit_gb") or str(config.DEFAULT_SIZE_LIMIT_GB))
         self.var_extra = tk.StringVar(value=s.get("extra"))
+
+        # « Modifier » colle au résumé plutôt que de fuir à droite de l'écran :
+        # posé au bout d'une ligne de 1 500 px, il était introuvable (11/09/2026).
+        self.lbl_params = ttk.Label(self.params_line, text="", style="HintSurface.TLabel")
+        self.lbl_params.pack(side="left")
+        self.btn_params = make_button(
+            self.params_line, i18n.t("import.params_edit", "Modifier ▾"),
+            self._toggle_params)
+        self.btn_params.pack(side="left", padx=(12, 0))
+
+        self.params_detail = ttk.Frame(bandeau, style="Soft.TFrame")
+        self._params_open = False
+
+        frame = ttk.Frame(self.params_detail, style="Soft.TFrame")
+        frame.pack(fill="x", padx=theme.pad, pady=theme.gap)
+        frame.columnconfigure(1, weight=1)
+        frame.columnconfigure(3, weight=2)
 
         ttk.Label(frame, text=i18n.t("import.case_label", "Cas :")).grid(
             row=0, column=0, sticky="w", padx=6, pady=4)
@@ -133,6 +165,42 @@ class ImportTab(ttk.Frame):
                        "(images multi-tronçons — contourne le bug Vound)"),
             command=self._on_skip_integrity_toggle)
         chk.grid(row=4, column=0, columnspan=4, sticky="w", padx=6, pady=(0, 4))
+
+        # Le résumé doit suivre ce qu'on modifie dans le volet, sinon il ment
+        # dès la première correction (constat de la relecture : un rappel faux
+        # est pire qu'un rappel absent).
+        for var in (self.var_casename, self.var_case, self.var_limit, self.var_tz,
+                    self.var_tasks, self.var_skip_integrity):
+            var.trace_add("write", lambda *_: self._refresh_params_summary())
+        self._refresh_params_summary()
+
+    def _toggle_params(self):
+        self._params_open = not self._params_open
+        if self._params_open:
+            self.params_detail.pack(fill="x", before=None)
+            self.btn_params.configure(text=i18n.t("import.params_close", "Replier ▴"))
+        else:
+            self.params_detail.pack_forget()
+            self.btn_params.configure(text=i18n.t("import.params_edit", "Modifier ▾"))
+
+    def _refresh_params_summary(self):
+        """Une ligne qui dit tout ce que le volet replié contient."""
+        if not hasattr(self, "lbl_params"):
+            return
+        nom = self.var_casename.get().strip()
+        integrite = (i18n.t("import.integrity_off", "intégrité des sources non vérifiée")
+                     if self.var_skip_integrity.get()
+                     else i18n.t("import.integrity_on", "intégrité des sources vérifiée"))
+        taches = os.path.basename(self.var_tasks.get().strip()) or "—"
+        morceaux = [
+            i18n.t("import.summary_case", "Cas cible : {n}",
+                   n=nom or i18n.t("import.summary_nocase", "aucun")),
+            i18n.t("import.summary_limit", "limite {g} Go", g=self.var_limit.get().strip()),
+            i18n.t("import.summary_tz", "fuseau {t}", t=self.var_tz.get().strip()),
+            i18n.t("import.summary_tasks", "tâches {f}", f=taches),
+            integrite,
+        ]
+        self.lbl_params.configure(text="  ·  ".join(morceaux))
 
     def _build_panels(self):
         # PanedWindow : la poignée entre les panneaux de collage et « Sources à
@@ -491,44 +559,46 @@ class ImportTab(ttk.Frame):
         frame = ttk.LabelFrame(bas, text=i18n.t("import.recap_frame", "Sources à importer"))
         frame.pack(fill="both", expand=True, padx=8, pady=4)
 
-        # Barre d'outils sur 2 lignes : ligne 1 = tout ce qui concerne les SOURCES,
-        # ligne 2 = tout ce qui concerne les TÂCHES.
+        # UNE barre d'outils, et non plus deux (décision D4, 11/09/2026). Les
+        # dix boutons sur deux rangées se valaient tous visuellement ; les cinq
+        # qui ne servent qu'occasionnellement sont passés sous « ⋯ ». La barre
+        # ne grandit plus non plus de deux boutons par tâche chargée : cocher
+        # une colonne entière se fait maintenant par son en-tête (D5).
         toolbar = ttk.Frame(frame)
-        toolbar.pack(fill="x", padx=4, pady=(4, 0))
-        # Vert = les 3 étapes du parcours nominal (analyser → mesurer → générer).
+        toolbar.pack(fill="x", padx=4, pady=(4, 2))
+        # Vert = l'action du panneau : c'est elle qui remplit le tableau.
         self.btn_analyze = make_button(toolbar, i18n.t("import.summarize", "▼ Analyser les chemins"),
                                        self.recapituler, color=config.ACTION_COLOR)
         self.btn_analyze.pack(side="left")
         # Neutre depuis le 10/09/2026 : « Analyser les chemins » mesure desormais
         # les lignes qui n'ont pas de taille, donc ce bouton n'est plus une etape
-        # du parcours mais un rattrapage (remesurer une source allegee). Deux
-        # verts cote a cote dans la meme barre ne disaient plus lequel cliquer.
-        self.btn_size = make_button(toolbar, i18n.t("import.compute_size", "Calculer la taille"),
+        # du parcours mais un rattrapage (remesurer une source allegee).
+        self.btn_size = make_button(toolbar, i18n.t("import.compute_size", "Remesurer"),
                                     self.calculer_taille)
         self.btn_size.pack(side="left", padx=6)
-        make_button(toolbar, i18n.t("import.export_list", "Exporter la liste…"),
-                   self._export_recap).pack(side="left")
-        self.btn_import_list = make_button(toolbar, i18n.t("import.import_list", "Importer une liste…"),
-                                           self._import_recap)
-        self.btn_import_list.pack(side="left", padx=4)
-        # Vider d'un coup : retirer 40 lignes une croix à la fois n'était pas
-        # tenable. Rouge = geste destructeur, et il demande confirmation.
-        self.btn_clear = make_button(toolbar, i18n.t("import.clear_list", "Vider la liste"),
-                                     self.vider_liste, color=config.DANGER_COLOR)
-        self.btn_clear.pack(side="left")
-        ttk.Separator(toolbar, orient="vertical").pack(side="left", fill="y", padx=8)
-        self.btn_check_all = make_button(toolbar, i18n.t("import.check_all", "Imp. : tout cocher"),
+        ttk.Separator(toolbar, orient="vertical").pack(side="left", fill="y", padx=6)
+        self.btn_check_all = make_button(toolbar, i18n.t("import.check_all", "Tout cocher"),
                                          lambda: self._set_all_import(True))
         self.btn_check_all.pack(side="left")
-        self.btn_uncheck_all = make_button(toolbar, i18n.t("import.uncheck_all", "Imp. : tout décocher"),
+        self.btn_uncheck_all = make_button(toolbar, i18n.t("import.uncheck_all", "Tout décocher"),
                                            lambda: self._set_all_import(False))
         self.btn_uncheck_all.pack(side="left", padx=4)
-        ttk.Separator(toolbar, orient="vertical").pack(side="left", fill="y", padx=8)
+        ttk.Separator(toolbar, orient="vertical").pack(side="left", fill="y", padx=6)
+        # Purge complète : rouge en contour, visible — enterrée sous « ⋯ », elle
+        # était introuvable au moment où l'on en a le plus besoin, entre deux lots.
+        self.btn_clear_all = make_button(
+            toolbar, i18n.t("import.clear_all", "Tout vider"),
+            lambda: self.vider_liste(tout=True), outline=config.DANGER_COLOR)
+        self.btn_clear_all.pack(side="left")
+        self._bind_tip(self.btn_clear_all, i18n.t(
+            "import.clear_all_tip",
+            "Efface le tableau ET les chemins collés au-dessus : on repart de zéro."))
+        ttk.Separator(toolbar, orient="vertical").pack(side="left", fill="y", padx=6)
         # Profil par défaut : appliqué aux NOUVELLES sources et à toutes les
         # lignes quand on en change. Mémorisé au .ini — « Défaut Intella » n'est
         # plus imposé (07/09/2026), c'est l'utilisateur qui décide.
         ttk.Label(toolbar, text=i18n.t("import.default_profile_label", "Profil par défaut :")).pack(side="left")
-        self.cb_default_profile = ttk.Combobox(toolbar, state="readonly", width=18,
+        self.cb_default_profile = ttk.Combobox(toolbar, state="readonly", width=27,
                                                postcommand=self._refresh_default_profiles)
         memorise = self.app.settings.get("default_profile", profiles.DEFAULT_NAME)
         if not profiles.exists(memorise):
@@ -537,22 +607,18 @@ class ImportTab(ttk.Frame):
         self.cb_default_profile.pack(side="left", padx=4)
         self.cb_default_profile.bind("<<ComboboxSelected>>", lambda _e: self._apply_profile_all())
 
-        toolbar2 = ttk.Frame(frame)
-        toolbar2.pack(fill="x", padx=4, pady=(2, 4))
-        make_button(toolbar2, i18n.t("import.reload_tasks", "Recharger les tâches"),
-                   lambda: self._load_tasks(show_error=True)).pack(side="left")
-        # Couleur de l'onglet « Inventaire du cas » : ce bouton recycle les tâches
-        # lues dans l'inventaire.
-        make_button(toolbar2, i18n.t("import.case_tasks", "Tâches du cas (inventaire)"),
-                   self._use_case_tasks, color=config.INVENTORY_TAB_COLOR).pack(side="left", padx=4)
-        ttk.Separator(toolbar2, orient="vertical").pack(side="left", fill="y", padx=8)
-        make_button(toolbar2, i18n.t("import.tasks_check_all", "Tâches : tout cocher"),
-                   lambda: self._set_all(True)).pack(side="left")
-        make_button(toolbar2, i18n.t("import.tasks_uncheck_all", "Tâches : tout décocher"),
-                   lambda: self._set_all(False)).pack(side="left", padx=4)
-        # Boutons de sélection par tâche (reconstruits dynamiquement) :
-        self.col_btns = ttk.Frame(toolbar2)
-        self.col_btns.pack(side="left", padx=8)
+        # « ⋯ » seul se lit « ·· » à l'écran, et rien ne dit que c'est un menu.
+        # Rangé À LA SUITE des autres, et non collé au bord droit : aligné sur
+        # la marge opposée, il paraissait appartenir à un autre panneau.
+        ttk.Separator(toolbar, orient="vertical").pack(side="left", fill="y", padx=6)
+        self.btn_more = make_button(toolbar, i18n.t("import.more", "Plus ▾"),
+                                    self._show_more_menu)
+        self.btn_more.pack(side="left")
+        self._bind_tip(self.btn_more, i18n.t(
+            "import.more_tip",
+            "Exporter / importer une liste, recharger les tâches, "
+            "reprendre les tâches du cas, vider la liste"))
+        self._build_more_menu()
 
         holder = ttk.Frame(frame)
         holder.pack(fill="both", expand=True, padx=4, pady=4)
@@ -568,7 +634,12 @@ class ImportTab(ttk.Frame):
         holder.columnconfigure(0, weight=1)
 
         # Surlignage des sources déjà présentes dans le cas (inventaire).
-        self.tree.tag_configure("dup", background="#ffd9d9")
+        # Déjà dans le cas : barrée et grisée (D7). Un fond rouge disait
+        # « erreur » là où il n'y en a pas — c'est au contraire l'outil qui
+        # fait son travail de dédoublonnage.
+        self.tree.tag_configure("dup", foreground=config.UI_INK_3,
+                                font=ui_theme.F_STRIKE)
+        self.tree.tag_configure("odd", background=config.UI_ZEBRA)
 
         self.tooltip = Tooltip(self.tree)
         self.tree.bind("<Button-1>", self._on_click)
@@ -580,10 +651,36 @@ class ImportTab(ttk.Frame):
         # voir l'avancement et pouvoir interrompre. Sert aussi à la validation.
         self.size_bar = MeasureBar(frame)
 
-        self.lbl_total = ttk.Label(frame, text=i18n.t("import.zero_sources", "0 source"))
-        self.lbl_total.pack(anchor="w", padx=6, pady=(0, 2))
-        self.lbl_inventory = ttk.Label(frame, text="", foreground="#64748b")
-        self.lbl_inventory.pack(anchor="w", padx=6, pady=(0, 4))
+    def _build_more_menu(self):
+        """Actions occasionnelles (D4) : présentes, mais hors du chemin de l'œil."""
+        m = tk.Menu(self, tearoff=0)
+        m.add_command(label=i18n.t("import.export_list", "Exporter la liste…"),
+                      command=self._export_recap)
+        m.add_command(label=i18n.t("import.import_list", "Importer une liste…"),
+                      command=self._import_recap)
+        m.add_separator()
+        m.add_command(label=i18n.t("import.reload_tasks", "Recharger les tâches"),
+                      command=lambda: self._load_tasks(show_error=True))
+        m.add_command(label=i18n.t("import.case_tasks", "Tâches du cas (inventaire)"),
+                      command=self._use_case_tasks)
+        m.add_command(label=i18n.t("import.tasks_check_all", "Tâches : tout cocher"),
+                      command=lambda: self._set_all(True))
+        m.add_command(label=i18n.t("import.tasks_uncheck_all", "Tâches : tout décocher"),
+                      command=lambda: self._set_all(False))
+        m.add_separator()
+        # Geste destructeur : isolé en fin de menu, et il demande confirmation.
+        m.add_command(label=i18n.t("import.clear_list", "Vider la liste"),
+                      command=lambda: self.vider_liste(tout=False),
+                      foreground=config.DANGER_COLOR)
+        self.more_menu = m
+
+    def _show_more_menu(self):
+        b = self.btn_more
+        try:
+            self.more_menu.tk_popup(b.winfo_rootx(),
+                                    b.winfo_rooty() + b.winfo_height())
+        finally:
+            self.more_menu.grab_release()
 
     def _compound_blocked(self) -> bool:
         """Vrai (+ message) si le cas sélectionné est un compound.
@@ -602,7 +699,7 @@ class ImportTab(ttk.Frame):
                    "« {n} » est un cas COMPOUND : il ne fait que référencer des "
                    "sous-cas et n'accepte aucune source.\n\nAjoutez les sources "
                    "dans l'un de ses sous-cas (sélectionnez-le comme cas dans "
-                   "l'onglet « 1. Inventaire du cas »).",
+                   "l'étape « 1. Le cas »).",
                    n=self.app.case_meta.get("name", "")))
         return True
 
@@ -633,8 +730,10 @@ class ImportTab(ttk.Frame):
         n'ont pas de sens tant que les tailles ne sont pas connues.
         """
         state = "disabled" if busy else "normal"
-        for w in (self.btn_analyze, self.btn_import_list, self.btn_clear,
-                  self.btn_check_all, self.btn_uncheck_all, self.btn_generate,
+        # « ⋯ » porte désormais Importer une liste et Vider la liste : le griser
+        # protège la mesure aussi sûrement que de griser les anciens boutons.
+        for w in (self.btn_analyze, self.btn_more, self.btn_check_all,
+                  self.btn_uncheck_all, self.btn_clear_all, self.btn_generate,
                   self.btn_import, self.btn_run_all):
             w.config(state=state)
         self.cb_default_profile.config(state="disabled" if busy else "readonly")
@@ -648,17 +747,30 @@ class ImportTab(ttk.Frame):
         application se valide encore à la main, et une génération seule sert à
         relire les fichiers avant de lancer.
         """
-        bar = ttk.Frame(self)
-        bar.pack(fill="x", padx=8, pady=(0, 8))
+        bar = ttk.Frame(self, style="Surface.TFrame")
+        bar.pack(fill="x", padx=0, pady=0)
+        self.action_bar = bar
+
+        # Le total quitte les deux lignes de texte gris sous le tableau : il se
+        # lit maintenant **à gauche du bouton qu'il conditionne**, c'est-à-dire
+        # là où l'œil se pose avant de cliquer.
+        resume = ttk.Frame(bar, style="Surface.TFrame")
+        resume.pack(side="left", padx=self.app.theme.pad, pady=5)
+        self.lbl_total = ttk.Label(resume, text=i18n.t("import.zero_sources", "0 source"),
+                                   style="Title.TLabel")
+        self.lbl_total.pack(anchor="w")
+        self.lbl_inventory = ttk.Label(resume, text="", style="HintSurface.TLabel")
+        self.lbl_inventory.pack(anchor="w")
+
         self.btn_run_all = make_button(
             bar, i18n.t("import.run_all", "▶ Lancer l'import complet"),
             self.lancer_import_complet, color=config.ACTION_COLOR)
-        self.btn_run_all.pack(side="left")
+        self.btn_run_all.pack(side="right", padx=(4, self.app.theme.pad), pady=6)
         self.btn_steps = make_button(
-            bar, i18n.t("import.steps_show", "⋯ Étapes"), self._toggle_steps)
-        self.btn_steps.pack(side="left", padx=4)
+            bar, i18n.t("import.steps_show", "Étapes ▾"), self._toggle_steps)
+        self.btn_steps.pack(side="right", pady=6)
 
-        # Étapes détaillées : masquées au repos, dépliées par « ⋯ ».
+        # Étapes détaillées : masquées au repos, dépliées par « Étapes ▾ ».
         self.steps_bar = ttk.Frame(self)
         self._steps_visible = False
         self.btn_generate = make_button(
@@ -677,11 +789,11 @@ class ImportTab(ttk.Frame):
     def _toggle_steps(self):
         self._steps_visible = not self._steps_visible
         if self._steps_visible:
-            self.steps_bar.pack(fill="x", padx=8, pady=(0, 8))
-            self.btn_steps.config(text=i18n.t("import.steps_hide", "⋯ Masquer"))
+            self.steps_bar.pack(fill="x", padx=self.app.theme.pad, pady=(0, 6))
+            self.btn_steps.config(text=i18n.t("import.steps_hide", "Étapes ▴"))
         else:
             self.steps_bar.pack_forget()
-            self.btn_steps.config(text=i18n.t("import.steps_show", "⋯ Étapes"))
+            self.btn_steps.config(text=i18n.t("import.steps_show", "Étapes ▾"))
 
     def lancer_import_complet(self):
         """Générer → Importer → Valider, sans confirmation intermédiaire.
@@ -767,7 +879,7 @@ class ImportTab(ttk.Frame):
             messagebox.showinfo(
                 i18n.t("import.integrity_title", "Intégrité des sources"),
                 i18n.t("import.select_case_first",
-                      "Sélectionnez d'abord un cas (onglet « 1. Inventaire du cas »)."))
+                      "Sélectionnez d'abord un cas (étape « 1. Le cas »)."))
             self.var_skip_integrity.set(False)
             return
         val = self.var_skip_integrity.get()
@@ -823,7 +935,7 @@ class ImportTab(ttk.Frame):
             messagebox.showinfo(title, i18n.t(
                 "import.case_tasks_not_loaded",
                 "La liste des sources du cas n'est pas chargée.\n"
-                "Lancez « Lire les sources » dans l'onglet « 1. Inventaire du cas »."))
+                "Lancez « Lire les sources » dans l'étape « 1. Le cas »."))
             return
         objs = inv.get("case_tasks") or []
         if not objs:
@@ -867,8 +979,18 @@ class ImportTab(ttk.Frame):
         for i, t in enumerate(self.tasks):
             self._heading_base[self._task_colid(i)] = f"T{i + 1}"
 
+        # D5 — l'en-tête d'une colonne COCHABLE bascule la colonne entière ;
+        # les autres trient, comme avant. Cela retire de la barre d'outils les
+        # deux boutons par tâche (« T1 ✓ », « T1 ✗ »), qui la faisaient déborder
+        # dès qu'un fichier de tâches en comptait plus de trois.
+        cochables = {"import"} | {self._task_colid(i) for i in range(len(self.tasks))}
         for c in cols:
-            self.tree.heading(c, text=self._heading_base[c], command=lambda col=c: self._sort_by(col))
+            if c in cochables:
+                self.tree.heading(c, text=self._heading_base[c],
+                                  command=lambda col=c: self._toggle_column_by_heading(col))
+            else:
+                self.tree.heading(c, text=self._heading_base[c],
+                                  command=lambda col=c: self._sort_by(col))
         self.tree.column("import", width=48, anchor="center", stretch=False)
         self.tree.column("name", width=320, anchor="w", stretch=True)
         self.tree.column("type", width=80, anchor="center", stretch=False)
@@ -878,21 +1000,51 @@ class ImportTab(ttk.Frame):
             self.tree.column(self._task_colid(i), width=64, anchor="center", stretch=False)
         self.tree.column("del", width=52, anchor="center", stretch=False)
 
-        self._rebuild_col_buttons()
+        self._refresh_headings()
         self._refresh_tree()
 
-    def _rebuild_col_buttons(self):
-        for w in self.col_btns.winfo_children():
-            w.destroy()
-        for i, t in enumerate(self.tasks):
-            b_on = make_button(self.col_btns, f"T{i + 1} ✓", lambda idx=i: self._toggle_column(idx, True),
-                               width=4, padx=4)
-            b_off = make_button(self.col_btns, f"T{i + 1} ✗", lambda idx=i: self._toggle_column(idx, False),
-                                width=4, padx=4)
-            b_on.pack(side="left", padx=(6, 0))
-            b_off.pack(side="left", padx=(0, 2))
-            self._bind_tip(b_on, t["name"])
-            self._bind_tip(b_off, t["name"])
+    def _toggle_column_by_heading(self, colid: str):
+        """Bascule toute une colonne cochable depuis son en-tête (D5).
+
+        La bascule est **globale, pas alternée ligne à ligne** : s'il reste une
+        case décochée on coche tout, sinon on décoche tout. C'est ce qu'on attend
+        d'un « tout cocher », et cela reste prévisible sur une liste triée.
+        """
+        if self._busy_measuring():
+            return
+        if colid == "import":
+            valeur = not all(s.import_selected for s in self.sources) if self.sources else True
+            self._set_all_import(valeur)
+            return
+        for i in range(len(self.tasks)):
+            if self._task_colid(i) == colid:
+                tid = self.tasks[i]["id"]
+                valeur = not all(tid in s.selected_task_ids for s in self.sources) \
+                    if self.sources else True
+                self._toggle_column(i, valeur)
+                return
+
+    def _refresh_headings(self):
+        """Montre dans l'en-tête si la colonne est entièrement cochée (D5).
+
+        Sans ce retour, rien ne distingue un en-tête cliquable d'un en-tête de
+        tri, et on ne sait pas ce que le prochain clic va faire.
+        """
+        if not hasattr(self, "tree"):
+            return
+        def marque(tous):
+            return config.CHECK if tous else config.UNCHECK
+        src = self.sources
+        try:
+            tous = bool(src) and all(s.import_selected for s in src)
+            self.tree.heading("import", text=f"{self._heading_base['import']} {marque(tous)}")
+            for i, t in enumerate(self.tasks):
+                tid = t["id"]
+                tous = bool(src) and all(tid in s.selected_task_ids for s in src)
+                colid = self._task_colid(i)
+                self.tree.heading(colid, text=f"{self._heading_base[colid]} {marque(tous)}")
+        except tk.TclError:
+            pass
 
     def _bind_tip(self, widget, text):
         widget.bind("<Enter>", lambda e, txt=text: self.tooltip.show(txt, e.x_root + 12, e.y_root + 12))
@@ -944,7 +1096,7 @@ class ImportTab(ttk.Frame):
         self._refresh_tree()
         msg = i18n.t("import.summary_log", "Analyse : {n} source(s).", n=len(self.sources))
         if removed:
-            msg += " " + i18n.t("import.summary_removed_log", "{n} déjà dans le cas, retirée(s).", n=removed)
+            msg += " " + i18n.t("import.summary_removed_log", "{n} déjà dans le cas : décochée(s) et barrée(s).", n=removed)
         self.app.log.log(msg)
         # La génération EXIGE une taille par source cochée : sans mesure, le
         # parcours s'arrête sur un refus. On enchaîne donc directement, mais
@@ -956,7 +1108,10 @@ class ImportTab(ttk.Frame):
         return config.human_size(s.size_bytes) if s.size_bytes is not None else "—"
 
     def _row_values(self, s):
-        values = [config.glyph(s.import_selected), s.name,
+        nom = s.name
+        if self._is_indexed(s):
+            nom += "  " + i18n.t("import.already_in_case", "— déjà dans le cas")
+        values = [config.glyph(s.import_selected), nom,
                   config.type_label(s.source_type), self._size_text(s),
                   profiles.display_name(getattr(s, "profile", "défaut") or "défaut")]
         for t in self.tasks:
@@ -967,11 +1122,16 @@ class ImportTab(ttk.Frame):
     def _refresh_tree(self):
         self.tree.delete(*self.tree.get_children())
         for i, s in enumerate(self.sources):
-            tags = ("dup",) if self._is_indexed(s) else ()
-            self.tree.insert("", "end", iid=str(i), values=self._row_values(s), tags=tags)
+            tags = ["dup"] if self._is_indexed(s) else []
+            if i % 2:
+                tags.append("odd")
+            self.tree.insert("", "end", iid=str(i), values=self._row_values(s),
+                             tags=tuple(tags))
         self._update_total()
         self._update_heading_arrows()
+        self._refresh_headings()
         self._update_inventory_label()
+        self.app.update_steps()
 
     def _update_total(self):
         checked = [s for s in self.sources if s.import_selected]
@@ -1050,12 +1210,26 @@ class ImportTab(ttk.Frame):
         return base
 
     def _drop_indexed(self) -> int:
-        """Retire les sources déjà présentes dans le cas. Retourne le nb retiré."""
+        """Écarte de l'import les sources **déjà présentes dans le cas** (D7).
+
+        Elles ne sont plus **retirées** de la liste mais **décochées et barrées**
+        (décision du 11/09/2026). Retirer en silence une ligne que l'utilisateur
+        venait de coller lui laissait croire à une perte : le journal seul en
+        gardait trace, et il fallait le relire pour comprendre pourquoi 18 chemins
+        collés donnaient 17 lignes. Retourne le nombre de lignes écartées.
+
+        ⚠ Le dédoublonnage lui-même n'a pas changé : il compare toujours à hôte
+        près (``path_parser.share_key``), un même cas mélangeant les écritures
+        IP et nom NetBIOS d'un même partage.
+        """
         if not self._inventory_matches():
             return 0
-        before = len(self.sources)
-        self.sources = [s for s in self.sources if not self._is_indexed(s)]
-        return before - len(self.sources)
+        n = 0
+        for s in self.sources:
+            if self._is_indexed(s) and s.import_selected:
+                s.import_selected = False
+                n += 1
+        return n
 
     def apply_inventory(self):
         """Appelé quand l'inventaire (liste des sources) vient d'être lu.
@@ -1070,7 +1244,7 @@ class ImportTab(ttk.Frame):
         self._refresh_tree()
         if removed:
             self.app.log.log(i18n.t(
-                "import.auto_removed_log", "{n} source(s) déjà indexée(s) retirée(s) automatiquement.",
+                "import.auto_removed_log", "{n} source(s) déjà indexée(s) décochée(s) automatiquement.",
                 n=removed))
 
     def _update_inventory_label(self):
@@ -1081,7 +1255,7 @@ class ImportTab(ttk.Frame):
             self.lbl_inventory.config(
                 foreground="#b45309",
                 text=i18n.t("import.no_case_selected",
-                           "ⓘ Aucun cas sélectionné — choisissez-le dans l'onglet « 1. Inventaire du cas »."),
+                           "ⓘ Aucun cas sélectionné — choisissez-le dans l'étape « 1. Le cas »."),
             )
             return
         effective = self._existing_bytes()  # max(case.xml, somme inventaire)
@@ -1192,12 +1366,12 @@ class ImportTab(ttk.Frame):
         msg = i18n.t("import.list_imported_log", "Liste importée : {n} source(s) depuis {p}",
                     n=len(self.sources), p=path)
         if removed:
-            msg += " " + i18n.t("import.list_imported_removed", "({n} déjà dans le cas, retirée(s)).", n=removed)
+            msg += " " + i18n.t("import.list_imported_removed", "({n} déjà dans le cas : décochée(s))." , n=removed)
         self.app.log.log(msg)
         info = i18n.t("import.n_sources_loaded", "{n} source(s) chargée(s).", n=len(self.sources))
         if removed:
             info += "\n" + i18n.t(
-                "import.n_removed_auto", "{n} déjà indexée(s) dans le cas, retirée(s) automatiquement.",
+                "import.n_removed_auto", "{n} déjà indexée(s) dans le cas : décochée(s), elles restent visibles barrées.",
                 n=removed)
         messagebox.showinfo(title, info)
 
@@ -1353,35 +1527,55 @@ class ImportTab(ttk.Frame):
             s.import_selected = state
         self._refresh_tree()
 
-    def vider_liste(self):
-        """Retire toutes les sources de « Sources à importer ».
+    def vider_liste(self, tout: bool = True):
+        """Repart de zéro : tableau **et** zones de chemins collés (11/09/2026).
 
-        Les zones de collage ne sont PAS touchées : elles gardent la trace de ce
-        qu'on a fourni, et c'est souvent d'elles qu'on repart pour relancer une
-        analyse. Vider les deux d'un même bouton ferait perdre le travail de
-        constitution de la liste, qui est le plus long.
+        Jusque-là, « Vider la liste » ne touchait pas aux zones de collage, au
+        motif qu'on repart souvent d'elles. À l'usage c'est l'inverse qui gêne :
+        entre deux lots, on veut **purger l'écran d'un coup** et ne pas retrouver
+        les chemins du lot précédent à la prochaine analyse. La confirmation dit
+        exactement ce qui part.
+
+        ``tout=False`` ne vide que le tableau (appelé par le menu « ⋯ »).
         """
         if self._compound_blocked() or self._busy_measuring():
             return
-        titre = i18n.t("import.clear_list", "Vider la liste")
-        if not self.sources:
+        titre = (i18n.t("import.clear_all", "Tout vider") if tout
+                 else i18n.t("import.clear_list", "Vider la liste"))
+        colles = sum(1 for zone in (self.txt_images, self.txt_folders)
+                     for ligne in zone.get("1.0", "end").splitlines() if ligne.strip())
+        if not self.sources and not (tout and colles):
             messagebox.showinfo(titre, i18n.t("import.clear_empty",
                                               "La liste est déjà vide."))
             return
-        if not messagebox.askyesno(titre, i18n.t(
+        if tout:
+            question = i18n.t(
+                "import.clear_all_confirm",
+                "Repartir de zéro ?\n\n{n} source(s) du tableau et {c} chemin(s) "
+                "collé(s) seront effacés.", n=len(self.sources), c=colles)
+        else:
+            question = i18n.t(
                 "import.clear_confirm",
                 "Retirer les {n} source(s) de la liste ?\n\nLes chemins collés "
                 "au-dessus sont conservés : « Analyser les chemins » les "
-                "remettra.", n=len(self.sources))):
+                "remettra.", n=len(self.sources))
+        if not messagebox.askyesno(titre, question):
             return
         n = len(self.sources)
         self.sources = []
         self._pending_sizes = {}
         self._resume_sizes = {}
         self._sort_col = None
+        if tout:
+            for zone in (self.txt_images, self.txt_folders):
+                zone.delete("1.0", "end")
         self._refresh_tree()
-        self.app.log.log(i18n.t("import.clear_log",
-                                "Liste des sources vidée ({n} retirée(s)).", n=n))
+        self.app.log.log(
+            i18n.t("import.clear_all_log",
+                   "Onglet vidé : {n} source(s) et {c} chemin(s) collé(s).",
+                   n=n, c=colles) if tout else
+            i18n.t("import.clear_log",
+                   "Liste des sources vidée ({n} retirée(s)).", n=n))
 
     def _toggle_column(self, task_idx, state):
         if not (0 <= task_idx < len(self.tasks)):
@@ -1670,7 +1864,7 @@ class ImportTab(ttk.Frame):
             messagebox.showerror(
                 i18n.t("common.case_required_title", "Cas requis"),
                 i18n.t("import.select_case_target",
-                      "Sélectionnez d'abord un cas dans l'onglet « 1. Inventaire du cas »."))
+                      "Sélectionnez d'abord un cas dans l'étape « 1. Le cas »."))
             return False
         # Seules les lignes cochées « Importer » sont générées.
         selected = [s for s in self.sources if s.import_selected]
@@ -1872,7 +2066,7 @@ class ImportTab(ttk.Frame):
         title = i18n.t("import.run_import", "Importer (lancer le .bat)")
         if not self.app.case_meta:
             messagebox.showinfo(title, i18n.t(
-                "import.select_case_short", "Sélectionnez d'abord un cas (onglet « 1. Inventaire du cas »)."))
+                "import.select_case_short", "Sélectionnez d'abord un cas (étape « 1. Le cas »)."))
             return
         bat = self._main_bat_path()
         if not bat:
@@ -1964,7 +2158,7 @@ class ImportTab(ttk.Frame):
         meta = self.app.case_meta
         if not meta:
             messagebox.showinfo(title, i18n.t(
-                "import.select_case_short", "Sélectionnez d'abord un cas (onglet « 1. Inventaire du cas »)."))
+                "import.select_case_short", "Sélectionnez d'abord un cas (étape « 1. Le cas »)."))
             return
         exe = path_parser.clean_field(self.app.var_exe.get())
         user = self.app.var_user.get().strip()
@@ -2058,6 +2252,12 @@ class ImportTab(ttk.Frame):
             else:
                 self.app.log.log(i18n.t("import.validate_other", "  • {n} : {m}", n=name, m=lg['message']))
         self._persist_measured_sizes(confirmed_paths)
+        self._last_validation_ok = bool(confirmed_paths)
+        self.app.update_steps()
+        if confirmed_paths:
+            self.app.set_status(i18n.t(
+                "import.status_validated", "{n} source(s) confirmée(s) dans le cas.",
+                n=len(confirmed_paths)))
         self._show_validation(inventory, logs, rows, run_dir, confirmed_paths)
 
     def _persist_measured_sizes(self, confirmed_paths):
@@ -2084,9 +2284,8 @@ class ImportTab(ttk.Frame):
                 n=len(to_persist)))
 
     def _show_validation(self, inventory, logs, rows, run_dir=None, confirmed_paths=None):
-        win = tk.Toplevel(self)
-        win.title(i18n.t("import.validate", "Valider les opérations"))
-        win.geometry("900x460")
+        win = make_dialog(self, i18n.t("import.validate", "Valider les opérations"),
+                          "900x460")
 
         n_ok = sum(1 for _n, in_case, _lg in rows if in_case)
         run_txt = ""

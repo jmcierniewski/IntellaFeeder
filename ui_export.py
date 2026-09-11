@@ -27,7 +27,7 @@ import mime_catalog
 import path_parser
 import profile_translate
 import sizing
-from ui_widgets import MeasureBar, make_button
+from ui_widgets import MeasureBar, attach_tip, make_button
 
 # En-têtes affichés du tableau (les clés internes des lignes restent en
 # français partout dans le code — ``case_export``, CSV… — pour ne rien casser ;
@@ -122,10 +122,26 @@ class ExportTab(ttk.Frame):
         # « Exporter les tâches du cas » : recyclage des tâches de l'inventaire.
         self._mk_btn(grp_exp, i18n.t("inventory.export_tasks_short", "Tâches du cas…"),
                     self._export_case_tasks).pack(side="left", padx=(0, 4), pady=4)
-        # « Info Profil » : couleur de l'onglet visé (violet) — c'est un RENVOI
-        # vers un autre onglet, pas une action de celui-ci.
-        self._mk_btn(actions, i18n.t("inventory.info_profile", "Info Profil →"), self._info_profile,
-                     color=config.PROFILE_TAB_COLOR).pack(side="left")
+        # NEUTRE comme ses voisins (11/09/2026). Il portait la couleur de
+        # l'onglet visé, mais entouré de quatre boutons neutres dans la même
+        # barre, un violet isolé ne se lisait pas comme « renvoi » : il se
+        # lisait comme une faute de goût. La flèche « → » dit le renvoi, et
+        # l'infobulle dit où il mène — c'est suffisant et plus sobre.
+        # ⚠ Dans son propre groupe, et non nu à côté des deux autres : un
+        # LabelFrame descend son contenu de la hauteur de son titre, si bien
+        # qu'un bouton posé à côté flottait **plus haut que ses voisins**
+        # (constaté à l'écran le 11/09/2026). L'alignement se règle par la
+        # structure, pas par un `pady` deviné.
+        grp_profil = ttk.LabelFrame(actions, text=i18n.t("inventory.grp_profile",
+                                                         "Reprendre"))
+        grp_profil.pack(side="left")
+        btn_profil = self._mk_btn(grp_profil, i18n.t("inventory.info_profile", "Info Profil →"),
+                                  self._info_profile)
+        btn_profil.pack(side="left", padx=4, pady=4)
+        attach_tip(btn_profil, i18n.t(
+            "inventory.info_profile_tip",
+            "Reprend les réglages d'indexation de la source sélectionnée et "
+            "ouvre l'onglet Profils pour les enregistrer sous un nom."))
 
         # Bandeau de progression du scan des dossiers à 0 (masqué au repos) :
         # même widget que l'onglet Import (progression + annulation).
@@ -164,7 +180,11 @@ class ExportTab(ttk.Frame):
         holder.columnconfigure(0, weight=1)
         # Source mesurée à 0 octet = vide pour de bon (≠ « à mesurer », ≠ « 0.0 Mo »
         # qui pèse quelques Ko) : à voir avant l'import, pas après.
-        self.tree.tag_configure("empty", foreground="#b91c1c")
+        self.tree.tag_configure("empty", foreground=config.DANGER_COLOR)
+        # Zébrage : sur un tableau de sept colonnes et vingt lignes, l'œil
+        # perd la ligne en route. Le tag est posé à l'insertion (cf. plus bas),
+        # pas par un style — ttk n'a pas de sélecteur « ligne paire ».
+        self.tree.tag_configure("odd", background=config.UI_ZEBRA)
         self.tree.bind("<Control-c>", self._copy_selection)
         self.tree.bind("<Control-C>", self._copy_selection)
         self.tree.bind("<Control-a>", self._select_all)
@@ -664,11 +684,14 @@ class ExportTab(ttk.Frame):
         # « Info Profil » doit retrouver la bonne source dans `sources_detail`.
         # `_view` fait foi — il est recalculé par `_rebuild_view`, seul point
         # d'entrée du remplissage.
-        for idx in self._view:
+        for rang, idx in enumerate(self._view):
             r = self.rows[idx]
+            tags = ["empty"] if self._is_empty_source(r) else []
+            if rang % 2:
+                tags.append("odd")
             self.tree.insert("", "end", iid=str(idx),
                              values=[r.get(c, "") for c in self.columns],
-                             tags=("empty",) if self._is_empty_source(r) else ())
+                             tags=tuple(tags))
 
     def _copy_selection(self, _event=None):
         """Copie les lignes sélectionnées (TSV : collable dans un tableur)."""
@@ -703,10 +726,20 @@ class ExportTab(ttk.Frame):
         """
         inv = self.app.inventory
         if not inv or not inv.get("folder_unknown"):
+            # 🐞 « Lisez d'abord les sources » était accolé au constat sans
+            # condition (signalé le 11/09/2026) : il s'affichait alors même que
+            # les sources VENAIENT d'être lues, et laissait croire à un échec de
+            # lecture là où il n'y a simplement rien à mesurer. Deux situations,
+            # deux phrases.
             messagebox.showinfo(
                 i18n.t("inventory.zero_folders_title", "Dossiers à 0"),
                 i18n.t("inventory.zero_folders_none",
-                      "Aucun dossier sans taille à mesurer.\nLisez d'abord les sources du cas."))
+                       "Aucun dossier sans taille à mesurer : tous les volumes "
+                       "de ce cas sont connus.")
+                if self._inventory_read() else
+                i18n.t("inventory.zero_folders_unread",
+                       "Les sources de ce cas n'ont pas encore été lues.\n"
+                       "Lancez « Lire les sources » d'abord."))
             return
         if self._scan_running:
             return
@@ -837,6 +870,16 @@ class ExportTab(ttk.Frame):
                 "{n} dossier(s) mesuré(s) — total {t} (intégré à la somme inventaire).",
                 n=len(results), t=config.human_size(total)))
         self._check_size_consistency()
+
+    def _inventory_read(self) -> bool:
+        """L'inventaire du cas a-t-il déjà été lu ?
+
+        Sert à choisir entre deux messages qui se ressemblent mais n'appellent
+        pas le même geste : « il n'y a rien à faire » (l'outil a travaillé) et
+        « lisez d'abord les sources » (il reste un geste à faire).
+        """
+        inv = self.app.inventory or {}
+        return bool(inv.get("sources_detail") is not None or inv.get("sources"))
 
     def _selected_source(self, title: str):
         """Source sélectionnée dans le tableau, ou ``None`` (message affiché)."""
@@ -978,9 +1021,13 @@ class ExportTab(ttk.Frame):
         title = i18n.t("inventory.export_tasks", "Exporter les tâches du cas…")
         if not objs:
             messagebox.showinfo(
-                title, i18n.t("inventory.export_tasks_none",
-                              "Aucune tâche sur les sources de ce cas.\n"
-                              "Lisez d'abord les sources (« Lire les sources »)."))
+                title,
+                i18n.t("inventory.export_tasks_none",
+                       "Aucune tâche n'est définie sur les sources de ce cas.")
+                if self._inventory_read() else
+                i18n.t("inventory.export_tasks_unread",
+                       "Les sources de ce cas n'ont pas encore été lues.\n"
+                       "Lancez « Lire les sources » d'abord."))
             return
         meta = self.app.case_meta
         case_name = (meta["name"] if meta else "") or "Case"

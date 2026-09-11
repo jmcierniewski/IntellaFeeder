@@ -16,13 +16,13 @@ from tkinter import messagebox, simpledialog, ttk
 
 import config
 import i18n
-import mime_catalog
 import profile_catalog
 import profile_translate
 import profiles
-from ui_category_picker import CategoryPicker
-from ui_widgets import (Tooltip, make_button, mime_filter_summary,
-                        settings_summary, show_mime_filter, show_source_settings)
+import ui_theme
+from ui_types_panel import TypesPanel
+from ui_widgets import (attach_tip, make_button, settings_summary,
+                        show_source_settings)
 
 # Unités d'option traduites via les clés i18n générales (unit.mb, unit.gb…).
 _UNIT_KEYS = {"Mo": "unit.mb", "Go": "unit.gb"}
@@ -30,6 +30,8 @@ _UNIT_KEYS = {"Mo": "unit.mb", "Go": "unit.gb"}
 # Options rendues en zone de texte multi-ligne (valeurs très longues) plutôt
 # qu'en champ d'une ligne — ex. le filtre de types MIME.
 MULTILINE_KEYS = {"sourceTypeFilter"}
+# Groupe du catalogue déplacé dans le sous-onglet des types.
+GROUPE_FILTRES = "Filtres"
 
 # Largeur (px) de la colonne des intitules du formulaire : la meme dans tous les
 # groupes, pour que les champs s'alignent verticalement d'une section a l'autre.
@@ -40,145 +42,6 @@ LARGEUR_LIBELLE = 280
 MODE_WARN_COLOR = config.DANGER_COLOR
 
 
-class ReferenceTab(ttk.Frame):
-    """Sous-onglet « Référentiel » : état des descriptions de types MIME.
-
-    🔴 **Il remplace un popup** (10/09/2026). L'ancien s'ouvrait à chaque lecture
-    de cas pour annoncer « n types filtrés n'ont pas de description » — une
-    information sur laquelle il n'y a **rien à faire** quand on a déjà la
-    dernière version d'Intella, et qui coûtait un clic à chaque fois. Ici, elle
-    est consultable quand on la cherche, **avec la liste** : sans les noms,
-    l'utilisateur ne pouvait même pas juger si le manque le concernait.
-    """
-
-    def __init__(self, parent, app):
-        super().__init__(parent)
-        self.app = app
-
-        self.lbl_state = ttk.Label(self, wraplength=900, justify="left")
-        self.lbl_state.pack(anchor="w", padx=10, pady=(10, 4))
-
-        self.lbl_case = ttk.Label(self, wraplength=900, justify="left")
-        self.lbl_case.pack(anchor="w", padx=10, pady=(0, 6))
-
-        holder = ttk.Frame(self)
-        holder.pack(fill="both", expand=True, padx=10, pady=(0, 4))
-        self.tree = ttk.Treeview(holder, columns=("name", "desc"),
-                                 show="headings", height=8)
-        self.tree.heading("name", text=i18n.t("profiles.ref_col", "Type sans description"))
-        self.tree.heading("desc", text=i18n.t("profiles.ref_col_user", "Votre description"))
-        self.tree.column("name", width=420, anchor="w")
-        self.tree.column("desc", width=380, anchor="w")
-        vsb = ttk.Scrollbar(holder, orient="vertical", command=self.tree.yview)
-        self.tree.configure(yscrollcommand=vsb.set)
-        self.tree.pack(side="left", fill="both", expand=True)
-        vsb.pack(side="right", fill="y")
-        self.tree.tag_configure("user", foreground="#0f766e")
-        # Double-clic = éditer. Le bouton dit la même chose pour qui ne devine
-        # pas qu'une ligne de tableau puisse s'ouvrir.
-        self.tree.bind("<Double-1>", lambda _e: self._editer())
-        barre = ttk.Frame(self)
-        barre.pack(fill="x", padx=10, pady=(0, 6))
-        make_button(barre, i18n.t("profiles.ref_edit", "Décrire ce type…"),
-                    self._editer).pack(side="left")
-        ttk.Label(barre, foreground="#64748b", text=i18n.t(
-            "profiles.ref_edit_hint",
-            "(ou double-cliquez une ligne)")).pack(side="left", padx=8)
-
-        ttk.Label(self, wraplength=900, justify="left", foreground="#64748b",
-                  text=i18n.t(
-                      "profiles.ref_hint",
-                      "Un type sans description reste parfaitement utilisable : "
-                      "seul son libellé manque. Ce sont le plus souvent des "
-                      "synonymes qu'Intella écrit sans les nommer. Si votre "
-                      "version d'Intella est plus récente que le référentiel, "
-                      "vous pouvez l'actualiser depuis Maintenance → Types MIME.")
-                  ).pack(anchor="w", padx=10, pady=(0, 10))
-        self.refresh()
-
-    def refresh(self):
-        s = mime_catalog.stats()
-        if s.get("external"):
-            etat = i18n.t(
-                "profiles.ref_external",
-                "Descriptions : FICHIER EXTERNE ({n} entrées) — {p}",
-                n=s["descriptions"], p=s.get("source", ""))
-            couleur = "#1d4ed8"
-        else:
-            etat = i18n.t(
-                "profiles.ref_builtin",
-                "Descriptions : version intégrée à l'application ({n} entrées).",
-                n=s["descriptions"])
-            couleur = "#166534"
-        if s.get("observed_learned"):
-            etat += " " + i18n.t("profiles.ref_learned",
-                                 "{n} nom(s) appris de vos cas.",
-                                 n=s["observed_learned"])
-        self.lbl_state.config(text=etat, foreground=couleur)
-
-        # Les types du dernier cas SANS libellé, plus ceux qu'on a déjà décrits
-        # soi-même : sans eux, on ne pourrait plus retrouver ni corriger une
-        # description écrite pour un cas précédent.
-        inedits = list(getattr(self.app, "undescribed_types", []) or [])
-        miens = [n for n in mime_catalog.user_labels() if n not in inedits]
-        lignes = inedits + sorted(miens)
-        self.tree.delete(*self.tree.get_children())
-        self._iids = {}
-        for i, nom in enumerate(lignes):
-            perso = mime_catalog.user_label(nom)
-            iid = f"r{i}"          # nom potentiellement vide → jamais comme iid
-            self._iids[iid] = nom
-            self.tree.insert("", "end", iid=iid,
-                             tags=("user",) if perso else (),
-                             values=(nom or i18n.t("mime.untyped", "(sans type)"),
-                                     perso))
-        if not inedits:
-            self.lbl_case.config(text=i18n.t(
-                "profiles.ref_case_ok",
-                "Aucun type sans description dans le dernier cas lu."),
-                foreground="#166534")
-        else:
-            self.lbl_case.config(text=i18n.t(
-                "profiles.ref_case",
-                "{n} type(s) filtré(s) par le dernier cas lu n'ont pas de "
-                "description :", n=len(inedits)), foreground="#475569")
-
-    def _editer(self):
-        """Saisit la description d'un type que Vound ne nomme pas."""
-        sel = self.tree.selection()
-        titre = i18n.t("profiles.ref_edit_title", "Décrire un type")
-        if not sel:
-            messagebox.showinfo(titre, i18n.t(
-                "profiles.ref_edit_none", "Sélectionnez d'abord un type."))
-            return
-        nom = self._iids.get(sel[0], "")
-        actuel = mime_catalog.user_label(nom)
-        officiel = mime_catalog.label(nom) if not actuel else None
-        invite = i18n.t("profiles.ref_edit_prompt",
-                        "Description de « {n} » :", n=nom or "(sans type)")
-        if officiel:
-            # Le cas se produit si Intella a fini par nommer ce type : autant le
-            # dire, plutôt que de laisser saisir un texte qui ne s'affichera pas.
-            invite += "\n\n" + i18n.t(
-                "profiles.ref_edit_official",
-                "Attention : Intella décrit désormais ce type « {d} ». Sa "
-                "description restera prioritaire sur la vôtre.", d=officiel)
-        texte = simpledialog.askstring(titre, invite, initialvalue=actuel, parent=self)
-        if texte is None:
-            return
-        try:
-            mime_catalog.set_user_label(nom, texte)
-        except OSError as exc:
-            messagebox.showerror(titre, i18n.t(
-                "profiles.ref_edit_failed",
-                "Impossible d'enregistrer : {e}", e=exc))
-            return
-        self.app.log.log(i18n.t(
-            "profiles.ref_edit_log", "Description personnelle : {n} → « {d} »",
-            n=nom or "(sans type)", d=texte.strip() or "—"))
-        self.refresh()
-
-
 class ProfilesTab(ttk.Frame):
     def __init__(self, parent, app):
         super().__init__(parent)
@@ -187,7 +50,6 @@ class ProfilesTab(ttk.Frame):
         self._widgets = {}        # clé option -> widget (pour activer/désactiver)
         self._text_widgets = {}   # clé option -> tk.Text (multi-ligne)
         self._names = []          # identifiants des profils, dans l'ordre de la liste
-        self.tooltip = Tooltip(self)
         self._build()
         # Ouvre sur le profil marqué par défaut, pas sur un formulaire vierge :
         # voir son nom étoilé dans la liste mais les réglages d'Intella dans le
@@ -204,7 +66,7 @@ class ProfilesTab(ttk.Frame):
             text=i18n.t(
                 "profiles.intro",
                 "Un profil = jeu de paramètres d'analyse appliqué à une source à "
-                "l'import (affecté dans l'onglet « 2. Import », colonne « Profil »). "
+                "l'import (affecté dans l'étape « 2. Sources », colonne « Profil »). "
                 "« Défaut Intella » applique les réglages standard d'Intella (aucune "
                 "option forcée) ; seules les valeurs qui en diffèrent sont "
                 "enregistrées et émises. L'étoile ★ marque le profil donné aux "
@@ -289,7 +151,10 @@ class ProfilesTab(ttk.Frame):
         form = ttk.Frame(canvas)
         win = canvas.create_window((0, 0), window=form, anchor="nw")
         form.bind("<Configure>", lambda _e: canvas.configure(scrollregion=canvas.bbox("all")))
-        canvas.bind("<Configure>", lambda e: canvas.itemconfigure(win, width=e.width))
+        def _on_canvas_configure(e):
+            canvas.itemconfigure(win, width=e.width)
+            self._on_form_resize(e.width)
+        canvas.bind("<Configure>", _on_canvas_configure)
         # Molette active seulement quand le pointeur survole ce formulaire (sinon
         # bind_all capterait la molette des autres onglets).
         def _wheel(e):
@@ -299,39 +164,61 @@ class ProfilesTab(ttk.Frame):
 
         self._build_form(form)
 
-        self.picker = CategoryPicker(
-            subnb, self.app,
-            get_filter=lambda: self._get_option("sourceTypeFilter"),
-            get_mode=self._filter_mode,
-            set_filter=self._set_filter_from_picker)
+        # DEUX sous-onglets (11/09/2026). « Types de fichiers à indexer » porte
+        # désormais les deux panneaux de l'ancien popup « Voir les types », et
+        # c'est là qu'on décrit un type — ce qui a rendu le sous-onglet
+        # « Référentiel » sans objet. Voir l'en-tête de `ui_types_panel`.
+        self.types_panel = TypesPanel(subnb, self.app, self)
         subnb.add(right, text=" " + i18n.t("profiles.tab_options", "Réglages"))
-        subnb.add(self.picker, text=" " + i18n.t("profiles.tab_types",
-                                                 "Types de fichiers à indexer"))
-        self.reference = ReferenceTab(subnb, self.app)
-        subnb.add(self.reference, text=" " + i18n.t("profiles.tab_reference",
-                                                    "Référentiel"))
+        subnb.add(self.types_panel, text=" " + i18n.t(
+            "profiles.tab_types", "Types de fichiers à indexer"))
 
     def refresh_reference(self):
-        """Rafraîchit le sous-onglet « Référentiel » (appelé par l'Inventaire)."""
-        if hasattr(self, "reference"):
-            self.reference.refresh()
+        """Le référentiel a changé (cas lu) : rafraîchit la liste de droite.
 
-    def _set_filter_from_picker(self, filtre: str, mode: str):
-        """Écrit ce que le sélecteur a composé — le profil reste à enregistrer.
-
-        Volontairement **sans sauvegarde automatique** : le sélecteur remplit le
-        formulaire comme le ferait une saisie, et « Enregistrer » garde son rôle
-        de point de validation unique.
+        Conservé sous ce nom : l'Inventaire l'appelle après chaque lecture de
+        cas, et il n'a pas à savoir que le sous-onglet « Référentiel » a disparu.
         """
-        self._set_option("sourceTypeFilter", filtre)
-        self._set_option("sourceTypeFilterMode", mode)
-        self._refresh_mime_summary()
+        if hasattr(self, "types_panel"):
+            self.types_panel.refresh_catalogue()
 
     def _build_form(self, form):
+        """Formulaire thématique, sur **deux colonnes quand la largeur le permet**.
+
+        Décision D8 (11/09/2026). Les neuf groupes empilés faisaient environ
+        1 100 px de haut : sur un 22 pouces on défilait dans une fenêtre aux
+        deux tiers vide, et sur un portable on défilait deux fois plus. La
+        répartition est recalculée quand la largeur change (cf. ``_layout_form``).
+        """
+        form.columnconfigure(0, weight=1, uniform="col")
+        form.columnconfigure(1, weight=1, uniform="col")
+        self._form = form
+        self._form_cols = [ttk.Frame(form), ttk.Frame(form)]
+        self._form_boxes = []          # [(box, poids)] dans l'ordre du catalogue
+        self._form_ncols = 0           # 0 = pas encore disposé
+
         for group, opts in profile_catalog.GROUPS:
+            # Le groupe « Filtres » a DÉMÉNAGÉ dans le sous-onglet « Types de
+            # fichiers à indexer » (11/09/2026) : il parle du même sujet que les
+            # deux panneaux de types, le laisser ici en faisait un troisième
+            # endroit où composer un filtre. `ui_types_panel` crée ses widgets
+            # et les enregistre dans `vars` — `_collect_values` ne voit pas la
+            # différence.
+            if group == GROUPE_FILTRES:
+                continue
             group_key = profile_catalog.GROUP_KEYS.get(group, "")
+            # 🐞 Parent = `form`, PAS une colonne. ``pack(in_=X)`` n'accepte
+            # que le parent du widget ou un de ses descendants : des boîtes
+            # créées dans la colonne 0 ne peuvent pas être packées dans la
+            # colonne 1, et la TclError interrompait la boucle — un seul groupe
+            # sur neuf s'affichait (constaté à la première capture v3.0).
             box = ttk.LabelFrame(form, text=i18n.t(group_key, group))
-            box.pack(fill="x", expand=True, padx=6, pady=4)
+            # Poids = ce que le groupe occupera en hauteur. Les champs comptent
+            # double : un multi-ligne (filtre MIME) prend deux lignes plus son
+            # résumé. Sans cette pondération, la colonne des cases à cocher
+            # serait deux fois plus courte que l'autre.
+            poids = sum(1 if o["type"] == "bool" else 2 for o in opts) + 2
+            self._form_boxes.append((box, poids))
             # Intitules alignes d'un groupe a l'autre : sans `minsize`, chaque
             # LabelFrame calait sa colonne 0 sur son plus long libelle, donc les
             # champs repartaient d'une abscisse differente a chaque section.
@@ -344,14 +231,33 @@ class ProfilesTab(ttk.Frame):
                 if o.get("unit"):
                     unit = i18n.t(_UNIT_KEYS.get(o["unit"], ""), o["unit"])
                     label += f" ({unit})"
-                if not o["confirmed"]:
-                    label += "  — " + i18n.t("profiles.to_verify", "à éprouver")
+                # D11 (11/09/2026) — « — à éprouver » et « [images] » quittent
+                # les libellés. C'étaient des notes de développement exposées à
+                # l'utilisateur final : sur un formulaire de trente options,
+                # elles doublaient la longueur des intitulés et cassaient
+                # l'alignement sans rien lui apprendre d'actionnable. Elles
+                # deviennent une infobulle (ⓘ) et une étiquette discrète.
+                suffixe = ""
                 if o["applies"] == "image":
-                    label += "  " + i18n.t("profiles.images_only", "[images]")
+                    suffixe = "  " + i18n.t("profiles.images_only", "images")
+                aide = []
+                if not o["confirmed"]:
+                    aide.append(i18n.t(
+                        "profiles.to_verify_tip",
+                        "Correspondance présumée, jamais confirmée sur un cas réel : "
+                        "à vérifier avant de s'y fier."))
+                if o["applies"] == "image":
+                    aide.append(i18n.t(
+                        "profiles.images_only_tip",
+                        "Sans effet sur une source « dossier » : ne s'applique "
+                        "qu'aux images forensiques."))
+                label += suffixe
                 if o["type"] == "bool":
                     var = tk.BooleanVar(value=bool(o["default"]))
                     w = ttk.Checkbutton(box, variable=var, text=label)
                     w.grid(row=gr, column=0, columnspan=2, sticky="w", padx=6, pady=2)
+                    if aide:
+                        self._attach_tip(w, "\n".join(aide))
                     self.vars[key] = var
                     self._widgets[key] = w
                     gr += 1
@@ -367,10 +273,6 @@ class ProfilesTab(ttk.Frame):
                     self._text_widgets[key] = w
                     self._widgets[key] = w
                     gr += 2
-                    if key == "sourceTypeFilter":
-                        # Un « refine » complet dans Intella produit 600 noms
-                        # séparés par des virgules : illisible dans un champ.
-                        gr += self._add_mime_reader(box, gr, w)
                 else:
                     lbl = ttk.Label(box, text=label)
                     if key == "sourceTypeFilterMode":
@@ -380,7 +282,7 @@ class ProfilesTab(ttk.Frame):
                         # ça. L'erreur ne se voit qu'après l'import, et Intella
                         # ne permet pas de revoir les réglages d'une source.
                         lbl.configure(foreground=MODE_WARN_COLOR,
-                                      font=("Segoe UI", 9, "bold"))
+                                      font=ui_theme.F_BOLD)
                     lbl.grid(row=gr, column=0, sticky="w", padx=6, pady=2)
                     var = tk.StringVar(value=str(o["default"]))
                     # Une liste deroulante ou un compteur n'a pas besoin de
@@ -403,6 +305,9 @@ class ProfilesTab(ttk.Frame):
                         w = ttk.Entry(box, textvariable=var)
                         colle = "ew"
                     w.grid(row=gr, column=1, sticky=colle, padx=6, pady=2)
+                    if aide:
+                        self._attach_tip(lbl, "\n".join(aide))
+                        self._attach_tip(w, "\n".join(aide))
                     if key == "fileNameFilters":
                         self._attach_tip(w, i18n.t(
                             "profiles.filename_filter_tip",
@@ -412,59 +317,47 @@ class ProfilesTab(ttk.Frame):
                     self.vars[key] = var
                     self._widgets[key] = w
                     gr += 1
-        # Le mode du filtre est créé APRÈS le champ de filtre (ordre du
-        # catalogue) : on ne peut l'écouter qu'ici, formulaire complet.
-        if "sourceTypeFilterMode" in self.vars:
-            self.vars["sourceTypeFilterMode"].trace_add(
-                "write", lambda *_a: self._refresh_mime_summary())
+        self._layout_form(1)
 
-    def _add_mime_reader(self, box, row, text_widget) -> int:
-        """Résumé du filtre de types + bouton de lecture. Retourne les lignes prises.
+    def _layout_form(self, ncols: int):
+        """Range les groupes sur une ou deux colonnes. Idempotent.
 
-        Le résumé se met à jour à la frappe : sans lui, rien ne dirait que le
-        champ contient 600 entrées plutôt que 3, ni qu'un nom n'a jamais été vu.
+        Les boîtes sont **reparentées** plutôt que recréées : recréer le
+        formulaire à chaque redimensionnement perdrait les valeurs saisies et
+        les liaisons (``vars``, infobulles, écoute du filtre).
         """
-        ligne = ttk.Frame(box)
-        ligne.grid(row=row, column=0, columnspan=2, sticky="ew", padx=6, pady=(0, 4))
-        self.lbl_mime = ttk.Label(ligne, text=mime_filter_summary(""))
-        self.lbl_mime.pack(side="left")
-        make_button(ligne, i18n.t("profiles.mime_view", "Voir les types…"),
-                    self._show_mime_filter).pack(side="right")
-        text_widget.bind("<<Modified>>", self._on_mime_modified)
-        return 1
-
-    def _on_mime_modified(self, event):
-        # Tk n'émet `<<Modified>>` qu'une fois tant que le drapeau n'est pas
-        # remis à zéro : l'oublier fige le résumé après la première frappe.
-        widget = event.widget
-        widget.edit_modified(False)
-        self._refresh_mime_summary()
-
-    def _refresh_mime_summary(self):
-        if not hasattr(self, "lbl_mime"):
+        if ncols == self._form_ncols:
             return
-        self.lbl_mime.config(text=mime_filter_summary(
-            self._get_option("sourceTypeFilter"), self._filter_mode()))
+        self._form_ncols = ncols
+        for col in self._form_cols:
+            col.grid_forget()
+        for box, _p in self._form_boxes:
+            box.pack_forget()
 
-    def _filter_mode(self) -> str:
-        """Mode courant du filtre — sans lui, la liste se lit à l'envers."""
-        try:
-            return self._get_option("sourceTypeFilterMode")
-        except KeyError:
-            return ""
+        if ncols == 1:
+            self._form_cols[0].grid(row=0, column=0, columnspan=2, sticky="nsew")
+            for box, _p in self._form_boxes:
+                box.pack(in_=self._form_cols[0], fill="x", expand=False, padx=6, pady=4)
+            return
 
-    def _show_mime_filter(self):
-        show_mime_filter(self, self._get_option("sourceTypeFilter"),
-                         i18n.t("profiles.mime_title", "Types filtrés par ce profil"),
-                         self._filter_mode(),
-                         on_change=self._set_filter_text)
+        self._form_cols[0].grid(row=0, column=0, sticky="nsew")
+        self._form_cols[1].grid(row=0, column=1, sticky="nsew")
+        # Remplissage glouton : chaque groupe va dans la colonne la moins
+        # chargée. Alterner une boîte sur deux déséquilibrerait les colonnes,
+        # les groupes n'ayant pas du tout la même hauteur.
+        charges = [0, 0]
+        for box, poids in self._form_boxes:
+            i = 0 if charges[0] <= charges[1] else 1
+            charges[i] += poids
+            try:
+                box.pack(in_=self._form_cols[i], fill="x", expand=False, padx=6, pady=4)
+            except tk.TclError:
+                # Un groupe qui ne se place pas ne doit pas faire disparaître
+                # les suivants : on le remet en colonne 0 plutôt que d'abandonner.
+                box.pack(in_=self._form_cols[0], fill="x", expand=False, padx=6, pady=4)
 
-    def _set_filter_text(self, texte: str):
-        """Réécrit le champ de filtre depuis la fenêtre de lecture/composition."""
-        self._set_option("sourceTypeFilter", texte)
-        self._refresh_mime_summary()
-        if hasattr(self, "picker"):
-            self.picker.refresh()
+    def _on_form_resize(self, largeur: int):
+        self._layout_form(2 if largeur >= self.LARGEUR_DEUX_COLONNES else 1)
 
     # ------------------------------------------------------------------ #
     # Réglages de la source d'origine (« Info Profil »)                  #
@@ -487,7 +380,7 @@ class ProfilesTab(ttk.Frame):
             self.lbl_settings.config(text=i18n.t(
                 "profiles.settings_none",
                 "Pour voir ce qu'un profil reprend d'une source réglée dans "
-                "Intella : onglet « Inventaire du cas », sélectionnez la source, "
+                "Intella : étape « 1. Le cas », sélectionnez la source, "
                 "« Info Profil → »."))
 
     def _show_source_settings(self):
@@ -498,9 +391,10 @@ class ProfilesTab(ttk.Frame):
             "profiles.settings_title", "Réglages de « {n} »",
             n=src.get("name") or "?"))
 
-    def _attach_tip(self, widget, text):
-        widget.bind("<Enter>", lambda e: self.tooltip.show(text, e.x_root + 12, e.y_root + 20))
-        widget.bind("<Leave>", lambda _e: self.tooltip.hide())
+    @staticmethod
+    def _attach_tip(widget, text):
+        """Conservé comme raccourci local ; `ui_widgets.attach_tip` fait le travail."""
+        attach_tip(widget, text)
 
     # ------------------------------------------------------------------ #
     # Liste / sélection                                                  #
@@ -552,6 +446,12 @@ class ProfilesTab(ttk.Frame):
     # ------------------------------------------------------------------ #
     # Lecture / écriture du formulaire                                   #
     # ------------------------------------------------------------------ #
+        # Le panneau de types n'enregistre pas ses boutons dans `_widgets` :
+        # il suit lui-même (sinon on composerait un filtre sur un profil en
+        # lecture seule, pour le perdre à la sélection suivante).
+        if hasattr(self, "types_panel"):
+            self.types_panel.set_editable(editable)
+
     def _set_option(self, key, value):
         if key in self._text_widgets:
             t = self._text_widgets[key]
@@ -570,11 +470,12 @@ class ProfilesTab(ttk.Frame):
         for key in self._widgets:
             if key in values:
                 self._set_option(key, values[key])
-        self._refresh_mime_summary()
-        # Le sélecteur montre le filtre du profil affiché : sans ce rappel, il
-        # garderait les cases du profil précédent.
-        if hasattr(self, "picker"):
-            self.picker.refresh()
+
+        # Le panneau de types lit le filtre depuis sa propre liste : sans
+        # cette ligne, changer de profil laisserait la liste du profil
+        # précédent à l'écran.
+        if hasattr(self, "types_panel"):
+            self.types_panel.set_filter_text(values.get("sourceTypeFilter", ""))
 
     def _collect_values(self) -> dict:
         return {key: profile_catalog.coerce(key, self._get_option(key))

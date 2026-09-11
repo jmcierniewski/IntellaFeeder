@@ -74,10 +74,14 @@ class TestI18n:
         assert "FR" in codes and "US" in codes
 
     def test_chargement_langue(self):
+        # Clé volontairement STABLE : « Parcourir… » ne changera pas de
+        # formulation au gré des chantiers d'ergonomie, contrairement aux
+        # libellés d'action (le test tombait sur « Calculer la taille » devenu
+        # « Remesurer » en v3.0 — un faux positif qui coûte une relecture).
         i18n.load("US")
-        assert i18n.t("import.compute_size", "Calculer la taille") == "Compute size"
+        assert i18n.t("common.browse", "Parcourir…") == "Browse…"
         i18n.load("FR")
-        assert i18n.t("import.compute_size", "x") == "Calculer la taille"
+        assert i18n.t("common.browse", "x") == "Parcourir…"
 
     def test_pas_de_pollution_entre_langues(self):
         """Chaque load() remplace intégralement l'état (pas de fusion)."""

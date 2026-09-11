@@ -279,24 +279,40 @@ def test_learn_from_xml_illisible(mimes, tmp_path):
 
 # --- Import d'un référentiel ----------------------------------------------
 
-def test_import_bilan_ajouts_et_pertes(mimes, tmp_path):
+def test_import_CUMULE_sans_rien_perdre(mimes, tmp_path):
+    """Contrat RENVERSÉ le 11/09/2026 : un import complète, il ne remplace plus.
+
+    Avant, installer un nouveau ``.properties`` faisait disparaître les libellés
+    absents du nouveau fichier — un filtre jusque-là lisible redevenait muet, et
+    rien à l'écran ne disait si l'import avait remplacé ou complété. On importe
+    pour GAGNER des libellés : le fichier choisi est donc fusionné, ses entrées
+    écrasant celles de même clé et laissant les autres en place.
+    """
     _ecrire(mimes, "v1.properties", "a/b=Un\nc/d=Deux\n")
     mc.load()
-    source = _ecrire(tmp_path, "v2.properties", "a/b=Un\ne/f=Trois\n")
+    source = _ecrire(tmp_path, "v2.properties",
+                     "a/b=Un modifie\ne/f=Trois\n")
     bilan = mc.import_descriptions(source)
     assert bilan["added"] == ["e/f"]
-    assert bilan["removed"] == ["c/d"]           # perte signalée AVANT usage
+    assert bilan["updated"] == ["a/b"]
     assert bilan["count"] == 2
     assert os.path.isfile(bilan["path"])
     assert mc.status("e/f") == mc.STATUS_DESCRIBED
+    # LE point du renversement : « c/d » n'était pas dans le nouveau fichier et
+    # reste pourtant décrit.
+    assert mc.label("c/d") == "Deux"
+    assert mc.label("a/b") == "Un modifie"
 
 
-def test_import_conserve_l_ancien_fichier(mimes, tmp_path):
-    _ecrire(mimes, "v1.properties", "a/b=Un\n")
+def test_import_ecrit_un_fichier_cumulatif_unique(mimes, tmp_path):
+    """Deux imports successifs alimentent UN seul fichier, pas une pile."""
     mc.load()
-    mc.import_descriptions(_ecrire(tmp_path, "v2.properties", "a/b=Un\n"))
-    restants = [f for f in os.listdir(str(mimes)) if f.endswith(".properties")]
-    assert len(restants) == 2
+    mc.import_descriptions(_ecrire(tmp_path, "a.properties", "x/1=Un\n"))
+    mc.import_descriptions(_ecrire(tmp_path, "b.properties", "x/2=Deux\n"))
+    assert mc.label("x/1") == "Un"      # le premier import survit au second
+    assert mc.label("x/2") == "Deux"
+    produits = [f for f in os.listdir(str(mimes)) if f.endswith(".properties")]
+    assert produits == [mc.CUMUL_FILENAME]
 
 
 def test_import_refuse_un_fichier_vide(mimes, tmp_path):
@@ -322,22 +338,25 @@ def test_embarque_sert_de_socle(tmp_path, monkeypatch):
     assert mc.status("c/d") == mc.STATUS_OBSERVED
 
 
-def test_fichier_externe_REMPLACE_les_descriptions_embarquees(tmp_path, monkeypatch):
-    """Importer, c'est installer une AUTRE version — pas fusionner deux époques.
+def test_fichier_externe_COMPLETE_les_descriptions_embarquees(tmp_path, monkeypatch):
+    """L'externe l'emporte sur l'embarqué, mais ne l'efface pas (11/09/2026).
 
-    Si les deux se mélangeaient, un type retiré par Vound resterait décrit par
-    l'embarqué, et le bilan « n type(s) disparu(s) » de l'import mentirait.
+    Contrepartie assumée : un type retiré par Vound d'une version future reste
+    décrit ici. Sans conséquence — un libellé de trop ne fait rien indexer.
     """
     d = tmp_path / "mimetypes"
     d.mkdir()
     monkeypatch.setattr(config, "mime_dir", lambda: str(d))
-    monkeypatch.setattr(mime_data, "DESCRIPTIONS", {"a/b": "Embarqué", "vieux/x": "Parti"})
+    monkeypatch.setattr(mime_data, "DESCRIPTIONS",
+                        {"a/b": "Embarqué", "vieux/x": "Toujours là"})
     monkeypatch.setattr(mime_data, "OBSERVED", [])
     _ecrire(d, "neuf.properties", "a/b=Externe\nc/d=Nouveau\n")
     mc.load()
-    assert mc.label("a/b") == "Externe"
-    assert mc.label("vieux/x") is None           # remplacé, pas fusionné
+    assert mc.label("a/b") == "Externe"           # collision : l'externe gagne
+    assert mc.label("vieux/x") == "Toujours là"   # absent du fichier : conservé
     assert mc.label("c/d") == "Nouveau"
+    assert mc.origin("c/d") == "external"
+    assert mc.origin("vieux/x") == "embedded"
 
 
 def test_noms_observes_FUSIONNENT_toujours(tmp_path, monkeypatch):
@@ -363,7 +382,7 @@ def test_sans_referentiel_tout_fonctionne(mimes):
     assert mc.stats()["descriptions"] == 0
 
 
-def test_descriptions_path_prend_le_plus_recent(mimes):
+def test_le_fichier_le_plus_recent_gagne_les_collisions(mimes):
     import time
     _ecrire(mimes, "vieux.properties", "a/b=Ancien\n")
     time.sleep(0.01)

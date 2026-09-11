@@ -59,6 +59,10 @@ STATUS_USER = "user"
 UNTYPED = ""
 
 DESCRIPTIONS_GLOB = ".properties"
+# Fichier CUMULATIF des descriptions importées (11/09/2026, cf. `load`). Il
+# porte le nom de l'application parce qu'il n'appartient plus à Vound : c'est la
+# somme de ce que l'utilisateur a importé, pas une version d'Intella.
+CUMUL_FILENAME = "intellaFeeder_descriptions.properties"
 OBSERVED_FILENAME = "noms_observes.txt"
 # Descriptions écrites par l'utilisateur pour les types que Vound ne nomme pas.
 USER_FILENAME = "descriptions_utilisateur.json"
@@ -70,6 +74,9 @@ _descriptions: dict[str, str] = {}
 _observed: set[str] = set()
 _user: dict[str, str] = {}      # descriptions saisies par l'utilisateur
 _source_file: str = ""
+# Descriptions venues des fichiers externes : permet de dire, entrée par
+# entrée, ce qui vient de l'embarqué et ce qui vient d'un import.
+_external: dict[str, str] = {}
 _duplicates: list[str] = []
 
 
@@ -133,24 +140,46 @@ def _first_separator(ligne: str) -> int:
 
 # --- Emplacement des fichiers ---------------------------------------------
 
-def descriptions_path() -> str:
-    """Fichier de descriptions à utiliser : le **plus récent** de ``mimetypes\\``.
+def cumul_path() -> str:
+    """Fichier cumulatif alimenté par les imports successifs."""
+    return os.path.join(config.mime_dir(), CUMUL_FILENAME)
 
-    Les imports sont horodatés et l'ancien est conservé (voir
-    ``import_descriptions``) : c'est la date de modification qui désigne l'actif,
-    pour qu'un retour en arrière soit une simple manipulation de fichiers.
+
+def descriptions_paths() -> list:
+    """Tous les ``.properties`` du dossier, **du plus ancien au plus récent**.
+
+    L'ordre fait la règle de collision : en fusionnant dans cet ordre, le plus
+    récemment écrit l'emporte.
+
+    🐞 **Le fichier cumulatif est forcé en dernier**, et pas seulement « le plus
+    récent » (11/09/2026). Deux fichiers écrits dans la même seconde portent la
+    même date : le tri les départageait alors par leur ordre d'énumération, donc
+    par leur NOM — et ``intellaFeeder_…`` passant avant ``v1.properties``, un
+    import tout juste enregistré se faisait écraser par un fichier plus ancien.
+    Défaut intermittent par nature (il ne se voit que si les deux écritures
+    tombent dans le même tic d'horloge), attrapé par
+    ``test_import_CUMULE_sans_rien_perdre``.
     """
     dossier = config.mime_dir()
     try:
-        fichiers = [f for f in os.listdir(dossier)
+        fichiers = [os.path.join(dossier, f) for f in os.listdir(dossier)
                     if f.lower().endswith(DESCRIPTIONS_GLOB)]
     except OSError:
-        return ""
-    if not fichiers:
-        return ""
-    fichiers.sort(key=lambda f: os.path.getmtime(os.path.join(dossier, f)),
-                  reverse=True)
-    return os.path.join(dossier, fichiers[0])
+        return []
+    cumul = CUMUL_FILENAME.lower()
+    fichiers.sort(key=lambda p: (os.path.basename(p).lower() == cumul,
+                                 os.path.getmtime(p)))
+    return fichiers
+
+
+def descriptions_path() -> str:
+    """Fichier de descriptions qui a le DERNIER mot, ou "" s'il n'y en a aucun.
+
+    Conservé pour l'affichage (« d'où vient ce libellé ») et pour les appelants
+    qui n'ont besoin que d'un chemin.
+    """
+    chemins = descriptions_paths()
+    return chemins[-1] if chemins else ""
 
 
 def observed_path() -> str:
@@ -168,28 +197,46 @@ def user_path() -> str:
 def load() -> None:
     """(Re)charge descriptions et noms observés. Ne lève jamais.
 
-    **Embarqué d'abord, fichier externe ensuite** : ``mime_data`` fournit le
-    socle (l'exe fonctionne seul, sans dossier ``mimetypes\\``), un
-    ``.properties`` présent le **remplace** intégralement — c'est le sens d'un
-    import : installer une autre version, pas fusionner deux époques.
-    Les noms observés, eux, **s'ajoutent** : ce sont des constats, pas une
-    version, et en perdre reviendrait à réafficher des alias comme « inconnus ».
+    **Tout se CUMULE, l'externe l'emportant sur l'embarqué** — renversement du
+    11/09/2026, demandé par l'utilisateur. Jusque-là un ``.properties`` importé
+    *remplaçait* l'embarqué, pour qu'un type retiré par Vound cesse d'être
+    décrit. À l'usage ce n'est pas ce qu'on veut : on importe pour **gagner**
+    des libellés, pas pour en perdre, et rien ne disait à l'écran si l'import
+    avait remplacé ou complété. Désormais :
+
+    1. ``mime_data`` fournit le socle (l'exe fonctionne seul, sans dossier) ;
+    2. chaque ``.properties`` du dossier est fusionné par-dessus, **du plus
+       ancien au plus récent** — en cas de collision, le dernier importé gagne
+       (cf. `descriptions_paths`) ;
+    3. les descriptions écrites par l'utilisateur restent en dessous de celles
+       de Vound (cf. `label`) — inchangé.
+
+    Ce qu'on accepte en échange : un type que Vound retirerait d'une version
+    future resterait décrit ici. Sans conséquence — un libellé de trop ne fait
+    rien indexer.
+
+    Les noms observés, eux, **s'ajoutent** toujours : ce sont des constats, pas
+    une version, et en perdre reviendrait à réafficher des alias comme
+    « inconnus ».
     """
-    global _descriptions, _observed, _user, _source_file, _duplicates
+    global _descriptions, _observed, _user, _source_file, _duplicates, _external
     _descriptions = dict(getattr(mime_data, "DESCRIPTIONS", {}))
     _observed = set(getattr(mime_data, "OBSERVED", []))
     _duplicates = []
-    _source_file = descriptions_path()
-    if _source_file:
+    _external = {}
+    _source_file = ""
+    for chemin in descriptions_paths():
         try:
-            with open(_source_file, encoding="latin-1") as fh:
-                externes, _duplicates = parse_properties(fh.read())
-            if externes:
-                _descriptions = externes
-            else:                       # fichier vide/illisible : on garde l'embarqué
-                _source_file = ""
+            with open(chemin, encoding="latin-1") as fh:
+                externes, doublons = parse_properties(fh.read())
         except OSError:
-            _source_file = ""
+            continue
+        if not externes:                # fichier vide ou illisible : ignoré
+            continue
+        _descriptions.update(externes)
+        _external.update(externes)
+        _duplicates.extend(doublons)
+        _source_file = chemin
     _observed |= set(_descriptions)
     try:
         with open(observed_path(), encoding="utf-8") as fh:
@@ -276,7 +323,9 @@ def stats() -> dict:
         "observed_only": len(_observed - set(_descriptions)),
         "observed_embedded": len(getattr(mime_data, "OBSERVED", [])),
         "duplicates": len(_duplicates),
-        "external": bool(_source_file),
+        "external": bool(_external),
+        "external_count": len(_external),
+        "external_files": len(descriptions_paths()),
         "embedded_descriptions": embarquees,
         "source": _source_file,
     }
@@ -293,6 +342,22 @@ def label(nom: str) -> str | None:
     """
     cle = (nom or "").strip()
     return _descriptions.get(cle) or _user.get(cle) or None
+
+
+def origin(nom: str) -> str:
+    """D'où vient le libellé de ce type : ``user`` / ``external`` / ``embedded``.
+
+    Affiché dans le référentiel : sans cela, « d'où sort ce libellé ? » n'a
+    pas de réponse, et l'on ne sait pas si un import a servi à quelque chose.
+    """
+    cle = (nom or "").strip()
+    if cle in _external:
+        return "external"
+    if cle in _descriptions:
+        return "embedded"
+    if cle in _user:
+        return "user"
+    return ""
 
 
 def status(nom: str) -> str:
@@ -493,16 +558,37 @@ def learn_from_sources(sources) -> list[str]:
 
 # --- Import d'un nouveau référentiel --------------------------------------
 
-def import_descriptions(chemin: str) -> dict:
-    """Installe un ``.properties`` d'Intella dans ``mimetypes\\``.
+def format_properties(entrees: dict) -> str:
+    """Sérialise des descriptions au format ``.properties`` d'Intella.
 
-    Rend un **bilan avant/après** — ``added`` / ``removed`` / ``duplicates`` —
-    parce qu'un référentiel de remplacement qui *perdrait* des noms rendrait
-    « non décrits » des filtres jusque-là lisibles. L'ancien fichier est
-    conservé (l'import est horodaté) : revenir en arrière reste possible.
+    Les caractères hors latin-1 sont échappés en ``\\uXXXX`` : c'est ce que fait
+    Vound, et c'est la seule façon d'écrire un fichier que `parse_properties`
+    relira à l'identique.
+    """
+    lignes = []
+    for cle in sorted(entrees):
+        valeur = entrees[cle] or ""
+        sortie = []
+        for car in valeur:
+            sortie.append(car if ord(car) < 256 else "\\u%04x" % ord(car))
+        lignes.append(f"{cle}=" + "".join(sortie))
+    return "\n".join(lignes) + "\n"
+
+
+def import_descriptions(chemin: str) -> dict:
+    """Ajoute un ``.properties`` d'Intella au référentiel cumulatif.
+
+    **Le fichier choisi COMPLÈTE ce qui est déjà connu** (11/09/2026) : ses
+    entrées sont fusionnées dans ``intellaFeeder_descriptions.properties``, où
+    elles écrasent les libellés de même clé et laissent les autres en place.
+    Plus rien n'est perdu à l'import — c'était la question posée : « est-ce que
+    ça remplace ou est-ce que ça s'accumule ? ».
+
+    Rend un bilan : ``added`` (types qui n'avaient aucun libellé), ``updated``
+    (libellé changé), ``kept`` (déjà identiques), ``duplicates``.
 
     Lève ``ValueError`` si le fichier est illisible ou ne contient aucune entrée
-    — mieux vaut refuser qu'installer un référentiel vide.
+    — mieux vaut refuser qu'écrire un cumul vide par-dessus un cumul utile.
     """
     try:
         with open(chemin, encoding="latin-1") as fh:
@@ -513,20 +599,23 @@ def import_descriptions(chemin: str) -> dict:
     if not nouvelles:
         raise ValueError("Aucune description trouvée dans ce fichier.")
 
-    avant = set(_descriptions)
-    apres = set(nouvelles)
-    cible = os.path.join(
-        config.mime_dir(),
-        f"{os.path.splitext(os.path.basename(chemin))[0]}_"
-        f"{config.now_compact()}.properties")
+    avant = dict(_descriptions)
+    cumul = dict(_external)          # ce que les fichiers externes disent déjà
+    cumul.update(nouvelles)          # le nouvel import a le dernier mot
+
+    cible = cumul_path()
     os.makedirs(config.mime_dir(), exist_ok=True)
-    with open(cible, "w", encoding="latin-1") as fh:
-        fh.write(contenu)
+    with open(cible, "w", encoding="latin-1", errors="replace") as fh:
+        fh.write(format_properties(cumul))
     load()
     return {
         "path": cible,
         "count": len(nouvelles),
-        "added": sorted(apres - avant),
-        "removed": sorted(avant - apres),
+        "total": len(_descriptions),
+        "added": sorted(k for k in nouvelles if k not in avant),
+        "updated": sorted(k for k in nouvelles
+                          if k in avant and avant[k] != nouvelles[k]),
+        "kept": sum(1 for k in nouvelles if avant.get(k) == nouvelles[k]),
         "duplicates": sorted(set(doublons)),
     }
+

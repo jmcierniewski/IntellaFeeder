@@ -1,4 +1,9 @@
-"""Fenêtre principale à onglets (Import / Export des sources / Journal)."""
+"""Fenêtre principale : barre de contexte, fil d'étapes, pages, barre d'état.
+
+Depuis la v3.0 (direction « Parcours », 11/09/2026), la navigation est dessinée
+par ``ui_nav`` et le ``ttk.Notebook`` n'affiche plus ses onglets — il reste le
+porteur des pages. Voir ``ui_nav`` pour le pourquoi de ce montage.
+"""
 
 import os
 import subprocess
@@ -10,6 +15,8 @@ import config
 import i18n
 import mime_catalog
 import path_parser
+import ui_nav
+import ui_theme
 from app_log import AppLog
 from settings import Settings
 from ui_detail import DetailTab
@@ -52,24 +59,36 @@ class MainWindow:
         self._exe_locked = bool(self.settings.get("intellacmd_path").strip())
 
         root.title(f"{i18n.t('app.title', config.APP_TITLE)} v{config.APP_VERSION}")
-        # Onglet Import dense (barre commune + langue + 5 lignes de paramètres +
-        # 2 lignes de toolbar) : 1060x840 masquait les boutons du bas sur des
-        # écrans standards. Fenêtre maximisée par défaut (s'adapte à tout écran) ;
-        # geometry/minsize ci-dessous servent de taille si l'utilisateur restaure.
-        root.geometry("1200x900")
-        root.minsize(1000, 800)
+        # v3.0 : la barre « Paramètres communs » (2 lignes) et la ligne du
+        # sélecteur de langue ont disparu, et les paramètres de l'Import se
+        # replient — ~190 px rendus au travail. La fenêtre peut donc descendre
+        # plus bas sans masquer les boutons d'action d'un écran de portable.
+        root.geometry("1280x860")
+        root.minsize(1000, 660)
         try:
             root.state("zoomed")  # Windows/Tk : démarre agrandie
         except tk.TclError:
             pass
 
-        self._style_tabs()
-        self._build_langbar()
-        self._build_topbar()
+        # Apparence : polices nommées, styles ttk, densité (cf. ui_theme).
+        self.theme = ui_theme.Theme(
+            root,
+            density=self.settings.get("density", ui_theme.NORMAL),
+            scale=self.settings.get("font_scale", "100"))
 
-        nb = ttk.Notebook(root)
+        self.context_bar = ui_nav.ContextBar(root, self)
+        self.context_bar.pack(fill="x", side="top")
+        self._build_context_detail()
+
+        self.nav = ui_nav.StepNav(root, self, self._on_nav_select)
+        self.nav.pack(fill="x", side="top")
+
+        self.status = ui_nav.StatusBar(root, self)
+        self.status.pack(fill="x", side="bottom")
+
+        nb = ttk.Notebook(root, style="Headless.TNotebook")
         self.notebook = nb
-        nb.pack(fill="both", expand=True, padx=8, pady=(0, 8))
+        nb.pack(fill="both", expand=True, padx=self.theme.pad, pady=(self.theme.gap, 0))
         self.export_tab = ExportTab(nb, self)
         self.detail_tab = DetailTab(nb, self)
         self.import_tab = ImportTab(nb, self)
@@ -80,47 +99,116 @@ class MainWindow:
         self.maintenance_tab = MaintenanceTab(nb, self)
         self.journal_tab = self.maintenance_tab.journal_tab
         self.help_tab = HelpTab(nb, self)
-        # Pastille de couleur par onglet pour les distinguer.
-        self._tab_imgs = [self._swatch(c) for c in
-                          (config.INVENTORY_TAB_COLOR, "#0ea5e9", "#1e40af",
-                           config.PROFILE_TAB_COLOR, "#94a3b8", "#16a34a")]
-        nb.add(self.export_tab, text=" " + i18n.t("tabs.inventory", "1. Inventaire du cas"),
-               image=self._tab_imgs[0], compound="left")
-        nb.add(self.detail_tab, text=" " + i18n.t("tabs.detail", "Détail du cas"),
-               image=self._tab_imgs[1], compound="left")
-        nb.add(self.import_tab, text=" " + i18n.t("tabs.import", "2. Import"),
-               image=self._tab_imgs[2], compound="left")
-        nb.add(self.profiles_tab, text=" " + i18n.t("tabs.profiles", "Profils"),
-               image=self._tab_imgs[3], compound="left")
-        nb.add(self.maintenance_tab, text=" " + i18n.t("tabs.maintenance", "Maintenance"),
-               image=self._tab_imgs[4], compound="left")
-        nb.add(self.help_tab, text=" " + i18n.t("tabs.help", "Aide"),
-               image=self._tab_imgs[5], compound="left")
+        # Les onglets du Notebook ne sont plus AFFICHÉS (style Headless), mais
+        # leur texte reste utile : il nomme la page dans les messages d'erreur Tk
+        # et sert de repli si le style venait à ne pas s'appliquer.
+        for page, cle, defaut in (
+                (self.export_tab, "tabs.inventory", "1. Inventaire du cas"),
+                (self.detail_tab, "tabs.detail", "Détail du cas"),
+                (self.import_tab, "tabs.import", "2. Import des sources"),
+                (self.profiles_tab, "tabs.profiles", "Profils"),
+                (self.maintenance_tab, "tabs.maintenance", "Maintenance"),
+                (self.help_tab, "tabs.help", "Aide")):
+            nb.add(page, text=i18n.t(cle, defaut))
+
+        # Correspondance page ↔ identifiant de navigation (cf. ui_nav).
+        self._nav_pages = {
+            "inventaire": self.export_tab, "detail": self.detail_tab,
+            "import": self.import_tab, "profils": self.profiles_tab,
+            "maintenance": self.maintenance_tab, "aide": self.help_tab,
+        }
+        # Quel que soit le chemin emprunté pour changer de page — fil d'étapes,
+        # `aller_a`, bouton « Info Profil → » d'un autre onglet — la navigation
+        # doit refléter la page réellement affichée. Un seul point d'écoute.
+        nb.bind("<<NotebookTabChanged>>", self._on_tab_changed)
 
         # Le cas memorise au .ini est detecte par ExportTab pendant sa
         # construction, quand les autres onglets n'existent pas encore : on
         # applique son type maintenant que le Notebook est complet.
         self._apply_case_kind()
+        self.refresh_context()
+        self.update_steps()
+        self.nav.set_active("inventaire", 0)
 
         root.protocol("WM_DELETE_WINDOW", self._on_close)
-        self.log.log(f"{config.APP_NAME} {config.APP_VERSION} démarré.")
+        # ⚠ Ces trois lignes sont les PREMIÈRES du journal : les laisser en
+        # français donnait un journal bilingue dès le démarrage en US.
+        self.log.log(i18n.t("app.started_log", "{a} {v} démarré.",
+                            a=config.APP_NAME, v=config.APP_VERSION))
         if not self.var_exe.get():
-            self.log.log("Chemin IntellaCmd.exe non encore mémorisé (sera enregistré au .ini).")
+            self.log.log(i18n.t(
+                "app.exe_unset_log",
+                "Chemin IntellaCmd.exe non encore mémorisé (sera enregistré au .ini)."))
         # Crée le .ini à côté du script/exe s'il n'existe pas encore.
         if not os.path.exists(self.settings.path):
             self.save_settings()
-            self.log.log(f"Fichier de configuration créé : {self.settings.path}")
+            self.log.log(i18n.t("app.ini_created_log",
+                                "Fichier de configuration créé : {p}",
+                                p=self.settings.path))
 
-    def _style_tabs(self):
-        """Onglets plus visibles : titres en gras, plus d'espace."""
-        style = ttk.Style(self.root)
-        style.configure("TNotebook.Tab", font=("Segoe UI", 10, "bold"), padding=[16, 7])
+    # ------------------------------------------------------------------ #
+    # Navigation : fil d'étapes, contexte, état (cf. ui_nav)             #
+    # ------------------------------------------------------------------ #
+    def _on_nav_select(self, tab_id: str, step_index=None):
+        """Un clic dans le fil d'étapes ou dans les outils."""
+        page = self._nav_pages.get(tab_id)
+        if page is None:
+            return
+        try:
+            self.notebook.select(page)
+        except tk.TclError:
+            return                      # page grisée (cas compound)
+        self.nav.set_active(tab_id, step_index)
 
-    def _swatch(self, color: str, size: int = 14):
-        """Petite image carrée de couleur, servant de pastille d'onglet."""
-        img = tk.PhotoImage(master=self.root, width=size, height=size)
-        img.put(color, to=(0, 0, size, size))
-        return img
+    def _on_tab_changed(self, _event=None):
+        courant = self.notebook.select()
+        for tab_id, page in self._nav_pages.items():
+            if str(page) == courant:
+                actif = self.nav._active or (None, None)
+                step = actif[1] if actif[0] == tab_id else None
+                self.nav.set_active(tab_id, step)
+                break
+        self.update_steps()
+
+    def refresh_context(self):
+        """Recopie l'état du cas dans la barre de contexte (une ligne)."""
+        meta = self.case_meta or {}
+        self.context_bar.refresh(
+            case_name=meta.get("name", "") or "",
+            case_path=meta.get("path", "") or self.settings.get("last_case", ""),
+            user=self.var_user.get(), exe=self.var_exe.get().strip())
+
+    def update_steps(self):
+        """Avancement du parcours : cas lu → sources analysées → import vérifié.
+
+        C'est ce qui donne son sens au fil : trois libellés qui ne changeraient
+        jamais ne seraient qu'une barre d'onglets déguisée.
+        """
+        if not hasattr(self, "nav") or not hasattr(self, "import_tab"):
+            return
+        compound = self.is_compound_case()
+        cas_lu = bool(self.case_meta)
+        valide = bool(getattr(self.import_tab, "_last_validation_ok", False))
+
+        self.nav.set_step_state(0, ui_nav.DONE if cas_lu else ui_nav.TODO)
+        if compound:
+            # Un compound ne peut pas recevoir de source : l'étape d'import n'a
+            # pas de sens, elle est barrée.
+            self.nav.set_step_state(1, ui_nav.BLOCKED)
+            return
+        # « Faite » = les sources ont été retrouvées dans le cas après import.
+        # La mesure seule ne suffit pas : rien n'est encore importé, et une
+        # étape verte le laisserait croire.
+        self.nav.set_step_state(1, ui_nav.DONE if valide else ui_nav.TODO)
+
+    def set_status(self, text: str, level: str = "ok"):
+        """Message de la barre d'état (bas de fenêtre), visible sur tout écran."""
+        if hasattr(self, "status"):
+            self.status.set_status(text, level)
+
+    def set_status_summary(self, text: str):
+        if hasattr(self, "status"):
+            self.status.set_summary(text)
 
     # ------------------------------------------------------------------ #
     # Langue de l'interface (dossier lang\*.lang, choix mémorisé au .ini) #
@@ -132,21 +220,18 @@ class MainWindow:
         if not i18n.load(code):
             i18n.load(i18n.BASE_LANGUAGE)
 
-    def _build_langbar(self):
-        """Sélecteur de langue, en haut à droite de la fenêtre."""
-        bar = ttk.Frame(self.root)
-        bar.pack(fill="x", padx=8, pady=(8, 0))
-        ttk.Label(bar, text=i18n.t("topbar.language", "Langue") + " :").pack(
-            side="right", padx=(4, 6))
-        available = i18n.available_languages()
-        self.var_lang = tk.StringVar(value=i18n.current_code())
-        cb = ttk.Combobox(bar, textvariable=self.var_lang, state="readonly",
-                          width=8, values=available)
-        cb.pack(side="right")
-        cb.bind("<<ComboboxSelected>>", self._on_language_change)
+    def change_language(self, code: str) -> None:
+        """Change la langue de l'interface (appelée par Maintenance → Options).
 
-    def _on_language_change(self, _event=None):
-        code = self.var_lang.get()
+        Le sélecteur a quitté la barre du haut en v3.0 : il s'applique au
+        redémarrage, c'est donc un réglage et non une commande — sa place est
+        avec les autres réglages, pas sur une ligne réservée de chaque écran.
+        """
+        if not code or code == i18n.current_code():
+            return
+        self._on_language_change(code)
+
+    def _on_language_change(self, code: str):
         self.settings.set("language", code)
         self.settings.save()
         # Charge la langue CIBLE avant le popup pour qu'il s'affiche déjà dans
@@ -227,29 +312,37 @@ class MainWindow:
             return
         self.root.destroy()
 
-    def _build_topbar(self):
-        bar = ttk.LabelFrame(self.root, text=i18n.t("topbar.title", "Paramètres communs"))
-        bar.pack(fill="x", padx=8, pady=8)
-        bar.columnconfigure(1, weight=1)
+    def _build_context_detail(self):
+        """Volet dépliable de la barre de contexte : les champs eux-mêmes.
+
+        Ce sont les anciens « Paramètres communs ». Ils restent modifiables,
+        mais ne coûtent plus deux lignes en permanence sur les six écrans.
+        """
+        bar = self.context_bar.detail
+        pad = self.theme.pad
+        inner = ttk.Frame(bar, style="Soft.TFrame")
+        inner.pack(fill="x", padx=pad, pady=self.theme.gap)
+        inner.columnconfigure(1, weight=1)
 
         # Utilisateur : lecture seule (récupéré dans case.xml du cas sélectionné).
-        ttk.Label(bar, text=i18n.t("topbar.user", "Utilisateur (du cas)")).grid(
-            row=0, column=0, sticky="w", padx=6, pady=4)
-        ttk.Entry(bar, textvariable=self.var_user, state="readonly").grid(
-            row=0, column=1, sticky="ew", padx=6, pady=4)
+        ttk.Label(inner, text=i18n.t("topbar.user", "Utilisateur (du cas)"),
+                  style="Soft.TLabel").grid(row=0, column=0, sticky="w", padx=6, pady=3)
+        ttk.Entry(inner, textvariable=self.var_user, state="readonly").grid(
+            row=0, column=1, sticky="ew", padx=6, pady=3)
 
-        ttk.Label(bar, text=i18n.t("topbar.exe", "IntellaCmd.exe *")).grid(
-            row=1, column=0, sticky="w", padx=6, pady=4)
+        ttk.Label(inner, text=i18n.t("topbar.exe", "IntellaCmd.exe *"),
+                  style="Soft.TLabel").grid(row=1, column=0, sticky="w", padx=6, pady=3)
         if self._exe_locked:
-            ttk.Entry(bar, textvariable=self.var_exe, state="readonly").grid(
-                row=1, column=1, sticky="ew", padx=6, pady=4)
-            ttk.Label(bar, text=i18n.t("topbar.exe_locked", "(verrouillé via .ini)"),
-                     foreground="#64748b").grid(row=1, column=2, padx=6, pady=4)
+            ttk.Entry(inner, textvariable=self.var_exe, state="readonly").grid(
+                row=1, column=1, sticky="ew", padx=6, pady=3)
+            ttk.Label(inner, text=i18n.t("topbar.exe_locked", "(verrouillé via .ini)"),
+                      style="Soft.TLabel").grid(row=1, column=2, padx=6, pady=3)
         else:
-            ttk.Entry(bar, textvariable=self.var_exe).grid(
-                row=1, column=1, sticky="ew", padx=6, pady=4)
-            make_button(bar, i18n.t("common.browse", "Parcourir…"), self._pick_exe).grid(
-                row=1, column=2, padx=6, pady=4)
+            ttk.Entry(inner, textvariable=self.var_exe).grid(
+                row=1, column=1, sticky="ew", padx=6, pady=3)
+            make_button(inner, i18n.t("common.browse", "Parcourir…"),
+                        self._pick_exe).grid(row=1, column=2, padx=6, pady=3)
+        self.var_exe.trace_add("write", lambda *_: self.refresh_context())
 
     def _pick_exe(self):
         f = filedialog.askopenfilename(
@@ -271,6 +364,12 @@ class MainWindow:
             self.detail_tab.refresh()
         if hasattr(self, "import_tab"):
             self.import_tab.apply_case_meta()
+        self.refresh_context()
+        self.update_steps()
+        nom = meta.get("name", "")
+        if nom:
+            self.set_status(i18n.t("status.case_loaded", "Cas « {n} » chargé.", n=nom))
+            self.set_status_summary(_resume_cas(meta))
 
     def is_compound_case(self) -> bool:
         """Le cas sélectionné est-il un cas compound (import impossible) ?"""
@@ -295,6 +394,11 @@ class MainWindow:
             self.notebook.tab(self.import_tab, state="disabled" if compound else "normal")
         except tk.TclError:
             return
+        # Les étapes 2 et 3 du fil deviennent barrées : un compound ne peut pas
+        # recevoir de source, et une étape cliquable qui refuse d'agir serait
+        # plus déroutante qu'une étape visiblement hors jeu.
+        if hasattr(self, "nav"):
+            self.nav.set_enabled("import", not compound)
         # Un onglet désactivé alors qu'il est affiché reste à l'écran : on
         # ramène l'utilisateur sur l'Inventaire, d'où vient la sélection du cas.
         if compound and self.notebook.select() == str(self.import_tab):
@@ -329,6 +433,9 @@ class MainWindow:
     def clear_case_meta(self):
         self.case_meta = None
         self._apply_case_kind()
+        self.refresh_context()
+        self.update_steps()
+        self.set_status_summary("")
         if hasattr(self, "detail_tab"):
             self.detail_tab.refresh()
         if hasattr(self, "import_tab"):
@@ -345,3 +452,14 @@ class MainWindow:
             self.save_settings()
         finally:
             self.root.destroy()
+
+
+def _resume_cas(meta) -> str:
+    """Résumé du cas pour la droite de la barre d'état (nom, sources, volume)."""
+    morceaux = [meta.get("name", "")]
+    taille = meta.get("size")
+    if taille:
+        morceaux.append(config.human_size(taille))
+    if meta.get("is_compound"):
+        morceaux.append(i18n.t("status.compound", "cas compound"))
+    return "  —  ".join(m for m in morceaux if m)

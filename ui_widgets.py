@@ -1,9 +1,13 @@
-"""Petits widgets réutilisables (infobulle, boutons, lecteurs colorés).
+"""Petits widgets réutilisables : infobulles, boutons, fenêtres, lecteurs.
 
-Deux lecteurs y cohabitent, au **même code couleur mais à deux échelles** : le
-filtre de types MIME d'une source (des centaines d'entrées) et les réglages
-d'indexation de cette source (une vingtaine). Ils ne se corrigent pas au même
-endroit — ne pas les fondre en un seul tableau.
+⚠ ``show_mime_filter`` a été RETIRÉ le 11/09/2026 : son contenu — les deux
+panneaux du filtre de types — est devenu le sous-onglet « Types de fichiers à
+indexer » (``ui_types_panel``). Il restait un popup de plus qui faisait doublon
+avec un onglet, et les deux ne se parlaient pas.
+
+Reste ici ``show_source_settings`` : les réglages d'une source, à une autre
+échelle (une vingtaine d'entrées contre plusieurs centaines) et avec un autre
+propos. Ne pas fondre les deux vues en une seule.
 """
 
 import tkinter as tk
@@ -13,6 +17,7 @@ import config
 import i18n
 import mime_catalog
 import profile_translate
+import ui_theme
 
 # --- Filtre de types MIME : trois états, trois couleurs ------------------- #
 # Un filtre réel compte plusieurs centaines d'entrées, et **18 % d'entre elles
@@ -30,11 +35,31 @@ MIME_STATUS_COLORS = {
 }
 
 
+# --- Réglages d'une source : trois états, trois couleurs ------------------ #
+# ⚠ **Même code couleur que les types MIME ci-dessus, autre échelle** : ici une
+# vingtaine de réglages, là plusieurs centaines de types. Ne pas fondre les deux
+# vues (cf. CLAUDE.md, Étude 4).
+# 🐞 Ce dictionnaire avait DISPARU le 11/09/2026 en même temps que
+# `show_mime_filter` : la fenêtre « Voir les réglages de la source… » levait un
+# NameError juste après son en-tête, et s'ouvrait donc **vide** — un grand
+# panneau avec deux lignes dedans, sans la moindre erreur visible.
+SETTING_STATUS_COLORS = {
+    profile_translate.STATUS_MAPPED: "#1d4ed8",       # bleu : rejoué par le profil
+    profile_translate.STATUS_UNSUPPORTED: "#111827",  # noir : à refaire dans Intella
+    profile_translate.STATUS_UNKNOWN: "#b91c1c",      # rouge : nom inconnu
+}
+
+
 def mime_status_label(etat: str) -> str:
     """Libellé traduit d'un état de `mime_catalog` (module sans i18n)."""
     return {
         mime_catalog.STATUS_DESCRIBED: i18n.t("mime.state_described", "décrit"),
-        mime_catalog.STATUS_OBSERVED: i18n.t("mime.state_observed", "vu dans vos cas"),
+        # ⚠ Libellé revu le 11/09/2026. Il disait « vu dans vos cas », ce qui a
+        # fait croire que le type était **dans le cas courant** — il n'en est
+        # rien : ce sont les 800 noms embarqués plus ceux appris des exports
+        # déjà lus. L'information utile est qu'il manque un libellé.
+        mime_catalog.STATUS_OBSERVED: i18n.t("mime.state_observed",
+                                             "connu, sans libellé"),
         mime_catalog.STATUS_UNKNOWN: i18n.t("mime.state_unknown", "inconnu"),
         mime_catalog.STATUS_USER: i18n.t("mime.state_user", "décrit par vous"),
     }.get(etat, etat)
@@ -75,7 +100,7 @@ def mime_filter_summary(texte: str, mode: str = "", avec_sens: bool = True) -> s
         return i18n.t("mime.filter_none", "Aucun filtre (tous les types indexés).")
     r = mime_catalog.summarize_filter(texte)
     resume = i18n.t("mime.filter_summary",
-                    "{t} type(s) — {d} décrit(s), {o} vu(s) dans vos cas",
+                    "{t} type(s) — {d} décrit(s), {o} sans libellé",
                     t=r["total"], d=r[mime_catalog.STATUS_DESCRIBED],
                     o=r[mime_catalog.STATUS_OBSERVED])
     if r[mime_catalog.STATUS_UNKNOWN]:
@@ -83,181 +108,6 @@ def mime_filter_summary(texte: str, mode: str = "", avec_sens: bool = True) -> s
                                 n=r[mime_catalog.STATUS_UNKNOWN])
     resume += "."
     return resume + " " + mime_filter_sense(mode) if avec_sens else resume
-
-
-def show_mime_filter(parent, texte: str, titre: str = "", mode: str = "",
-                    on_change=None) -> None:
-    """Fenêtre du filtre de types : ce qu'il contient, et ce qu'on peut y mettre.
-
-    **Deux panneaux**, parce qu'un seul ne suffisait pas (retour du
-    10/09/2026) : à gauche le filtre courant, à droite **tout le catalogue**.
-    « Un utilisateur ne peut pas les inventer » — sans la liste des noms
-    possibles, composer un filtre à la main revenait à deviner l'orthographe
-    exacte de ``application/vnd.openxmlformats-officedocument.wordprocessingml.document``.
-
-    ``mode`` (``include``/``exclude``) est affiché **en tête et en gras** : la
-    liste seule se lit à l'envers une fois sur deux (cf. `mime_filter_sense`).
-    ``on_change`` : appelé avec le nouveau filtre quand l'utilisateur ajoute ou
-    retire des types. Absent → fenêtre en lecture seule.
-    """
-    win = tk.Toplevel(parent)
-    win.title(titre or i18n.t("mime.filter_title", "Types filtrés"))
-    win.geometry("1120x620")
-    win.transient(parent.winfo_toplevel())
-
-    lbl_sense = ttk.Label(win, text=mime_filter_sense(mode),
-                          font=("Segoe UI", 10, "bold"))
-    lbl_sense.pack(anchor="w", padx=10, pady=(10, 2))
-    lbl_resume = ttk.Label(win, text=mime_filter_summary(texte, avec_sens=False))
-    lbl_resume.pack(anchor="w", padx=10, pady=(0, 6))
-
-    split = ttk.PanedWindow(win, orient="horizontal")
-    split.pack(fill="both", expand=True, padx=10, pady=(0, 6))
-
-    # --- Gauche : le filtre courant -------------------------------------- #
-    gauche = ttk.LabelFrame(split, text=i18n.t("mime.pane_current",
-                                               "Types de ce filtre"))
-    split.add(gauche, weight=1)
-    tree = ttk.Treeview(gauche, columns=("name", "label", "state"),
-                        show="headings", selectmode="extended")
-    for col, entete, largeur in (
-            ("name", i18n.t("mime.col_name", "Type"), 240),
-            ("label", i18n.t("mime.col_label", "Description"), 200),
-            ("state", i18n.t("mime.col_state", "État"), 110)):
-        tree.heading(col, text=entete)
-        tree.column(col, width=largeur, anchor="w")
-    vsb = ttk.Scrollbar(gauche, orient="vertical", command=tree.yview)
-    tree.configure(yscrollcommand=vsb.set)
-    tree.pack(side="left", fill="both", expand=True)
-    vsb.pack(side="right", fill="y")
-    for etat, couleur in MIME_STATUS_COLORS.items():
-        tree.tag_configure(etat, foreground=couleur)
-
-    # --- Droite : tout le catalogue, cherchable -------------------------- #
-    droite = ttk.LabelFrame(split, text=i18n.t("mime.pane_catalog",
-                                               "Types disponibles (référentiel)"))
-    split.add(droite, weight=1)
-    barre = ttk.Frame(droite)
-    barre.pack(fill="x", padx=6, pady=(6, 2))
-    ttk.Label(barre, text=i18n.t("mime.search", "Rechercher")).pack(side="left")
-    var_search = tk.StringVar()
-    ttk.Entry(barre, textvariable=var_search).pack(side="left", fill="x",
-                                                   expand=True, padx=6)
-    var_cats = tk.BooleanVar(value=True)
-    ttk.Checkbutton(barre, variable=var_cats, text=i18n.t(
-        "mime.only_categories", "Catégories seules")).pack(side="left")
-
-    catalogue = ttk.Treeview(droite, columns=("name", "label"),
-                             show="headings", selectmode="extended")
-    catalogue.heading("name", text=i18n.t("mime.col_name", "Type"))
-    catalogue.heading("label", text=i18n.t("mime.col_label", "Description"))
-    catalogue.column("name", width=260, anchor="w")
-    catalogue.column("label", width=220, anchor="w")
-    cvsb = ttk.Scrollbar(droite, orient="vertical", command=catalogue.yview)
-    catalogue.configure(yscrollcommand=cvsb.set)
-    catalogue.pack(side="left", fill="both", expand=True, padx=(6, 0), pady=(0, 6))
-    cvsb.pack(side="right", fill="y", pady=(0, 6))
-    for etat, couleur in MIME_STATUS_COLORS.items():
-        catalogue.tag_configure(etat, foreground=couleur)
-
-    lbl_count = ttk.Label(win, foreground="#475569")
-    lbl_count.pack(anchor="w", padx=10)
-
-    # --- État courant, et son rendu -------------------------------------- #
-    # Liste vivante du filtre : la fenêtre édite CETTE liste, et n'écrit dans le
-    # profil qu'au travers de `on_change` — l'appelant reste maître du champ.
-    courant = mime_catalog.split_filter(texte) if (texte or "").strip() else []
-
-    # ⚠ `iid=nom` serait piégeux : le référentiel porte une entrée à nom VIDE
-    # (« Untyped », le type des items non reconnus) et un iid vide désigne la
-    # RACINE du Treeview — l'insertion échouerait. On indexe donc par position.
-    iid_filtre: dict = {}
-    iid_catalogue: dict = {}
-
-    def _peindre_filtre():
-        tree.delete(*tree.get_children())
-        iid_filtre.clear()
-        for i, nom in enumerate(courant):
-            etat = mime_catalog.status(nom)
-            iid = f"f{i}"
-            iid_filtre[iid] = nom
-            tree.insert("", "end", iid=iid, tags=(etat,),
-                        values=(nom or i18n.t("mime.untyped", "(sans type)"),
-                                mime_catalog.describe(nom),
-                                mime_status_label(etat)))
-        courant_txt = ",".join(courant)
-        lbl_resume.config(text=mime_filter_summary(courant_txt, avec_sens=False))
-        lbl_sense.config(text=mime_filter_sense(mode))
-
-    def _peindre_catalogue(*_a):
-        catalogue.delete(*catalogue.get_children())
-        motif = var_search.get()
-        n = 0
-        iid_catalogue.clear()
-        for nom, etat, libelle in mime_catalog.search(motif, limit=2000):
-            if var_cats.get() and not nom.startswith(mime_catalog.CATEGORY_PREFIX):
-                continue
-            iid = f"c{n}"
-            iid_catalogue[iid] = nom
-            catalogue.insert("", "end", iid=iid, tags=(etat,),
-                             values=(nom or i18n.t("mime.untyped", "(sans type)"),
-                                     libelle))
-            n += 1
-        lbl_count.config(text=i18n.t("mime.catalog_count",
-                                     "{n} type(s) affiché(s) à droite.", n=n))
-
-    var_search.trace_add("write", _peindre_catalogue)
-    var_cats.trace_add("write", _peindre_catalogue)
-    _peindre_filtre()
-    _peindre_catalogue()
-
-    # --- Édition (seulement si l'appelant l'accepte) --------------------- #
-    bas = ttk.Frame(win)
-    bas.pack(fill="x", padx=10, pady=(4, 10))
-
-    if on_change is not None:
-        def _ajouter():
-            ajoutes = [iid_catalogue[i] for i in catalogue.selection()
-                       if iid_catalogue.get(i) not in courant]
-            if not ajoutes:
-                return
-            courant.extend(ajoutes)
-            _peindre_filtre()
-            on_change(",".join(courant))
-
-        def _retirer():
-            for iid in tree.selection():
-                nom = iid_filtre.get(iid)
-                if nom in courant:
-                    courant.remove(nom)
-            _peindre_filtre()
-            on_change(",".join(courant))
-
-        make_button(bas, i18n.t("mime.add", "◀ Ajouter au filtre"), _ajouter,
-                    color=config.ACTION_COLOR).pack(side="left")
-        # Neutre : retirer un type se refait d'un clic, ce n'est pas destructeur.
-        make_button(bas, i18n.t("mime.remove", "Retirer du filtre"),
-                    _retirer).pack(side="left", padx=6)
-        ttk.Label(bas, foreground="#64748b", wraplength=560, justify="left",
-                  text=i18n.t(
-                      "mime.edit_hint",
-                      "Ajouter ou retirer modifie le champ du profil ; "
-                      "« Enregistrer » reste nécessaire pour le conserver.")
-                  ).pack(side="left", padx=10)
-
-    make_button(bas, i18n.t("common.close", "Fermer"), win.destroy).pack(side="right")
-
-
-# --- Réglages d'une source : trois états, trois couleurs ----------------- #
-# ⚠ **Deux échelles distinctes, même code couleur** : les *réglages* d'une
-# source ici, les *types MIME* d'un filtre plus haut. Ne pas les fondre dans un
-# seul tableau — un filtre compte des centaines d'entrées, un jeu de réglages
-# une vingtaine, et ils ne se corrigent pas au même endroit.
-SETTING_STATUS_COLORS = {
-    profile_translate.STATUS_MAPPED: "#1d4ed8",       # bleu : rejoué par le profil
-    profile_translate.STATUS_UNSUPPORTED: "#111827",  # noir : à refaire dans Intella
-    profile_translate.STATUS_UNKNOWN: "#b91c1c",      # rouge : nom inconnu, à vérifier
-}
 
 
 def setting_status_label(etat: str) -> str:
@@ -315,13 +165,10 @@ def show_source_settings(parent, src: dict, titre: str = "") -> None:
     Le rouge est le signal d'une version d'Intella plus récente : un nom qui
     n'est ni au catalogue ni dans la table des non-rejouables est apparu depuis.
     """
-    win = tk.Toplevel(parent)
-    win.title(titre or i18n.t("settings.title", "Réglages de la source"))
-    win.geometry("940x600")
-    win.transient(parent.winfo_toplevel())
+    win = make_dialog(parent, titre or i18n.t("settings.title", "Réglages de la source"),
+                      "1130x620")
 
-    ttk.Label(win, wraplength=910, justify="left",
-              font=("Segoe UI", 10, "bold"),
+    ttk.Label(win, wraplength=910, justify="left", font=ui_theme.F_BOLD,
               text=i18n.t(
                   "settings.header",
                   "Un profil ne rejoue que les réglages qu'Intella accepte à "
@@ -329,23 +176,55 @@ def show_source_settings(parent, src: dict, titre: str = "") -> None:
               ).pack(anchor="w", padx=10, pady=(10, 2))
     ttk.Label(win, text=settings_summary(src)).pack(anchor="w", padx=10, pady=(0, 6))
 
+    # Chaque état porte son explication (demande du 11/09/2026) : les trois
+    # libellés sont justes mais muets — « à refaire dans Intella » ne dit ni
+    # pourquoi, ni ce qu'il faut faire, et « inconnu » se lit comme une erreur
+    # alors que c'est le plus souvent le signe d'un Intella plus récent.
+    aides = {
+        profile_translate.STATUS_MAPPED: i18n.t(
+            "settings.tip_mapped",
+            "Ce réglage fait partie des options qu'IntellaCmd accepte à l'import "
+            "automatique. Enregistré dans le profil, il sera réappliqué tel quel "
+            "à chaque source qui utilise ce profil. Vous n'avez rien à faire."),
+        profile_translate.STATUS_UNSUPPORTED: i18n.t(
+            "settings.tip_unsupported",
+            "Intella sait enregistrer ce réglage, mais son import automatique ne "
+            "l'accepte pas : la commande le jette en silence. Un profil ne peut "
+            "donc pas le rejouer.\n\nÀ faire : après l'import, ouvrez la source "
+            "dans Intella et remettez ce réglage à la main — ou acceptez la "
+            "valeur par défaut."),
+        profile_translate.STATUS_UNKNOWN: i18n.t(
+            "settings.tip_unknown",
+            "Ce nom de réglage n'est ni dans la liste des options pilotables, ni "
+            "dans celle des réglages connus mais non rejouables. C'est presque "
+            "toujours le signe d'une version d'Intella plus récente que ce que "
+            "l'application connaît.\n\nÀ faire : vérifiez dans Intella ce que ce "
+            "réglage vaut pour vos sources. Il n'y a rien de cassé."),
+    }
     legende = ttk.Frame(win)
     legende.pack(fill="x", padx=10, pady=(0, 6))
     for etat in (profile_translate.STATUS_MAPPED,
                  profile_translate.STATUS_UNSUPPORTED,
                  profile_translate.STATUS_UNKNOWN):
-        tk.Label(legende, text="■ " + setting_status_label(etat),
-                 fg=SETTING_STATUS_COLORS[etat]).pack(side="left", padx=(0, 16))
+        pastille = tk.Label(legende, text="■ " + setting_status_label(etat) + " ⓘ",
+                            fg=SETTING_STATUS_COLORS[etat], cursor="question_arrow")
+        pastille.pack(side="left", padx=(0, 16))
+        attach_tip(pastille, aides[etat])
 
     holder = ttk.Frame(win)
     holder.pack(fill="both", expand=True, padx=10, pady=(0, 10))
-    tree = ttk.Treeview(holder, columns=("key", "label", "value", "state"),
+    # ⚠ Le MOTIF a sa propre colonne. Accolé à l'état, il donnait une cellule de
+    # 90 caractères dans une colonne de 190 pixels : « à refaire dans Intella —
+    # Intella n'acce… », c'est-à-dire l'information utile coupée juste avant.
+    tree = ttk.Treeview(holder,
+                        columns=("key", "label", "value", "state", "why"),
                         show="headings")
     for col, entete, largeur in (
-            ("key", i18n.t("settings.col_key", "Réglage (nom Intella)"), 230),
-            ("label", i18n.t("settings.col_label", "Description"), 300),
-            ("value", i18n.t("settings.col_value", "Valeur"), 150),
-            ("state", i18n.t("settings.col_state", "État"), 190)):
+            ("key", i18n.t("settings.col_key", "Réglage (nom Intella)"), 210),
+            ("label", i18n.t("settings.col_label", "Description"), 260),
+            ("value", i18n.t("settings.col_value", "Valeur"), 110),
+            ("state", i18n.t("settings.col_state", "État"), 170),
+            ("why", i18n.t("settings.col_why", "Pourquoi"), 330)):
         tree.heading(col, text=entete)
         tree.column(col, width=largeur, anchor="w")
     vsb = ttk.Scrollbar(holder, orient="vertical", command=tree.yview)
@@ -356,13 +235,11 @@ def show_source_settings(parent, src: dict, titre: str = "") -> None:
         tree.tag_configure(etat, foreground=couleur)
 
     for ligne in profile_translate.describe_settings(src):
-        etat = setting_status_label(ligne["status"])
-        motif = setting_reason_label(ligne["reason"])
-        if motif:
-            etat += " — " + motif
         tree.insert("", "end", tags=(ligne["status"],),
                     values=(ligne["xml_key"], ligne["label"],
-                            ligne["value"] or "—", etat))
+                            ligne["value"] or "—",
+                            setting_status_label(ligne["status"]),
+                            setting_reason_label(ligne["reason"])))
 
     make_button(win, i18n.t("common.close", "Fermer"), win.destroy).pack(
         anchor="e", padx=10, pady=(0, 10))
@@ -372,8 +249,17 @@ def show_source_settings(parent, src: dict, titre: str = "") -> None:
 # tk.Button (et non ttk.Button) : sous le thème Windows, le FOND d'un ttk.Button
 # n'est pas modifiable → on ne pourrait pas contraster/colorer. On centralise ici
 # pour que tous les boutons aient le même look.
-BTN_FONT = ("Segoe UI", 9, "bold")
-BTN_DEFAULT_BG = "#475569"   # slate-600 : contrasté sur fond clair, texte blanc
+#
+# v3.0 — DEUX NIVEAUX, pas un seul (11/09/2026). Jusque-là tout bouton était un
+# aplat plein : sur un panneau de dix boutons, le bouton d'action se noyait dans
+# neuf autres de même poids. Un bouton coloré est désormais **plein** (l'action,
+# le danger), un bouton neutre est **en contour** (fond clair, texte sombre,
+# filet). La règle « une seule action colorée par panneau » y gagne enfin un
+# contraste qui se voit.
+BTN_DEFAULT_BG = "#475569"   # conservé : repli si le thème n'est pas actif
+BTN_OUTLINE_BG = config.UI_SURFACE
+BTN_OUTLINE_FG = config.UI_INK
+BTN_OUTLINE_LINE = "#9fadba"
 
 
 def _darken(hex_color: str, factor: float = 0.82) -> str:
@@ -387,20 +273,44 @@ def _darken(hex_color: str, factor: float = 0.82) -> str:
         return hex_color
 
 
-def make_button(parent, text, command, color: str = None, fg: str = "white", **kw):
-    """Bouton à l'apparence standard de l'application (contrasté, colorable).
+def make_button(parent, text, command, color: str = None, fg: str = "white",
+                outline: str = None, **kw):
+    """Bouton à l'apparence standard de l'application.
 
-    ``color`` : fond du bouton (défaut = slate). ``kw`` surcharge tout attribut
-    tk.Button (ex. ``state``, ``width``).
+    - sans ``color`` ni ``outline`` : bouton **neutre en contour** (le cas le
+      plus fréquent) ;
+    - ``color`` : bouton **plein** de cette couleur — réservé aux quatre rôles
+      de ``config`` (action, danger, alerte, renvoi vers un autre onglet) ;
+    - ``outline`` : bouton **en contour coloré**, pour un renvoi discret vers un
+      autre onglet sans concurrencer l'action du panneau.
+
+    ``kw`` surcharge tout attribut tk.Button (ex. ``state``, ``width``). Le
+    bouton est enregistré auprès du thème actif : son rembourrage suit la
+    densité choisie dans Maintenance → Options, sans redémarrage.
     """
-    bg = color or BTN_DEFAULT_BG
+    if color:
+        bg, texte, bordure = color, fg, color
+        actif = _darken(color)
+    elif outline:
+        bg, texte, bordure = config.UI_SURFACE, outline, outline
+        actif = config.ACCENT_SOFT
+    else:
+        bg, texte, bordure = BTN_OUTLINE_BG, BTN_OUTLINE_FG, BTN_OUTLINE_LINE
+        actif = config.UI_SURFACE_2
     style = dict(
-        font=BTN_FONT, bg=bg, fg=fg, activebackground=_darken(bg),
-        activeforeground=fg, relief="raised", bd=1, padx=10, pady=3,
-        cursor="hand2", highlightthickness=0, disabledforeground="#cbd5e1",
+        # Bordure : `highlightthickness` et non `relief="solid"` — un relief
+        # solid se dessine en noir dur, quelle que soit la couleur voulue.
+        font=ui_theme.F_BTN, bg=bg, fg=texte, activebackground=actif,
+        activeforeground=texte, relief="flat", bd=0,
+        highlightthickness=1, highlightbackground=bordure, highlightcolor=bordure,
+        padx=10, pady=3, cursor="hand2", disabledforeground="#b6c0ca",
     )
     style.update(kw)
-    return tk.Button(parent, text=text, command=command, **style)
+    btn = tk.Button(parent, text=text, command=command, **style)
+    theme = ui_theme.current()
+    if theme is not None:
+        theme.register_button(btn)
+    return btn
 
 
 class MeasureBar(ttk.Frame):
@@ -498,6 +408,83 @@ class MeasureBar(ttk.Frame):
         if not self._packed:
             self.pack(**self._pack_opts)
             self._packed = True
+
+
+def make_dialog(parent, titre: str, geometry: str = "") -> tk.Toplevel:
+    """Fenêtre secondaire **réductible**, au look de l'application.
+
+    ⚠ Pas de ``transient()`` — et c'est le point (demande du 11/09/2026).
+    Sous Windows, une fenêtre marquée transitoire devient une *fenêtre outil* :
+    elle perd son bouton Réduire et n'apparaît plus dans la barre des tâches.
+    Or ces fenêtres-là — le filtre de types, les réglages d'une source, la
+    vérification d'import — se consultent en allant et venant avec la fenêtre
+    principale ; ne pouvoir que les fermer oblige à tout rouvrir.
+
+    Ce qu'on perd : elles ne restent plus au-dessus du parent. C'est le prix
+    d'un bouton Réduire, et c'est ce qui a été demandé.
+    """
+    win = tk.Toplevel(parent)
+    win.title(titre)
+    if geometry:
+        win.geometry(geometry)
+    win.configure(background=config.UI_BG)
+    try:
+        win.iconbitmap(config.resource_path("intella.ico"))
+    except tk.TclError:
+        pass                       # icône absente : sans importance
+    win.bind("<Escape>", lambda _e: win.destroy())
+    return win
+
+
+def attach_tip(widget, texte: str, delai: int = 450):
+    """Attache une infobulle à un widget. Le moyen standard dans l'application.
+
+    Chaque appelant créait jusque-là sa propre paire ``<Enter>``/``<Leave>``
+    autour d'un ``Tooltip`` partagé, ce qui rendait l'ajout d'une infobulle plus
+    coûteux qu'il ne devrait — donc rare. Le délai évite qu'une bulle surgisse au
+    moindre passage de souris sur une barre d'outils dense.
+    """
+    if not texte:
+        return
+    etat = {"tip": None, "after": None}
+
+    def _montrer(x, y):
+        etat["after"] = None
+        if etat["tip"] is not None:
+            return
+        try:
+            tip = tk.Toplevel(widget)
+        except tk.TclError:
+            return
+        tip.wm_overrideredirect(True)
+        tip.wm_geometry(f"+{x}+{y}")
+        tk.Label(tip, text=texte, background="#fffbe6", foreground=config.UI_INK,
+                 relief="solid", borderwidth=1, justify="left", padx=7, pady=4,
+                 font=ui_theme.F_SMALL, wraplength=460).pack()
+        etat["tip"] = tip
+
+    def _entrer(e):
+        _quitter(None)
+        etat["after"] = widget.after(delai, lambda: _montrer(e.x_root + 14, e.y_root + 22))
+
+    def _quitter(_e):
+        if etat["after"] is not None:
+            try:
+                widget.after_cancel(etat["after"])
+            except tk.TclError:
+                pass
+            etat["after"] = None
+        if etat["tip"] is not None:
+            try:
+                etat["tip"].destroy()
+            except tk.TclError:
+                pass
+            etat["tip"] = None
+
+    widget.bind("<Enter>", _entrer, add="+")
+    widget.bind("<Leave>", _quitter, add="+")
+    widget.bind("<Button-1>", _quitter, add="+")
+    widget.bind("<Destroy>", _quitter, add="+")
 
 
 class Tooltip:

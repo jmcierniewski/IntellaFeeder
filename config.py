@@ -7,7 +7,7 @@ from datetime import datetime
 APP_NAME = "IntellaFeeder"
 # Affichée dans le titre de la fenêtre et le journal → à incrémenter à CHAQUE
 # construction d'exe livrée, sinon impossible de savoir quel build tourne.
-APP_VERSION = "2.9d"
+APP_VERSION = "3.1b"
 APP_TITLE = "IntellaFeeder — Générateur de sources d'import Intella"
 
 # --- Réglages forensiques par défaut ---
@@ -72,9 +72,29 @@ UNCHECK = "☐"
 # un nouveau, vérifier qu'aucun autre du même panneau ne porte déjà ce rôle.
 INVENTORY_TAB_COLOR = "#3b82f6"   # bleu : renvoi vers « 1. Inventaire du cas »
 PROFILE_TAB_COLOR = "#8b5cf6"     # violet : renvoi vers « Profils »
-ACTION_COLOR = "#16a34a"          # vert : l'action du panneau
-DANGER_COLOR = "#b91c1c"          # rouge : destructif ou anomalie
-WARN_COLOR = "#b45309"            # orange : attention
+ACTION_COLOR = "#15803d"          # vert : l'action du panneau
+DANGER_COLOR = "#a4262c"          # rouge : destructif ou anomalie
+WARN_COLOR = "#9a5b00"            # orange : attention
+
+# --- Apparence v3 (direction « Parcours », choisie le 11/09/2026) ----------
+# Teinte de CHROME (navigation, sélection, en-têtes) — volontairement distincte
+# des quatre couleurs de rôle ci-dessus : le fil d'étapes n'est pas un bouton,
+# il ne doit donc pas emprunter le vert de l'action. Elle n'apparaît jamais en
+# aplat sous un libellé de bouton, seulement en fond clair + liseré.
+ACCENT = "#0f5c67"                # teal profond : l'étape courante, le focus
+ACCENT_SOFT = "#e2f0f2"           # son fond clair
+
+UI_BG = "#e9edf1"                 # fond de la fenêtre
+UI_SURFACE = "#ffffff"            # fond d'un panneau
+UI_SURFACE_2 = "#f5f7f9"          # fond secondaire (pieds de panneau, champs ro)
+UI_LINE = "#c6cfd8"               # filet structurant
+UI_LINE_SOFT = "#dde4ea"          # filet interne (séparation de lignes)
+UI_INK = "#0f172a"                # texte principal
+UI_INK_2 = "#4a5866"              # texte secondaire (libellés)
+UI_INK_3 = "#7d8b99"              # texte d'appoint (indications, unités)
+UI_SEL = "#d9e9ec"                # ligne sélectionnée d'un tableau
+UI_ZEBRA = "#f7f9fa"              # une ligne sur deux
+UI_HEAD = "#e7edf1"               # en-tête de tableau
 
 
 def glyph(state: bool) -> str:

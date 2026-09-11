@@ -99,7 +99,7 @@ class DetailTab(ttk.Frame):
             self.text.insert(
                 "end",
                 i18n.t("detail.no_case",
-                       "Sélectionnez un cas dans l'onglet « 1. Inventaire du cas ».") + "\n",
+                       "Sélectionnez un cas dans l'étape « 1. Le cas ».") + "\n",
                 "muted")
             self.text.configure(state="disabled")
             return

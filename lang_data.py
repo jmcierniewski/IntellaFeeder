@@ -99,7 +99,7 @@ BUILTIN = {
             "inventory.case_summary": "Cas « {n} » — {c} source(s) — taille du cas {s}",
             "inventory.n_scannable_folders": "{n} dossier(s) à 0 (scannables)",
             "inventory.zero_folders_title": "Dossiers à 0",
-            "inventory.zero_folders_none": "Aucun dossier sans taille à mesurer.\nLisez d'abord les sources du cas.",
+            "inventory.zero_folders_none": "Aucun dossier sans taille à mesurer : tous les volumes de ce cas sont connus.",
             "inventory.scan_cancel_log": "Scan des dossiers : annulation demandée.",
             "inventory.scan_cancelled_log": "Scan interrompu : {n} dossier(s) mesuré(s), {m} restant(s) à 0.",
             "inventory.scan_cancelled_summary": "Scan interrompu — {n} dossier(s) mesuré(s) (total {t}), {m} restant(s) à 0.",
@@ -118,7 +118,7 @@ BUILTIN = {
             "inventory.info_profile_log": "Info Profil : réglages de « {n} » transférés à l'onglet Profils ({c} option(s)).",
             "inventory.export_xml_none": "Aucun XML disponible.\nLancez d'abord « Lire les sources ».",
             "inventory.export_xml_log": "XML des sources exporté : {p}",
-            "inventory.export_tasks_none": "Aucune tâche sur les sources de ce cas.\nLisez d'abord les sources (« Lire les sources »).",
+            "inventory.export_tasks_none": "Aucune tâche n'est définie sur les sources de ce cas.",
             "inventory.export_tasks_log": "Tâches du cas exportées ({n} tâche(s) dédupliquée(s)) : {p}",
             "inventory.export_tasks_msg": "{n} tâche(s) dédupliquée(s) exportée(s) :\n{p}\n\n1 objet = 1 tâche logique (UUID par source fusionnés par signature).",
             "inventory.export_csv_none": "Lisez d'abord les sources d'un cas.",
@@ -178,7 +178,7 @@ BUILTIN = {
             "opt.enableCrawlerScript": "Activer un script de crawler",
             "opt.sourceCrawlerScriptType": "Type de script de crawler",
             "opt.sourceCrawlerScriptFile": "Fichier de script de crawler",
-            "profiles.intro": "Un profil = jeu de paramètres d'analyse appliqué à une source à l'import (affecté dans l'onglet « 2. Import », colonne « Profil »). « Défaut Intella » applique les réglages standard d'Intella (aucune option forcée) ; seules les valeurs qui en diffèrent sont enregistrées et émises. L'étoile ★ marque le profil donné aux nouvelles sources — « Définir par défaut » le change.",
+            "profiles.intro": "Un profil = jeu de paramètres d'analyse appliqué à une source à l'import (affecté dans l'étape « 2. Sources », colonne « Profil »). « Défaut Intella » applique les réglages standard d'Intella (aucune option forcée) ; seules les valeurs qui en diffèrent sont enregistrées et émises. L'étoile ★ marque le profil donné aux nouvelles sources — « Définir par défaut » le change.",
             "profiles.saved": "Profils enregistrés",
             "profiles.name_label": "Nom du profil",
             "profiles.new": "Nouveau",
@@ -186,7 +186,7 @@ BUILTIN = {
             "profiles.comments": "Commentaires",
             "profiles.analysis_options": "Options d'analyse",
             "profiles.to_verify": "à éprouver",
-            "profiles.images_only": "[images]",
+            "profiles.images_only": "images",
             "profiles.filename_filter_tip": "Jokers autorisés dans les noms de fichiers : « ? » (un caractère) et « * » (plusieurs). Ex. : rapport_*.pdf, IMG_????.jpg",
             "profiles.name_required": "Indiquez un nom de profil.",
             "profiles.default_reserved": "Le profil « défaut » est réservé.",
@@ -213,7 +213,7 @@ BUILTIN = {
             "tabs.profiles": "Profils",
             "tabs.journal": "Journal",
             "tabs.help": "Aide",
-            "detail.no_case": "Sélectionnez un cas dans l'onglet « 1. Inventaire du cas ».",
+            "detail.no_case": "Sélectionnez un cas dans l'étape « 1. Le cas ».",
             "detail.h1_case": "Cas",
             "detail.name": "Nom",
             "detail.folder": "Dossier",
@@ -251,16 +251,16 @@ BUILTIN = {
             "detail.subcases_recap_missing": "{n} sous-cas non joignable(s) : l'inventaire des sources sera partiel.",
             "import.already_used": "déjà {s} occupé(s)",
             "import.and_n_more": "… et {n} autre(s).",
-            "import.auto_removed_log": "{n} source(s) déjà indexée(s) retirée(s) automatiquement.",
+            "import.auto_removed_log": "{n} source(s) déjà indexée(s) décochée(s) automatiquement.",
             "import.case_label": "Cas :",
             "import.case_prefix": "Cas « {n} » : ",
             "import.case_tasks": "Tâches du cas (inventaire)",
             "import.case_tasks_none": "Aucune tâche n'est définie sur les sources de ce cas.",
-            "import.case_tasks_not_loaded": "La liste des sources du cas n'est pas chargée.\nLancez « Lire les sources » dans l'onglet « 1. Inventaire du cas ».",
+            "import.case_tasks_not_loaded": "La liste des sources du cas n'est pas chargée.\nLancez « Lire les sources » dans l'étape « 1. Le cas ».",
             "import.case_tasks_recycled_log": "Tâches recyclées depuis l'inventaire du cas : {n} tâche(s).",
             "import.case_tasks_recycled_msg": "{n} tâche(s) du cas chargée(s) (dédupliquées).\nElles s'appliquent comme un fichier de tâches : cochez-les par source.",
             "import.case_tasks_unreadable": "Tâches illisibles :\n{e}",
-            "import.check_all": "Imp. : tout cocher",
+            "import.check_all": "Tout cocher",
             "import.close": "Fermer",
             "import.col_delete": "Suppr.",
             "import.col_import": "Imp.",
@@ -269,7 +269,7 @@ BUILTIN = {
             "import.col_name": "Nom de la source",
             "import.col_profile": "Profil",
             "import.col_source": "Source",
-            "import.compute_size": "Calculer la taille",
+            "import.compute_size": "Remesurer",
             "import.computing_size_log": "Calcul de la taille de {n} source(s) cochée(s)…",
             "import.corrections_needed": "Corrections nécessaires",
             "import.default_profile_label": "Profil par défaut :",
@@ -306,7 +306,7 @@ BUILTIN = {
             "import.limit_label": "Limite / cas (Go)",
             "import.limit_status": "{etat} la limite ({eff} / {lim})",
             "import.list_imported_log": "Liste importée : {n} source(s) depuis {p}",
-            "import.list_imported_removed": "({n} déjà dans le cas, retirée(s)).",
+            "import.list_imported_removed": "({n} déjà dans le cas : décochée(s)).",
             "import.list_invalid_format": "Format invalide (liste de sources attendue).",
             "import.list_replace_confirm": "Remplacer la liste actuelle ({cur} source(s)) par {new} source(s) du fichier ?",
             "import.list_unreadable": "Lecture impossible :\n{e}",
@@ -314,10 +314,10 @@ BUILTIN = {
             "import.log_failed": "ÉCHEC : {m}",
             "import.log_ok": "OK",
             "import.n_indexed": "{n} source(s) indexée(s)",
-            "import.n_removed_auto": "{n} déjà indexée(s) dans le cas, retirée(s) automatiquement.",
+            "import.n_removed_auto": "{n} déjà indexée(s) dans le cas : décochée(s), elles restent visibles barrées.",
             "import.n_sources_loaded": "{n} source(s) chargée(s).",
             "import.no_bat_found": "Aucun fichier d'import trouvé pour ce cas.\nCliquez d'abord sur « Générer les fichiers d'import ».",
-            "import.no_case_selected": "ⓘ Aucun cas sélectionné — choisissez-le dans l'onglet « 1. Inventaire du cas ».",
+            "import.no_case_selected": "ⓘ Aucun cas sélectionné — choisissez-le dans l'étape « 1. Le cas ».",
             "import.no_checked": "Aucune source cochée « Importer ».\nSeules les lignes cochées sont mesurées.",
             "import.no_inventory_read": "⚠ liste des sources non lue (onglet 1) → pas de dédoublonnage.",
             "import.no_rows_to_export": "Aucune ligne à exporter.",
@@ -343,17 +343,17 @@ BUILTIN = {
             "import.report_title": "Terminé",
             "import.run_confirm": "Lancer l'import dans Intella ?\n\n{b}\n\nIntellaCmd va ajouter les sources au cas (action non réversible côté cas). Une fenêtre de console s'ouvre et affiche la progression.\n\n« Valider les opérations » sera lancé automatiquement à la fin de l'import.\n\nContinuer ?",
             "import.run_import": "Importer (lancer le .bat)",
-            "import.select_case_first": "Sélectionnez d'abord un cas (onglet « 1. Inventaire du cas »).",
-            "import.select_case_short": "Sélectionnez d'abord un cas (onglet « 1. Inventaire du cas »).",
-            "import.select_case_target": "Sélectionnez d'abord un cas dans l'onglet « 1. Inventaire du cas ».",
+            "import.select_case_first": "Sélectionnez d'abord un cas (étape « 1. Le cas »).",
+            "import.select_case_short": "Sélectionnez d'abord un cas (étape « 1. Le cas »).",
+            "import.select_case_target": "Sélectionnez d'abord un cas dans l'étape « 1. Le cas ».",
             "import.size_done_log": "Calcul des tailles terminé. Total cochées : {t}.",
             "import.size_title": "Taille",
             "import.skip_integrity": "Ne pas vérifier l'intégrité des sources (images multi-tronçons — contourne le bug Vound)",
             "import.source_removed_log": "Source retirée de la liste : {n}",
             "import.summarize": "▼ Analyser les chemins",
             "import.summary_log": "Analyse : {n} source(s).",
-            "import.summary_removed_log": "{n} déjà dans le cas, retirée(s).",
-            "import.target_case_frame": "Cas cible (défini par l'onglet « 1. Inventaire du cas »)",
+            "import.summary_removed_log": "{n} déjà dans le cas : décochée(s) et barrée(s).",
+            "import.target_case_frame": "Cas cible (défini par l'étape « 1. Le cas »)",
             "import.tasks_check_all": "Tâches : tout cocher",
             "import.tasks_file_label": "Fichier de tâches",
             "import.tasks_file_loaded_log": "Fichier de tâches chargé : {n} tâche(s).",
@@ -365,7 +365,7 @@ BUILTIN = {
             "import.tasks_uncheck_all": "Tâches : tout décocher",
             "import.timezone_label": "Fuseau horaire",
             "import.total_summary": "{n} source(s), {c} à importer — taille cochées : {t}{suffix}",
-            "import.uncheck_all": "Imp. : tout décocher",
+            "import.uncheck_all": "Tout décocher",
             "import.under_limit": "sous",
             "import.validate": "Valider les opérations",
             "import.validate_absent": "  ✗ {n} : absente du cas (aucun log d'import correspondant).",
@@ -384,7 +384,7 @@ BUILTIN = {
             "import.warnings_title": "Avertissements",
             "import.write_title": "Écriture",
             "import.zero_sources": "0 source",
-            "import.compound_body": "« {n} » est un cas COMPOUND : il ne fait que référencer des sous-cas et n'accepte aucune source.\n\nAjoutez les sources dans l'un de ses sous-cas (sélectionnez-le comme cas dans l'onglet « 1. Inventaire du cas »).",
+            "import.compound_body": "« {n} » est un cas COMPOUND : il ne fait que référencer des sous-cas et n'accepte aucune source.\n\nAjoutez les sources dans l'un de ses sous-cas (sélectionnez-le comme cas dans l'étape « 1. Le cas »).",
             "import.compound_title": "Cas compound",
             "type.folder": "Dossier",
             "type.image": "Image",
@@ -467,8 +467,8 @@ BUILTIN = {
             "import.image_filetypes": "Images forensiques",
             "import.pick_files_title": "Fichiers à ajouter comme sources",
             "import.run_all": "▶ Lancer l'import complet",
-            "import.steps_show": "⋯ Étapes",
-            "import.steps_hide": "⋯ Masquer",
+            "import.steps_show": "Étapes ▾",
+            "import.steps_hide": "Étapes ▴",
             "import.generated_log": "Fichiers d'import générés dans {p}.",
             "topbar.language_lose_work": "{n} source(s) sont listées dans l'onglet « Import ». Le redémarrage les perd.\n\nExportez la liste d'abord (« Exporter la liste… ») si vous voulez la retrouver.\n\nContinuer quand même ?",
             "inventory.info_profile_ignored": "Non repris (non pilotables à l'import) : {k}. « Voir les réglages… » les affiche en détail.",
@@ -487,29 +487,29 @@ BUILTIN = {
             "mime.col_label": "Description",
             "mime.col_state": "État",
             "mime.state_empty": "Aucun référentiel chargé. Les filtres restent lisibles, mais sans description. Importez le fichier depuis votre installation d'Intella.",
-            "mime.state": "{d} descriptions (dont {c} catégories) — {o} nom(s) observé(s) dans vos cas, dont {s} sans description.",
+            "mime.state": "{d} descriptions (dont {c} catégories) — {o} nom(s) de type connu(s), dont {s} sans description.",
             "mime.state_file": "Fichier : {f}",
             "mime.state_duplicates": "{n} clé(s) en double dans le fichier — la dernière valeur l'emporte.",
             "mime.import_title": "Importer un référentiel de types MIME",
             "mime.filetype": "Descriptions Intella",
-            "mime.import_ok": "{n} description(s) importée(s).",
-            "mime.import_added": "{n} nouveau(x) type(s).",
+            "mime.import_ok": "{n} description(s) lue(s) dans le fichier.",
+            "mime.import_added": "{n} type(s) gagnent un libellé.",
             "mime.import_removed": "⚠ {n} type(s) décrit(s) par l'ancien fichier ne le sont plus : {ex}…",
             "mime.import_duplicates": "{n} clé(s) en double dans le fichier.",
             "mime.search_none": "Aucun type ne correspond à « {q} ».",
             "mime.state_described": "décrit",
-            "mime.state_observed": "vu dans vos cas",
+            "mime.state_observed": "connu, sans libellé",
             "mime.state_unknown": "inconnu",
             "files.base": "Dossier de l'application",
             "files.ini": "Paramètres (.ini)",
             "files.profiles": "Profils d'analyse",
-            "files.lang": "Langues",
+            "files.lang": "Langues (dossier facultatif)",
             "files.mime": "Référentiel de types MIME",
-            "files.missing": "(absent)",
+            "files.missing": "absent",
             "files.open": "Ouvrir",
             "mime.untyped": "(sans type)",
             "mime.filter_none": "Aucun filtre (tous les types indexés).",
-            "mime.filter_summary": "{t} type(s) — {d} décrit(s), {o} vu(s) dans vos cas",
+            "mime.filter_summary": "{t} type(s) — {d} décrit(s), {o} sans libellé",
             "mime.filter_unknown": "{n} inconnu(s)",
             "mime.filter_title": "Types filtrés",
             "common.close": "Fermer",
@@ -527,7 +527,7 @@ BUILTIN = {
             "options.recursive_default": "Explorer les sous-dossiers par défaut (dépôt d'images forensiques)",
             "options.recursive_help": "Décoché, un dossier déposé n'est exploré qu'au premier niveau : un dossier de scellés voisine souvent avec d'autres cas ou des copies de travail, et descendre d'office ramènerait des images étrangères. Coché si vos images sont systématiquement rangées dans des sous-dossiers. La case reste modifiable à chaque dépôt dans l'onglet Import.",
             "options.recursive_saved": "Exploration récursive par défaut : {v}.",
-            "mime.origin_embedded": "Source : version INTÉGRÉE à l'application. Déposer un fichier .properties dans le dossier ci-dessous la remplacerait.",
+            "mime.origin_embedded": "Toutes viennent de la version intégrée à l'application ; importer un .properties d'Intella y ajouterait les siennes.",
             "mime.origin_external": "Source : FICHIER EXTERNE, qui remplace la version intégrée ({e} descriptions).",
             "mime.origin_learned": "{n} nom(s) appris de vos cas s'ajoutent à ceux livrés.",
             "mime.filter_none_include": "Aucun filtre : le mode « include » reste sans effet tant que la liste est vide — tous les types sont indexés.",
@@ -572,7 +572,7 @@ BUILTIN = {
             "import.clear_log": "Liste des sources vidée ({n} retirée(s)).",
             "profiles.view_settings": "Voir les réglages de la source…",
             "profiles.settings_from": "Réglages repris de la source « {n} ». {r}",
-            "profiles.settings_none": "Pour voir ce qu'un profil reprend d'une source réglée dans Intella : onglet « Inventaire du cas », sélectionnez la source, « Info Profil → ».",
+            "profiles.settings_none": "Pour voir ce qu'un profil reprend d'une source réglée dans Intella : étape « 1. Le cas », sélectionnez la source, « Info Profil → ».",
             "profiles.settings_title": "Réglages de « {n} »",
             "profiles.provenance": "Repris de la source « {n} » le {d}.",
             "profiles.provenance_lost": "Non rejoué (à refaire dans Intella) : {k}",
@@ -584,7 +584,7 @@ BUILTIN = {
             "profiles.ref_learned": "{n} nom(s) appris de vos cas.",
             "profiles.ref_case": "{n} type(s) filtré(s) par le dernier cas lu n'ont pas de description :",
             "profiles.ref_case_ok": "Aucun type sans description dans le dernier cas lu.",
-            "mime.pane_current": "Types de ce filtre",
+            "mime.pane_current": "Types inclus dans ce filtre",
             "mime.pane_catalog": "Types disponibles (référentiel)",
             "mime.only_categories": "Catégories seules",
             "mime.catalog_count": "{n} type(s) affiché(s) à droite.",
@@ -607,7 +607,137 @@ BUILTIN = {
             "profiles.ref_edit_prompt": "Description de « {n} » :",
             "profiles.ref_edit_official": "Attention : Intella décrit désormais ce type « {d} ». Sa description restera prioritaire sur la vôtre.",
             "profiles.ref_edit_failed": "Impossible d'enregistrer : {e}",
-            "profiles.ref_edit_log": "Description personnelle : {n} → « {d} »"
+            "profiles.ref_edit_log": "Description personnelle : {n} → « {d} »",
+            "import.params_edit": "Modifier ▾",
+            "import.integrity_off": "intégrité des sources non vérifiée",
+            "import.integrity_on": "intégrité des sources vérifiée",
+            "import.summary_case": "Cas cible : {n}",
+            "import.summary_limit": "limite {g} Go",
+            "import.summary_tz": "fuseau {t}",
+            "import.summary_tasks": "tâches {f}",
+            "import.more_tip": "Exporter / importer une liste, recharger les tâches, reprendre les tâches du cas, vider la liste",
+            "import.already_in_case": "— déjà dans le cas",
+            "import.params_close": "Replier ▴",
+            "import.summary_nocase": "aucun",
+            "journal.filter_all": "Tout",
+            "journal.status_errors": "{e} erreur(s) et {a} alerte(s) — voir le journal",
+            "journal.status_alerts": "{a} alerte(s) — voir le journal",
+            "journal.filter_alerts": "Alertes",
+            "journal.filter_errors": "Erreurs",
+            "journal.search": "Rechercher",
+            "options.dnd_saved": "Glisser-déposer : {v} (au prochain démarrage).",
+            "options.display": "Affichage",
+            "options.dnd": "Glisser-déposer",
+            "options.scale_reset": "Rétablir",
+            "options.language": "Langue",
+            "options.language_hint": "appliquée au redémarrage",
+            "options.density": "Densité d'affichage",
+            "options.font_scale": "Taille du texte",
+            "options.density_help": "La densité agit sur la hauteur des lignes des tableaux et sur les marges : « compacte » pour voir davantage de sources sur un écran de portable, « confortable » sur un grand écran. Les deux réglages s'appliquent immédiatement.",
+            "options.dnd_enable": "Activer le glisser-déposer depuis l'Explorateur",
+            "options.dnd_help": "Interrupteur de secours : décoché, l'application reste utilisable par le collage de chemins et les boutons « Ajouter… ». Le changement prend effet au redémarrage.",
+            "ctx.case": "CAS",
+            "ctx.user": "UTILISATEUR",
+            "ctx.exe": "INTELLACMD",
+            "step.case": "Le cas",
+            "step.case_sub": "lire ce qui est déjà là",
+            "step.sources": "Import des sources",
+            "step.sources_sub": "coller, mesurer, importer",
+            "step.import": "Import",
+            "step.import_sub": "générer et lancer",
+            "ctx.edit": "Modifier…",
+            "tabs.detail_short": "Détail",
+            "ctx.no_case": "aucun cas sélectionné",
+            "ctx.exe_ok": "configuré",
+            "ctx.exe_missing": "à renseigner",
+            "options.density_compact": "Compacte",
+            "options.density_normal": "Normale",
+            "options.density_comfort": "Confortable",
+            "profiles.to_verify_tip": "Correspondance présumée, jamais confirmée sur un cas réel : à vérifier avant de s'y fier.",
+            "profiles.images_only_tip": "Sans effet sur une source « dossier » : ne s'applique qu'aux images forensiques.",
+            "status.compound": "cas compound",
+            "status.case_loaded": "Cas « {n} » chargé.",
+            "import.status_validated": "{n} source(s) confirmée(s) dans le cas.",
+            "inventory.info_profile_tip": "Reprend les réglages d'indexation de la source sélectionnée et ouvre l'onglet Profils pour les enregistrer sous un nom.",
+            "inventory.zero_folders_unread": "Les sources de ce cas n'ont pas encore été lues.\nLancez « Lire les sources » d'abord.",
+            "inventory.export_tasks_unread": "Les sources de ce cas n'ont pas encore été lues.\nLancez « Lire les sources » d'abord.",
+            "help.search_clear": "Effacer",
+            "help.search_tip": "Tapez un mot : toutes ses occurrences sont surlignées. « › » et « ‹ » sautent de l'une à l'autre, Entrée fait la même chose que « › ».",
+            "help.fig_step1": "① Le cas",
+            "help.fig_step1_sub": "lire ce qui est déjà là",
+            "help.fig_step2": "② Import des sources",
+            "help.fig_step2_sub": "coller → analyser → lancer l'import",
+            "help.fig_include": "SEULS ces types sont indexés",
+            "help.fig_exclude": "ces types sont ÉCARTÉS",
+            "help.search_hits": "{n} résultat(s)",
+            "help.search_pos": "{i} / {n}",
+            "help.fig_filter_note": "Le défaut est « exclude ».\nUne liste composée comme « ce que je veux »\nfait alors exactement l'inverse.",
+            "help.fig_segments_note": "Une seule ligne à coller : le premier segment. Intella retrouve les autres tout seul.",
+            "help.fig_first": "à indiquer",
+            "help.search": "Rechercher dans l'aide",
+            "import.clear_all": "Tout vider",
+            "import.clear_all_tip": "Efface le tableau ET les chemins collés au-dessus : on repart de zéro.",
+            "import.clear_all_confirm": "Repartir de zéro ?\n\n{n} source(s) du tableau et {c} chemin(s) collé(s) seront effacés.",
+            "import.clear_all_log": "Onglet vidé : {n} source(s) et {c} chemin(s) collé(s).",
+            "mime.describe_title": "Décrire un type",
+            "mime.import_tip": "Ajoute les libellés d'un .properties d'Intella à ceux déjà connus.\nLes entrées de même nom sont remplacées par celles du fichier ; les autres restent en place. Rien n'est perdu : plusieurs imports successifs s'additionnent dans un fichier unique.",
+            "mime.learn_tip": "Récolte les NOMS de types présents dans un export de sources, sans leur donner de libellé.\n\nÀ quoi ça sert : Intella écrit dans ses filtres des synonymes qu'il ne décrit nulle part (18 % d'un filtre réel). Les apprendre évite qu'ils s'affichent « inconnus » — ce qui ferait passer pour une anomalie ce qui est normal.",
+            "mime.describe_prompt": "Votre description pour « {t} » :",
+            "mime.describe_log": "Description personnelle : {t} → « {d} »",
+            "mime.import_total": "Le référentiel compte maintenant {n} descriptions.",
+            "files.copied": "Informations de version copiées.",
+            "mime.filter_all": "Tous",
+            "mime.filter_undescribed": "Sans description",
+            "mime.filter_user": "Décrits par vous",
+            "mime.filter_external": "Venus d'un import",
+            "mime.col_origin": "Vient de",
+            "mime.shown": "{n} type(s) affiché(s).",
+            "mime.describe_none": "Sélectionnez d'abord un type dans la liste.",
+            "mime.import_updated": "{n} libellé(s) remplacé(s) par celui du fichier.",
+            "mime.import_kept": "{n} étaient déjà identiques.",
+            "files.col_what": "Élément",
+            "files.col_where": "Emplacement",
+            "files.col_state": "État",
+            "files.state_ok": "lu au démarrage",
+            "files.n_files": "{n} fichier(s)",
+            "files.n_cases": "{n} cas",
+            "mime.describe": "Décrire ce type…",
+            "mime.origin_merged": "{n} description(s) viennent de {f} fichier(s) importé(s), ajoutées aux {e} intégrées.",
+            "files.copy": "Copier ces informations",
+            "files.hint": "Double-cliquez une ligne pour l'ouvrir. Un dossier absent n'est pas une anomalie : il est créé au premier usage.",
+            "app.subtitle": "Générateur de sources d'import Intella",
+            "profiles.filter_mode_tip": "« exclude » : les types listés sont ÉCARTÉS, tout le reste est indexé.\n« include » : SEULS les types listés sont indexés.\n\nC'est « exclude » par défaut, comme dans Intella : une liste composée comme « ce que je veux garder » ferait alors exactement l'inverse.",
+            "mime.states_tip": "État d'un type dans le référentiel :\n• décrit — libellé fourni par Vound ;\n• décrit par vous — libellé que vous avez saisi ;\n• connu, sans libellé — le nom existe (Intella l'écrit), mais personne ne le décrit. C'est un synonyme valide, il n'y a rien à corriger ;\n• inconnu — jamais rencontré. Vérifiez l'orthographe, ou votre version d'Intella est plus récente que le référentiel.",
+            "mime.only_categories_tip": "Coché : seules les 78 catégories d'Intella, toutes décrites — c'est ce qu'on met le plus souvent dans un filtre.\nDécoché : tous les types, rangés par famille (application, image, text…). La famille est la seule appartenance que le référentiel de Vound permette de déduire ; il n'indique pas à quelle catégorie d'Intella appartient un type.",
+            "profiles.filter_mode_label": "Mode du filtre de types",
+            "profiles.other_filters": "Autres filtres",
+            "mime.count_in_filter": "{n} type(s) dans ce filtre",
+            "mime.ref_types": "{n} type(s) dans {f} famille(s)",
+            "mime.added_log": "{n} type(s) ajouté(s) au filtre du profil.",
+            "profiles.hash_filter_tip": "Chemins de fichiers .md5, séparés par des virgules. Les items dont l'empreinte y figure sont écartés de l'indexation.\n⚠ Le chemin doit être visible DEPUIS LE SERVEUR Intella, pas depuis ce poste.",
+            "mime.ref_categories": "{n} catégorie(s)",
+            "mime.remove_all": "Tout retirer",
+            "mime.add_to_filter": "◀ Ajouter au filtre",
+            "mime.family_other": "(autres)",
+            "mime.family_count": "{n} type(s)",
+            "settings.tip_mapped": "Ce réglage fait partie des options qu'IntellaCmd accepte à l'import automatique. Enregistré dans le profil, il sera réappliqué tel quel à chaque source qui utilise ce profil. Vous n'avez rien à faire.",
+            "settings.tip_unsupported": "Intella sait enregistrer ce réglage, mais son import automatique ne l'accepte pas : la commande le jette en silence. Un profil ne peut donc pas le rejouer.\n\nÀ faire : après l'import, ouvrez la source dans Intella et remettez ce réglage à la main — ou acceptez la valeur par défaut.",
+            "settings.tip_unknown": "Ce nom de réglage n'est ni dans la liste des options pilotables, ni dans celle des réglages connus mais non rejouables. C'est presque toujours le signe d'une version d'Intella plus récente que ce que l'application connaît.\n\nÀ faire : vérifiez dans Intella ce que ce réglage vaut pour vos sources. Il n'y a rien de cassé.",
+            "import.more": "Plus ▾",
+            "mime.catalog_tip": "Double-cliquez un type pour l'ajouter au filtre, à gauche (sélection multiple possible, puis « ◀ Ajouter au filtre »).\nUn double-clic sur une famille l'ouvre ou la referme.\n\nPour donner un libellé à un type, passez par Maintenance → Types MIME.",
+            "inventory.grp_profile": "Reprendre",
+            "settings.col_why": "Pourquoi",
+            "mime.origin_embedded_short": "intégré",
+            "mime.origin_external_short": "fichier importé",
+            "mime.origin_user_short": "vous",
+            "app.started_log": "{a} {v} démarré.",
+            "app.exe_unset_log": "Chemin IntellaCmd.exe non encore mémorisé (sera enregistré au .ini).",
+            "app.ini_created_log": "Fichier de configuration créé : {p}",
+            "files.lang_state": "{l} — intégrées à l'application ; {n} fichier(s) ici",
+            "files.write_lang": "Écrire les langues ici…",
+            "files.write_lang_tip": "Dépose dans le dossier « lang » une copie des langues intégrées à l'application (FR, US).\n\nÀ quoi ça sert : un fichier .lang présent l'emporte sur la version intégrée. C'est le moyen de corriger une traduction, ou d'ajouter une langue, sans reconstruire l'exécutable. Le dossier reste FACULTATIF : sans lui, l'application tourne déjà en FR et en US.",
+            "files.write_lang_done": "{n} fichier(s) écrit(s) dans {d}.",
+            "files.write_lang_kept": "Déjà présent(s), laissé(s) intact(s) : {l}."
         },
         "help": [
             [
@@ -623,12 +753,16 @@ BUILTIN = {
                 "Déroulé recommandé"
             ],
             [
-                "b",
-                "1. Onglet « Inventaire du cas » : lisez d'abord les sources déjà présentes dans le cas. Cela sert surtout à repérer les sources déjà indexées, pour ne pas les ajouter deux fois (elles sont retirées automatiquement de la liste d'import). Le volume déjà occupé, lui, est donné par le fichier case.xml du cas : il est connu même sans lire les sources. Le bouton « Exporter le XML » enregistre une copie de la liste lue. « Scanner les dossiers à 0 » mesure les dossiers dont Intella ne reporte pas la taille : c'est une information indicative (affichage), pas un élément du contrôle de la limite — la mesure affiche sa progression et peut être interrompue à tout moment, les dossiers déjà mesurés étant conservés."
+                "fig",
+                "parcours"
             ],
             [
                 "b",
-                "2. Onglet « Import » : collez les chemins des nouvelles sources (1 chemin par ligne) — images forensiques à gauche, dossiers/fichiers à droite."
+                "1. Étape « 1. Le cas » : lisez d'abord les sources déjà présentes dans le cas. Cela sert surtout à repérer les sources déjà indexées, pour ne pas les ajouter deux fois (elles sont retirées automatiquement de la liste d'import). Le volume déjà occupé, lui, est donné par le fichier case.xml du cas : il est connu même sans lire les sources. Le bouton « Exporter le XML » enregistre une copie de la liste lue. « Scanner les dossiers à 0 » mesure les dossiers dont Intella ne reporte pas la taille : c'est une information indicative (affichage), pas un élément du contrôle de la limite — la mesure affiche sa progression et peut être interrompue à tout moment, les dossiers déjà mesurés étant conservés."
+            ],
+            [
+                "b",
+                "2. Étape « 2. Import des sources » : collez les chemins des nouvelles sources (1 chemin par ligne) — images forensiques à gauche, dossiers/fichiers à droite."
             ],
             [
                 "b",
@@ -640,11 +774,11 @@ BUILTIN = {
             ],
             [
                 "b",
-                "« Vider la liste » retire toutes les sources d'un coup. Les chemins collés au-dessus sont conservés."
+                "« Tout vider » repart de zéro : il efface le tableau ET les chemins collés au-dessus. Le menu « Plus ▾ » propose « Vider la liste », qui ne vide que le tableau."
             ],
             [
                 "b",
-                "4. Cliquez « Calculer la taille » : la mesure est OBLIGATOIRE avant de générer (sans elle, l'outil ne peut pas vérifier que le cas restera sous la limite). Une barre de progression indique la source en cours de mesure. La taille occupée déclarée dans le case.xml du cas (onglet « 1. Inventaire du cas ») ne suffit pas : elle ne compte pas les sources ajoutées mais pas encore indexées, et peut donc sous-estimer le volume réel. Les mesures ne sont mémorisées (fichier IF_<nom du cas>.info à la racine du dossier du cas) qu'une fois les sources confirmées présentes dans le cas par « Valider les opérations » : si vous allégez une source avant de l'importer, elle sera bien remesurée."
+                "4. Les tailles : « Analyser les chemins » mesure déjà les lignes qui n'en ont pas — la mesure est OBLIGATOIRE avant de générer, sans elle l'outil ne peut pas vérifier que le cas restera sous la limite. « Remesurer » ne sert qu'à refaire la mesure d'une source allégée entre-temps. Une barre de progression indique la source en cours. La taille occupée déclarée dans le case.xml du cas (étape « 1. Le cas ») ne suffit pas : elle ne compte pas les sources ajoutées mais pas encore indexées, et peut donc sous-estimer le volume réel. Les mesures ne sont mémorisées (fichier IF_<nom du cas>.info à la racine du dossier du cas) qu'une fois les sources confirmées présentes dans le cas par « Valider les opérations » : si vous allégez une source avant de l'importer, elle sera bien remesurée."
             ],
             [
                 "b",
@@ -652,7 +786,7 @@ BUILTIN = {
             ],
             [
                 "b",
-                "Origine des tâches : le champ « Fichier de tâches » de l'onglet Import accepte tout fichier de tâches exporté d'Intella. Vous pouvez aussi recycler les tâches déjà appliquées aux sources du cas (bouton « Tâches du cas (inventaire) »), ou exporter les tâches post-indexation du cas depuis l'onglet « Détail du cas » puis désigner le fichier obtenu ici."
+                "Origine des tâches : le champ « Fichier de tâches » de l'étape « 2. Import des sources » accepte tout fichier de tâches exporté d'Intella. Vous pouvez aussi recycler les tâches déjà appliquées aux sources du cas (bouton « Tâches du cas (inventaire) »), ou exporter les tâches post-indexation du cas depuis l'écran « Détail du cas » puis désigner le fichier obtenu ici."
             ],
             [
                 "b",
@@ -680,7 +814,7 @@ BUILTIN = {
             ],
             [
                 "b",
-                "Cocher / décocher vite : « Tout cocher / décocher », ou les boutons « T1 ✓ / T1 ✗ » pour (dé)cocher toute une colonne d'un coup."
+                "Cocher / décocher vite : « Tout cocher / décocher », ou cliquez l'en-tête d'une colonne de tâche (T1, T2…) pour la cocher ou la décocher entièrement. La coche dans l'en-tête dit si la colonne est pleine."
             ],
             [
                 "b",
@@ -712,7 +846,7 @@ BUILTIN = {
             ],
             [
                 "b",
-                "Astuce « Info Profil » : réglez une source d'exemple dans Intella, puis dans l'onglet « Inventaire du cas », lisez les sources, sélectionnez cette source et cliquez « Info Profil → ». Ses réglages (y compris le filtre de types) remplissent automatiquement l'onglet Profils : il ne reste qu'à nommer et enregistrer le profil."
+                "Astuce « Info Profil » : réglez une source d'exemple dans Intella, puis dans l'étape « 1. Le cas », lisez les sources, sélectionnez cette source et cliquez « Info Profil → ». Ses réglages (y compris le filtre de types) remplissent automatiquement l'onglet Profils : il ne reste qu'à nommer et enregistrer le profil."
             ],
             [
                 "h2",
@@ -760,27 +894,47 @@ BUILTIN = {
             ],
             [
                 "p",
-                "Par défaut, Intella indexe tout ce qu'il trouve. Vous pouvez restreindre l'indexation d'une source à certaines familles de fichiers — utile quand un scellé contient surtout des données sans intérêt pour l'enquête."
-            ],
-            [
-                "warn",
-                "Dans Intella, vous cochez ce que vous voulez, mais le cas enregistre la liste INVERSE — tout ce que vous n'avez pas coché, souvent des centaines d'entrées. IntellaFeeder, lui, vous fait cocher ce que vous voulez garder."
-            ],
-            [
-                "h2",
-                "Le sélecteur de catégories"
+                "Par défaut, Intella indexe tout ce qu'il trouve. Un profil peut restreindre l'indexation à certains types de fichiers — utile quand un scellé contient surtout des données sans intérêt pour l'enquête."
             ],
             [
                 "p",
-                "Onglet « Profils » → sous-onglet « Types de fichiers à indexer ». Cochez les catégories voulues, « Appliquer au profil », puis « Enregistrer ». Seules ces catégories seront indexées pour les sources qui utilisent ce profil."
+                "Tout se passe au même endroit : onglet « Profils » → sous-onglet « Types de fichiers à indexer ». À gauche, ce que votre filtre contient ; à droite, tout ce qu'il est possible d'y mettre."
+            ],
+            [
+                "h2",
+                "Le mode : à lire avant tout le reste"
+            ],
+            [
+                "fig",
+                "filtre"
+            ],
+            [
+                "warn",
+                "Le mode vaut « exclude » par défaut, comme dans Intella. Une liste composée comme « ce que je veux garder » ferait donc exactement l'inverse : tout indexer SAUF ça. Vérifiez le mode avant d'enregistrer — Intella ne permet pas de revoir les réglages d'une source après l'import."
             ],
             [
                 "b",
-                "Aucune case cochée = aucun filtre : tout est indexé. C'est le réglage normal."
+                "Filtre vide = aucun filtre : tout est indexé. C'est le réglage normal, et le plus fréquent."
+            ],
+            [
+                "h2",
+                "Composer un filtre"
+            ],
+            [
+                "p",
+                "Sélectionnez une ou plusieurs entrées à droite, puis « ◀ Ajouter au filtre » — un double-clic sur un type fait la même chose pour lui seul. À gauche, un double-clic retire le type du filtre ; « Retirer du filtre » et « Tout retirer » aussi. Rien n'est enregistré tant que vous n'avez pas cliqué « Enregistrer »."
             ],
             [
                 "b",
-                "« Toutes les catégories » revient au même : tout est indexé."
+                "« Catégories seules » (coché par défaut) ne montre que les 78 catégories d'Intella — Documents, Images, Chat… C'est ce qu'on met le plus souvent dans un filtre, et elles ont toutes un libellé."
+            ],
+            [
+                "b",
+                "Décoché, vous voyez tous les types, rangés par famille : application, image, text, message… Sélectionner une famille entière ajoute tous ses types d'un coup."
+            ],
+            [
+                "b",
+                "La famille n'est pas la catégorie d'Intella. Le fichier de descriptions livré par Vound nomme les catégories et les types, mais ne dit jamais quel type appartient à quelle catégorie : la famille (la partie avant la barre oblique) est le seul regroupement qu'on puisse en déduire."
             ],
             [
                 "h2",
@@ -788,11 +942,27 @@ BUILTIN = {
             ],
             [
                 "p",
-                "Un profil récupéré d'une source déjà réglée dans Intella (bouton « Info Profil » de l'Inventaire) porte souvent une longue liste de types à écarter. Le bouton « Voir les types… » l'affiche en clair, avec son sens : selon le mode, la liste désigne ce qui est indexé ou au contraire ce qui est écarté. Lisez toujours la ligne en gras en haut de la fenêtre avant de conclure."
+                "Un profil récupéré d'une source déjà réglée dans Intella (bouton « Info Profil » de l'étape « 1. Le cas ») porte souvent une longue liste de types. Le panneau de gauche la montre telle quelle ; la phrase en haut dit ce qu'elle fait."
             ],
             [
                 "p",
-                "Les noms sont colorés : en bleu ceux que le référentiel sait nommer, en noir ceux qu'Intella écrit sans les décrire (ce sont des synonymes, c'est normal), en rouge ceux qui n'ont jamais été rencontrés — à vérifier."
+                "Quatre états, quatre couleurs — passez la souris sur la liste pour les revoir :"
+            ],
+            [
+                "b",
+                "décrit (bleu) : le libellé vient du fichier de Vound."
+            ],
+            [
+                "b",
+                "décrit par vous (turquoise) : vous l'avez saisi vous-même."
+            ],
+            [
+                "b",
+                "connu, sans libellé (noir) : le nom existe — Intella l'écrit — mais personne ne le décrit. C'est un synonyme parfaitement valide, il n'y a rien à corriger. Sur un filtre réel, près d'un nom sur cinq est dans ce cas."
+            ],
+            [
+                "b",
+                "inconnu (rouge) : jamais rencontré. Vérifiez l'orthographe, ou votre version d'Intella est plus récente que le référentiel."
             ],
             [
                 "h2",
@@ -800,15 +970,51 @@ BUILTIN = {
             ],
             [
                 "p",
-                "Certains types que filtre un cas n'ont aucune description : ce sont des synonymes qu'Intella écrit sans les nommer. Vous pouvez leur donner votre propre libellé : onglet « Profils » → sous-onglet « Référentiel », double-cliquez une ligne."
-            ],
-            [
-                "b",
-                "Votre description apparaît ensuite partout où le type est affiché, en turquoise pour la distinguer de celles d'Intella."
+                "Cela se fait dans Maintenance → Types MIME, le seul endroit où l'on entretient le référentiel : sélectionnez le type (ou double-cliquez-le), puis « Décrire ce type… » et saisissez votre libellé. Il apparaît ensuite partout où le type est affiché, en turquoise."
             ],
             [
                 "b",
                 "Si une future version d'Intella décrit ce type, c'est SA description qui s'affichera. La vôtre n'est pas perdue pour autant."
+            ],
+            [
+                "h1",
+                "Le référentiel des types : d'où viennent les noms"
+            ],
+            [
+                "p",
+                "Un filtre est une liste de noms techniques. Le référentiel sert à les afficher en clair. Il se remplit de trois façons, qui s'additionnent."
+            ],
+            [
+                "b",
+                "Les descriptions intégrées à l'application : 679 libellés, disponibles dès la première installation. Vous n'avez rien à faire pour en profiter."
+            ],
+            [
+                "b",
+                "Un fichier importé : Maintenance → Types MIME → « Importer un fichier de descriptions… ». Le fichier se trouve dans le dossier d'installation d'Intella (mimetype-descriptions_<langue>.properties). Utile si votre version d'Intella est plus récente que l'application."
+            ],
+            [
+                "b",
+                "Vos propres descriptions, saisies au fil de l'eau."
+            ],
+            [
+                "p",
+                "Les imports successifs se CUMULENT : un nouveau fichier ajoute ses libellés et remplace ceux de même nom, sans jamais effacer les autres. La colonne « Vient de » de Maintenance → Types MIME dit, pour chaque entrée, d'où sort son libellé."
+            ],
+            [
+                "h2",
+                "« Apprendre depuis un export XML », à quoi ça sert"
+            ],
+            [
+                "p",
+                "Intella écrit dans ses filtres des synonymes qu'il ne décrit nulle part — cinq noms différents pour un document Word, par exemple. Ces noms sont valides, mais absents du fichier de descriptions."
+            ],
+            [
+                "p",
+                "« Apprendre depuis un export XML » récolte ces noms dans un export de sources et les mémorise. Ils passent alors de « inconnu » (rouge) à « connu, sans libellé » (noir) : vous ne les confondrez plus avec une faute de frappe. Aucun libellé n'est inventé au passage."
+            ],
+            [
+                "b",
+                "L'application apprend déjà toute seule de chaque cas que vous lisez. Ce bouton sert à repartir d'un export gardé de côté, ou d'un cas lu sur un autre poste."
             ],
             [
                 "h1",
@@ -837,6 +1043,10 @@ BUILTIN = {
             [
                 "h1",
                 "Images en plusieurs morceaux : intégrité"
+            ],
+            [
+                "fig",
+                "segments"
             ],
             [
                 "warn",
@@ -896,15 +1106,15 @@ BUILTIN = {
             ],
             [
                 "b",
-                "Dès que vous sélectionnez un cas compound, l'onglet « Import » se grise : il n'y a rien à y importer. Pour ajouter des sources, prenez plutôt l'un de ses sous-cas comme cas de travail."
+                "Dès que vous sélectionnez un cas compound, l'étape « 2. Import des sources » se grise : il n'y a rien à y importer. Pour ajouter des sources, prenez plutôt l'un de ses sous-cas comme cas de travail."
             ],
             [
                 "b",
-                "L'onglet « Inventaire du cas » interroge chaque sous-cas à tour de rôle : le tableau gagne une colonne « Sous-cas » qui indique d'où vient chaque source. L'export CSV la reprend, et « Exporter le XML » dépose un fichier par sous-cas."
+                "L'étape « 1. Le cas » interroge chaque sous-cas à tour de rôle : le tableau gagne une colonne « Sous-cas » qui indique d'où vient chaque source. L'export CSV la reprend, et « Exporter le XML » dépose un fichier par sous-cas."
             ],
             [
                 "b",
-                "L'onglet « Détail du cas » liste les sous-cas référencés (nom, volume) et les utilisateurs qui ont des droits, ceux du compound comme ceux des sous-cas."
+                "L'écran « Détail du cas » liste les sous-cas référencés (nom, volume) et les utilisateurs qui ont des droits, ceux du compound comme ceux des sous-cas."
             ],
             [
                 "p",
@@ -1000,7 +1210,7 @@ BUILTIN = {
             "inventory.case_summary": "Case « {n} » — {c} source(s) — case size {s}",
             "inventory.n_scannable_folders": "{n} zero-size folder(s) (scannable)",
             "inventory.zero_folders_title": "Zero-size folders",
-            "inventory.zero_folders_none": "No folder without size to measure.\nFirst read the case's sources.",
+            "inventory.zero_folders_none": "No folder left to measure: every volume in this case is known.",
             "inventory.scan_cancel_log": "Folder scan: cancellation requested.",
             "inventory.scan_cancelled_log": "Scan interrupted: {n} folder(s) measured, {m} still at 0.",
             "inventory.scan_cancelled_summary": "Scan interrupted — {n} folder(s) measured (total {t}), {m} still at 0.",
@@ -1019,7 +1229,7 @@ BUILTIN = {
             "inventory.info_profile_log": "Profile info: settings from « {n} » transferred to the Profiles tab ({c} option(s)).",
             "inventory.export_xml_none": "No XML available.\nFirst run « Read sources ».",
             "inventory.export_xml_log": "Sources XML exported: {p}",
-            "inventory.export_tasks_none": "No task on this case's sources.\nFirst read the sources (« Read sources »).",
+            "inventory.export_tasks_none": "No task is defined on the sources of this case.",
             "inventory.export_tasks_log": "Case tasks exported ({n} deduplicated task(s)): {p}",
             "inventory.export_tasks_msg": "{n} deduplicated task(s) exported:\n{p}\n\n1 object = 1 logical task (per-source UUIDs merged by signature).",
             "inventory.export_csv_none": "First read a case's sources.",
@@ -1079,7 +1289,7 @@ BUILTIN = {
             "opt.enableCrawlerScript": "Enable a crawler script",
             "opt.sourceCrawlerScriptType": "Crawler script type",
             "opt.sourceCrawlerScriptFile": "Crawler script file",
-            "profiles.intro": "A profile = a set of analysis settings applied to a source at import time (assigned in the « 2. Import » tab, « Profile » column). « Intella defaults » applies Intella's standard settings (no option forced); only values that differ from them are saved and emitted. The ★ marks the profile given to new sources — « Set as default » changes it.",
+            "profiles.intro": "A profile = a set of analysis settings applied to a source at import time (assigned in the « 2. Sources » step, « Profile » column). « Intella defaults » applies Intella's standard settings (no option forced); only values that differ from them are saved and emitted. The ★ marks the profile given to new sources — « Set as default » changes it.",
             "profiles.saved": "Saved profiles",
             "profiles.name_label": "Profile name",
             "profiles.new": "New",
@@ -1087,7 +1297,7 @@ BUILTIN = {
             "profiles.comments": "Comments",
             "profiles.analysis_options": "Analysis options",
             "profiles.to_verify": "to verify",
-            "profiles.images_only": "[images]",
+            "profiles.images_only": "images",
             "profiles.filename_filter_tip": "Wildcards allowed in file names: « ? » (one character) and « * » (several). E.g.: report_*.pdf, IMG_????.jpg",
             "profiles.name_required": "Enter a profile name.",
             "profiles.default_reserved": "The « default » profile is reserved.",
@@ -1110,11 +1320,11 @@ BUILTIN = {
             "profiles.err_already_exists": "A profile « {n} » already exists.",
             "tabs.inventory": "1. Case inventory",
             "tabs.detail": "Case details",
-            "tabs.import": "2. Import",
+            "tabs.import": "2. Import sources",
             "tabs.profiles": "Profiles",
             "tabs.journal": "Log",
             "tabs.help": "Help",
-            "detail.no_case": "Select a case in the « 1. Case inventory » tab.",
+            "detail.no_case": "Select a case in the « 1. The case » step.",
             "detail.h1_case": "Case",
             "detail.name": "Name",
             "detail.folder": "Folder",
@@ -1157,11 +1367,11 @@ BUILTIN = {
             "import.case_prefix": "Case « {n} » : ",
             "import.case_tasks": "Case tasks (inventory)",
             "import.case_tasks_none": "No task is defined on this case's sources.",
-            "import.case_tasks_not_loaded": "The case's source list is not loaded.\nRun « Read sources » in the « 1. Case inventory » tab.",
+            "import.case_tasks_not_loaded": "The case's source list is not loaded.\nRun « Read sources » in the « 1. The case » step.",
             "import.case_tasks_recycled_log": "Tasks recycled from the case inventory: {n} task(s).",
             "import.case_tasks_recycled_msg": "{n} case task(s) loaded (deduplicated).\nThey apply like a task file: check them per source.",
             "import.case_tasks_unreadable": "Unreadable tasks:\n{e}",
-            "import.check_all": "Imp.: check all",
+            "import.check_all": "Check all",
             "import.close": "Close",
             "import.col_delete": "Del.",
             "import.col_import": "Imp.",
@@ -1170,7 +1380,7 @@ BUILTIN = {
             "import.col_name": "Source name",
             "import.col_profile": "Profile",
             "import.col_source": "Source",
-            "import.compute_size": "Compute size",
+            "import.compute_size": "Re-measure",
             "import.computing_size_log": "Computing the size of {n} checked source(s)…",
             "import.corrections_needed": "Corrections needed",
             "import.default_profile_label": "Default profile:",
@@ -1218,7 +1428,7 @@ BUILTIN = {
             "import.n_removed_auto": "{n} already indexed in the case, removed automatically.",
             "import.n_sources_loaded": "{n} source(s) loaded.",
             "import.no_bat_found": "No import file found for this case.\nFirst click « Generate the import files ».",
-            "import.no_case_selected": "ⓘ No case selected — choose one in the « 1. Case inventory » tab.",
+            "import.no_case_selected": "ⓘ No case selected — choose one in the « 1. The case » step.",
             "import.no_checked": "No source checked « Import ».\nOnly checked rows are measured.",
             "import.no_inventory_read": "⚠ source list not read (tab 1) → no deduplication.",
             "import.no_rows_to_export": "No row to export.",
@@ -1244,9 +1454,9 @@ BUILTIN = {
             "import.report_title": "Done",
             "import.run_confirm": "Run the import into Intella?\n\n{b}\n\nIntellaCmd will add the sources to the case (not reversible on the case side). A console window opens and shows progress.\n\n« Validate operations » will start automatically when the import finishes.\n\nContinue?",
             "import.run_import": "Import (run the .bat)",
-            "import.select_case_first": "First select a case (« 1. Case inventory » tab).",
-            "import.select_case_short": "First select a case (« 1. Case inventory » tab).",
-            "import.select_case_target": "First select a case in the « 1. Case inventory » tab.",
+            "import.select_case_first": "First select a case (« 1. The case » step).",
+            "import.select_case_short": "First select a case (« 1. The case » step).",
+            "import.select_case_target": "First select a case in the « 1. The case » step.",
             "import.size_done_log": "Size computation done. Total checked: {t}.",
             "import.size_title": "Size",
             "import.skip_integrity": "Do not verify source integrity (multi-segment images — works around the Vound bug)",
@@ -1254,7 +1464,7 @@ BUILTIN = {
             "import.summarize": "▼ Analyse paths",
             "import.summary_log": "Analysis: {n} source(s).",
             "import.summary_removed_log": "{n} already in the case, removed.",
-            "import.target_case_frame": "Target case (set by the « 1. Case inventory » tab)",
+            "import.target_case_frame": "Target case (set by the « 1. The case » step)",
             "import.tasks_check_all": "Tasks: check all",
             "import.tasks_file_label": "Task file",
             "import.tasks_file_loaded_log": "Task file loaded: {n} task(s).",
@@ -1266,7 +1476,7 @@ BUILTIN = {
             "import.tasks_uncheck_all": "Tasks: uncheck all",
             "import.timezone_label": "Timezone",
             "import.total_summary": "{n} source(s), {c} to import — checked size: {t}{suffix}",
-            "import.uncheck_all": "Imp.: uncheck all",
+            "import.uncheck_all": "Uncheck all",
             "import.under_limit": "under",
             "import.validate": "Validate operations",
             "import.validate_absent": "  ✗ {n}: absent from the case (no matching import log).",
@@ -1285,7 +1495,7 @@ BUILTIN = {
             "import.warnings_title": "Warnings",
             "import.write_title": "Writing",
             "import.zero_sources": "0 source",
-            "import.compound_body": "“{n}” is a COMPOUND case: it only references sub-cases and accepts no source.\n\nAdd the sources to one of its sub-cases (select it as the case in the “1. Case inventory” tab).",
+            "import.compound_body": "“{n}” is a COMPOUND case: it only references sub-cases and accepts no source.\n\nAdd the sources to one of its sub-cases (select it as the case in the “1. The case” step).",
             "import.compound_title": "Compound case",
             "type.folder": "Folder",
             "type.image": "Image",
@@ -1368,8 +1578,8 @@ BUILTIN = {
             "import.image_filetypes": "Forensic images",
             "import.pick_files_title": "Files to add as sources",
             "import.run_all": "▶ Run the full import",
-            "import.steps_show": "⋯ Steps",
-            "import.steps_hide": "⋯ Hide",
+            "import.steps_show": "Steps ▾",
+            "import.steps_hide": "Steps ▴",
             "import.generated_log": "Import files generated in {p}.",
             "topbar.language_lose_work": "{n} source(s) are listed in the « Import » tab. Restarting loses them.\n\nExport the list first (« Export the list… ») if you want it back.\n\nContinue anyway?",
             "inventory.info_profile_ignored": "Not carried over (not drivable at import): {k}. “View settings…” shows them in detail.",
@@ -1388,29 +1598,29 @@ BUILTIN = {
             "mime.col_label": "Description",
             "mime.col_state": "Status",
             "mime.state_empty": "No reference loaded. Filters remain readable, but without descriptions. Import the file from your Intella installation.",
-            "mime.state": "{d} descriptions ({c} categories) — {o} name(s) seen in your cases, {s} of them without a description.",
+            "mime.state": "{d} descriptions ({c} categories) — {o} known type name(s), {s} of them without a description.",
             "mime.state_file": "File: {f}",
             "mime.state_duplicates": "{n} duplicate key(s) in the file — the last value wins.",
             "mime.import_title": "Import a MIME type reference",
             "mime.filetype": "Intella descriptions",
-            "mime.import_ok": "{n} description(s) imported.",
-            "mime.import_added": "{n} new type(s).",
+            "mime.import_ok": "{n} description(s) read from the file.",
+            "mime.import_added": "{n} type(s) gain a label.",
             "mime.import_removed": "⚠ {n} type(s) described by the previous file no longer are: {ex}…",
             "mime.import_duplicates": "{n} duplicate key(s) in the file.",
             "mime.search_none": "No type matches “{q}”.",
             "mime.state_described": "described",
-            "mime.state_observed": "seen in your cases",
+            "mime.state_observed": "known, no label",
             "mime.state_unknown": "unknown",
             "files.base": "Application folder",
             "files.ini": "Settings (.ini)",
             "files.profiles": "Analysis profiles",
-            "files.lang": "Languages",
+            "files.lang": "Languages (optional folder)",
             "files.mime": "MIME type reference",
             "files.missing": "(missing)",
             "files.open": "Open",
             "mime.untyped": "(untyped)",
             "mime.filter_none": "No filter (all types indexed).",
-            "mime.filter_summary": "{t} type(s) — {d} described, {o} seen in your cases",
+            "mime.filter_summary": "{t} type(s) — {d} described, {o} without a label",
             "mime.filter_unknown": "{n} unknown",
             "mime.filter_title": "Filtered types",
             "common.close": "Close",
@@ -1428,7 +1638,7 @@ BUILTIN = {
             "options.recursive_default": "Explore subfolders by default (forensic image drop)",
             "options.recursive_help": "When unchecked, a dropped folder is scanned one level deep only: a seals folder often sits next to other cases or working copies, and descending by default would bring in foreign images. Check it if your images always live in subfolders. The checkbox stays editable for each drop in the Import tab.",
             "options.recursive_saved": "Recursive exploration by default: {v}.",
-            "mime.origin_embedded": "Source: version BUILT INTO the application. Dropping a .properties file in the folder below would replace it.",
+            "mime.origin_embedded": "All of them come from the version built into the application; importing an Intella .properties file would add its own.",
             "mime.origin_external": "Source: EXTERNAL FILE, replacing the built-in version ({e} descriptions).",
             "mime.origin_learned": "{n} name(s) learned from your cases add to the shipped ones.",
             "mime.filter_none_include": "No filter: “include” mode has no effect while the list is empty — every type is indexed.",
@@ -1485,7 +1695,7 @@ BUILTIN = {
             "profiles.ref_learned": "{n} name(s) learnt from your cases.",
             "profiles.ref_case": "{n} type(s) filtered by the last case read have no description:",
             "profiles.ref_case_ok": "No undescribed type in the last case read.",
-            "mime.pane_current": "Types in this filter",
+            "mime.pane_current": "Types included in this filter",
             "mime.pane_catalog": "Available types (reference)",
             "mime.only_categories": "Categories only",
             "mime.catalog_count": "{n} type(s) shown on the right.",
@@ -1508,7 +1718,138 @@ BUILTIN = {
             "profiles.ref_edit_prompt": "Description of “{n}”:",
             "profiles.ref_edit_official": "Careful: Intella now describes this type “{d}”. Its description will keep priority over yours.",
             "profiles.ref_edit_failed": "Could not save: {e}",
-            "profiles.ref_edit_log": "Personal description: {n} → “{d}”"
+            "profiles.ref_edit_log": "Personal description: {n} → “{d}”",
+            "import.params_edit": "Edit ▾",
+            "import.integrity_off": "source integrity not checked",
+            "import.integrity_on": "source integrity checked",
+            "import.summary_case": "Target case: {n}",
+            "import.summary_limit": "limit {g} GB",
+            "import.summary_tz": "time zone {t}",
+            "import.summary_tasks": "tasks {f}",
+            "import.more_tip": "Export / import a list, reload tasks, reuse the case tasks, clear the list",
+            "import.already_in_case": "— already in the case",
+            "import.params_close": "Collapse ▴",
+            "import.summary_nocase": "none",
+            "journal.filter_all": "All",
+            "journal.status_errors": "{e} error(s) and {a} warning(s) — see the journal",
+            "journal.status_alerts": "{a} warning(s) — see the journal",
+            "journal.filter_alerts": "Warnings",
+            "journal.filter_errors": "Errors",
+            "journal.search": "Search",
+            "options.dnd_saved": "Drag and drop: {v} (from next start).",
+            "options.display": "Display",
+            "options.dnd": "Drag and drop",
+            "options.scale_reset": "Reset",
+            "options.language": "Language",
+            "options.language_hint": "applied on restart",
+            "options.density": "Display density",
+            "options.font_scale": "Text size",
+            "options.density_help": "Density drives table row height and margins: “compact” to fit more sources on a laptop screen, “comfortable” on a large display. Both settings apply immediately.",
+            "options.dnd_enable": "Enable drag and drop from File Explorer",
+            "options.dnd_help": "Safety switch: when off, the application stays usable by pasting paths and by the “Add…” buttons. Takes effect on restart.",
+            "ctx.case": "CASE",
+            "ctx.user": "USER",
+            "ctx.exe": "INTELLACMD",
+            "step.case": "The case",
+            "step.case_sub": "read what is already there",
+            "step.sources": "Import sources",
+            "step.sources_sub": "paste, measure, import",
+            "step.import": "Import",
+            "step.import_sub": "generate and run",
+            "ctx.edit": "Edit…",
+            "tabs.detail_short": "Details",
+            "ctx.no_case": "no case selected",
+            "ctx.exe_ok": "configured",
+            "ctx.exe_missing": "not set",
+            "options.density_compact": "Compact",
+            "options.density_normal": "Normal",
+            "options.density_comfort": "Comfortable",
+            "profiles.to_verify_tip": "Presumed mapping, never confirmed on a real case: check before relying on it.",
+            "profiles.images_only_tip": "No effect on a folder source: applies to forensic images only.",
+            "status.compound": "compound case",
+            "status.case_loaded": "Case “{n}” loaded.",
+            "import.status_validated": "{n} source(s) confirmed in the case.",
+            "profiles.filter_mode_label": "Type filter mode",
+            "profiles.filter_mode_tip": "“exclude”: the listed types are LEFT OUT, everything else is indexed.\n“include”: ONLY the listed types are indexed.\n\nIt defaults to “exclude”, as in Intella: a list built as “what I want to keep” would then do the exact opposite.",
+            "profiles.other_filters": "Other filters",
+            "profiles.hash_filter_tip": "Paths to .md5 files, comma separated. Items whose hash appears there are left out of indexing.\n⚠ The path must be reachable FROM THE INTELLA SERVER, not from this workstation.",
+            "mime.states_tip": "A type's state in the reference list:\n• described — label supplied by Vound;\n• described by you — label you typed;\n• known, no label — the name exists (Intella writes it), but nobody describes it. A valid synonym, nothing to fix;\n• unknown — never encountered. Check the spelling, or your Intella is newer than the reference list.",
+            "mime.only_categories_tip": "Ticked: only Intella's 78 categories, all of them described — that is what a filter usually holds.\nUnticked: every type, grouped by family (application, image, text…). The family is the only membership Vound's reference list allows us to derive; it never says which Intella category a type belongs to.",
+            "mime.add_to_filter": "◀ Add to filter",
+            "mime.remove_all": "Remove all",
+            "mime.describe": "Describe this type…",
+            "mime.describe_title": "Describe a type",
+            "mime.describe_prompt": "Your description for “{t}”:",
+            "mime.describe_none": "Select a type in the list first.",
+            "mime.describe_log": "Personal description: {t} → “{d}”",
+            "mime.count_in_filter": "{n} type(s) in this filter",
+            "mime.added_log": "{n} type(s) added to the profile filter.",
+            "mime.ref_categories": "{n} categor(ies)",
+            "mime.ref_types": "{n} type(s) in {f} famil(ies)",
+            "mime.family_other": "(other)",
+            "mime.family_count": "{n} type(s)",
+            "mime.col_origin": "Comes from",
+            "mime.filter_undescribed": "No description",
+            "mime.filter_user": "Described by you",
+            "mime.filter_external": "From an import",
+            "mime.shown": "{n} type(s) shown.",
+            "mime.import_tip": "Adds the labels of an Intella .properties file to those already known.\nEntries of the same name are replaced by the file's; the others stay. Nothing is lost: successive imports add up into a single file.",
+            "mime.learn_tip": "Collects the type NAMES found in a source export, without giving them a label.\n\nWhat for: Intella writes synonyms into its filters that it describes nowhere (18 % of a real filter). Learning them keeps those names from showing as “unknown” — which would make the normal look like an anomaly.",
+            "mime.origin_merged": "{n} description(s) come from {f} imported file(s), added to the {e} built-in ones.",
+            "mime.import_updated": "{n} label(s) replaced by the file's.",
+            "mime.import_kept": "{n} were already identical.",
+            "mime.import_total": "The reference list now holds {n} descriptions.",
+            "settings.tip_mapped": "This setting is one of the options IntellaCmd accepts on automatic import. Saved in the profile, it will be reapplied as is to every source using that profile. Nothing for you to do.",
+            "settings.tip_unsupported": "Intella can store this setting, but its automatic import does not accept it: the command silently drops it. A profile therefore cannot replay it.\n\nWhat to do: after the import, open the source in Intella and set it by hand — or accept the default.",
+            "settings.tip_unknown": "This setting name is neither in the list of drivable options nor in the list of known-but-not-replayable ones. That almost always means your Intella is newer than what the application knows about.\n\nWhat to do: check in Intella what that setting is worth for your sources. Nothing is broken.",
+            "help.search": "Search the help",
+            "help.search_clear": "Clear",
+            "help.search_hits": "{n} result(s)",
+            "help.search_pos": "{i} / {n}",
+            "help.search_tip": "Type a word: every occurrence is highlighted. “›” and “‹” jump from one to the next; Enter does the same as “›”.",
+            "help.fig_step1": "① The case",
+            "help.fig_step1_sub": "read what is already there",
+            "help.fig_step2": "② Import sources",
+            "help.fig_step2_sub": "paste → analyse → run the import",
+            "help.fig_include": "ONLY these types are indexed",
+            "help.fig_exclude": "these types are LEFT OUT",
+            "help.fig_filter_note": "The default is “exclude”.\nA list built as “what I want”\nthen does the exact opposite.",
+            "help.fig_first": "give this one",
+            "help.fig_segments_note": "One line to paste: the first segment. Intella finds the others by itself.",
+            "files.col_what": "Item",
+            "files.col_where": "Location",
+            "files.col_state": "State",
+            "files.copy": "Copy this information",
+            "files.copied": "Version information copied.",
+            "files.n_files": "{n} file(s)",
+            "files.n_cases": "{n} case(s)",
+            "files.cases": "Generated output",
+            "files.state_ok": "read at startup",
+            "files.hint": "Double-click a row to open it. A missing folder is not a fault: it is created on first use.",
+            "app.subtitle": "Intella import source generator",
+            "import.clear_all": "Clear all",
+            "import.clear_all_tip": "Clears the table AND the paths pasted above: you start from scratch.",
+            "import.clear_all_confirm": "Start from scratch?\n\n{n} source(s) from the table and {c} pasted path(s) will be erased.",
+            "import.clear_all_log": "Tab cleared: {n} source(s) and {c} pasted path(s).",
+            "inventory.info_profile_tip": "Picks up the indexing settings of the selected source and opens the Profiles tab to save them under a name.",
+            "inventory.zero_folders_unread": "The sources of this case have not been read yet.\nRun “Read sources” first.",
+            "inventory.export_tasks_unread": "The sources of this case have not been read yet.\nRun “Read sources” first.",
+            "mime.filter_all": "All",
+            "import.more": "More ▾",
+            "mime.catalog_tip": "Double-click a type to add it to the filter on the left (you can also select several, then “◀ Add to filter”).\nDouble-clicking a family folds or unfolds it.\n\nTo give a type a label, go to Maintenance → MIME types.",
+            "inventory.grp_profile": "Reuse",
+            "settings.col_why": "Why",
+            "mime.origin_embedded_short": "built in",
+            "mime.origin_external_short": "imported file",
+            "mime.origin_user_short": "you",
+            "app.started_log": "{a} {v} started.",
+            "app.exe_unset_log": "IntellaCmd.exe path not stored yet (it will be written to the .ini).",
+            "app.ini_created_log": "Configuration file created: {p}",
+            "files.lang_state": "{l} — built into the application; {n} file(s) here",
+            "files.write_lang": "Write the languages here…",
+            "files.write_lang_tip": "Drops a copy of the languages built into the application (FR, US) into the “lang” folder.\n\nWhat for: a .lang file that is present wins over the built-in version. That is how you fix a translation, or add a language, without rebuilding the executable. The folder stays OPTIONAL: without it the application already runs in FR and US.",
+            "files.write_lang_done": "{n} file(s) written to {d}.",
+            "files.write_lang_kept": "Already there, left untouched: {l}."
         },
         "help": [
             [
@@ -1545,7 +1886,7 @@ BUILTIN = {
             ],
             [
                 "b",
-                "4. Click « Compute size »: measuring is MANDATORY before generating (without it, the tool cannot check that the case stays under the limit). A progress bar shows the source being measured. The used size declared in the case's case.xml (« 1. Case inventory » tab) is not enough: it does not count sources added but not yet indexed, so it may underestimate the actual volume. Measurements are only saved (file IF_<case name>.info at the root of the case folder) once the sources are confirmed present in the case by « Validate operations »: if you trim a source before importing it, it will be measured again."
+                "4. Click « Compute size »: measuring is MANDATORY before generating (without it, the tool cannot check that the case stays under the limit). A progress bar shows the source being measured. The used size declared in the case's case.xml (« 1. The case » step) is not enough: it does not count sources added but not yet indexed, so it may underestimate the actual volume. Measurements are only saved (file IF_<case name>.info at the root of the case folder) once the sources are confirmed present in the case by « Validate operations »: if you trim a source before importing it, it will be measured again."
             ],
             [
                 "b",
@@ -1553,7 +1894,7 @@ BUILTIN = {
             ],
             [
                 "b",
-                "Where tasks come from: the Import tab's « Task file » field accepts any task file exported from Intella. You can also recycle the tasks already applied to the case's sources (« Case tasks (inventory) » button), or export the case's post-indexing tasks from the « Case detail » tab and select the resulting file here."
+                "Where tasks come from: the “2. Import sources” step's « Task file » field accepts any task file exported from Intella. You can also recycle the tasks already applied to the case's sources (« Case tasks (inventory) » button), or export the case's post-indexing tasks from the « Case detail » tab and select the resulting file here."
             ],
             [
                 "b",
@@ -1653,7 +1994,7 @@ BUILTIN = {
             ],
             [
                 "b",
-                "In the Import tab's source list, the « Profile » column lets you choose the profile for each source. The « Default profile » menu applies the chosen profile to every row at once."
+                "In the “2. Import sources” step's source list, the « Profile » column lets you choose the profile for each source. The « Default profile » menu applies the chosen profile to every row at once."
             ],
             [
                 "h1",
@@ -1661,27 +2002,47 @@ BUILTIN = {
             ],
             [
                 "p",
-                "By default Intella indexes everything it finds. You can restrict a source to certain families of files — useful when an exhibit mostly holds data of no interest to the case."
-            ],
-            [
-                "warn",
-                "In Intella you tick what you want, but the case stores the OPPOSITE list — everything you did not tick, often hundreds of entries. IntellaFeeder instead lets you tick what you want to keep."
-            ],
-            [
-                "h2",
-                "The category selector"
+                "By default Intella indexes everything it finds. A profile can narrow indexing down to certain file types — useful when an exhibit mostly holds data of no interest to the case."
             ],
             [
                 "p",
-                "“Profiles” tab → “File types to index” sub-tab. Tick the categories you want, “Apply to profile”, then “Save”. Only those categories will be indexed for sources using this profile."
+                "It all happens in one place: the “Profiles” tab → “File types to index” sub-tab. On the left, what your filter contains; on the right, everything you can put in it."
+            ],
+            [
+                "h2",
+                "The mode: read this before anything else"
+            ],
+            [
+                "fig",
+                "filtre"
+            ],
+            [
+                "warn",
+                "The mode defaults to “exclude”, as it does in Intella. A list built as “what I want to keep” would therefore do the exact opposite: index everything BUT that. Check the mode before saving — Intella will not let you review a source's settings after import."
             ],
             [
                 "b",
-                "No box ticked = no filter: everything is indexed. That is the normal setting."
+                "An empty filter means no filter at all: everything is indexed. That is the normal — and most common — setting."
+            ],
+            [
+                "h2",
+                "Building a filter"
+            ],
+            [
+                "p",
+                "Select one or more entries on the right, then “◀ Add to filter” — double-clicking a type does the same for that one type. On the left, a double-click takes the type out of the filter; so do “Remove” and “Remove all”. Nothing is stored until you click “Save”."
             ],
             [
                 "b",
-                "“All items” amounts to the same thing: everything is indexed."
+                "“Categories only” (ticked by default) shows just Intella's 78 categories — Documents, Images, Chat… That is what a filter usually holds, and they all carry a label."
+            ],
+            [
+                "b",
+                "Unticked, you see every type, grouped by family: application, image, text, message… Selecting a whole family adds all of its types at once."
+            ],
+            [
+                "b",
+                "A family is not an Intella category. The description file shipped by Vound names both categories and types, but never says which type belongs to which category: the family (the part before the slash) is the only grouping that can be derived from it."
             ],
             [
                 "h2",
@@ -1689,27 +2050,79 @@ BUILTIN = {
             ],
             [
                 "p",
-                "A profile picked up from a source already configured in Intella (“Profile info” button in the Inventory) often carries a long list of types to skip. The “View types…” button shows it in plain language, with its meaning: depending on the mode, the list says what is indexed or what is skipped. Always read the bold line at the top of the window before drawing conclusions."
+                "A profile picked up from a source already tuned in Intella (the “Profile info” button in step “1. The case”) often carries a long list of types. The left pane shows it as is; the sentence at the top says what it does."
             ],
             [
                 "p",
-                "Names are colour-coded: blue for those the reference can name, black for those Intella writes without describing (they are synonyms, this is normal), red for those never seen before — worth checking."
-            ],
-            [
-                "h2",
-                "Naming a type the reference does not know"
-            ],
-            [
-                "p",
-                "Some types filtered by a case have no description: they are synonyms Intella writes without naming. You can give them your own label: “Profiles” tab → “Reference” sub-tab, double-click a row."
+                "Four states, four colours — hover over the list to see them again:"
             ],
             [
                 "b",
-                "Your description then appears wherever the type is shown, in teal so it stands apart from Intella's."
+                "described (blue): the label comes from Vound's file."
+            ],
+            [
+                "b",
+                "described by you (teal): you typed it yourself."
+            ],
+            [
+                "b",
+                "known, no label (black): the name exists — Intella writes it — but nobody describes it. A perfectly valid synonym, nothing to fix. In a real filter, close to one name in five is like this."
+            ],
+            [
+                "b",
+                "unknown (red): never encountered. Check the spelling, or your Intella version is newer than the reference list."
+            ],
+            [
+                "h2",
+                "Naming a type the reference list ignores"
+            ],
+            [
+                "p",
+                "This is done in Maintenance → MIME types, the one place where the reference list is maintained: select the type (or double-click it), then “Describe this type…” and type your label. It then shows up everywhere that type appears, in teal."
             ],
             [
                 "b",
                 "If a future Intella version describes that type, ITS description wins. Yours is not lost for all that."
+            ],
+            [
+                "h1",
+                "The type reference list: where the names come from"
+            ],
+            [
+                "p",
+                "A filter is a list of technical names. The reference list turns them into plain language. It fills up three ways, and they add up."
+            ],
+            [
+                "b",
+                "Descriptions built into the application: 679 labels, available from the very first install. Nothing to do to benefit from them."
+            ],
+            [
+                "b",
+                "An imported file: Maintenance → MIME types → “Import a description file…”. The file sits in Intella's install folder (mimetype-descriptions_<language>.properties). Useful when your Intella is newer than the application."
+            ],
+            [
+                "b",
+                "Your own descriptions, typed as you go."
+            ],
+            [
+                "p",
+                "Successive imports ADD UP: a new file contributes its labels and replaces those of the same name, never wiping the others. The “Comes from” column in Maintenance → MIME types tells you, for each entry, where its label comes from."
+            ],
+            [
+                "h2",
+                "What “Learn from an XML export” is for"
+            ],
+            [
+                "p",
+                "Intella writes synonyms into its filters that it describes nowhere — five different names for a Word document, for instance. Those names are valid, but absent from the description file."
+            ],
+            [
+                "p",
+                "“Learn from an XML export” collects those names from a source export and remembers them. They move from “unknown” (red) to “known, no label” (black), so you will not mistake them for a typo. No label is invented along the way."
+            ],
+            [
+                "b",
+                "The application already learns from every case you read. This button is for starting from an export you kept aside, or a case read on another machine."
             ],
             [
                 "h1",
@@ -1741,7 +2154,7 @@ BUILTIN = {
             ],
             [
                 "warn",
-                "A known issue in the vendor's software (Vound) can cause integrity verification to fail for forensic images split into several files. Until a fix is released, the Import tab offers a « Do not verify source integrity » checkbox."
+                "A known issue in the vendor's software (Vound) can cause integrity verification to fail for forensic images split into several files. Until a fix is released, the “2. Import sources” step offers a « Do not verify source integrity » checkbox."
             ],
             [
                 "b",
@@ -1753,7 +2166,7 @@ BUILTIN = {
             ],
             [
                 "p",
-                "After reading a case's inventory, the Import tab compares the paths you paste with those already indexed. Sources already present are automatically removed from the list (both when clicking « Analyse paths » and when importing a list)."
+                "After reading a case's inventory, the “2. Import sources” step compares the paths you paste with those already indexed. Sources already present are automatically removed from the list (both when clicking « Analyse paths » and when importing a list)."
             ],
             [
                 "h1",
