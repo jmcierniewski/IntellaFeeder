@@ -13,6 +13,8 @@ command per source, continues after a failure) ready to run.
 
 ## Interface (v3)
 
+> What changed since v2.5, and why: **[V3.md](V3.md)**.
+
 The window is a **two-step trail** — ① the case, ② import sources — with four
 tools alongside it (case detail, profiles, maintenance, help). Each step
 carries a state computed from real progress. Density and text scale are
@@ -126,6 +128,8 @@ script `.bat` résilient (1 commande IntellaCmd par source, poursuit après un
 échec) prêt à lancer.
 
 ## Interface (v3)
+
+> Ce qui a changé depuis la v2.5, et pourquoi : **[V3.md](V3.md)**.
 
 La fenêtre est un **fil de deux étapes** — ① le cas, ② l'import des sources —
 avec quatre outils à côté (détail du cas, profils, maintenance, aide). Chaque
