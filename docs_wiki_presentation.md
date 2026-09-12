@@ -48,6 +48,11 @@ you are, not a row of tabs in disguise.
    to list sources already indexed — used both to display the case's current
    content and to avoid double-indexing. Reading a case also teaches the tool
    the MIME type names Intella writes in that case's filters.
+
+   *(screenshot below: an earlier version of this screen)*
+
+![The case screen](https://github.com/jmcierniewski/IntellaFeeder/blob/af051dbbe7d74d94a02028b0f5778c62b67a52b0/Pictures/IF1.png)
+
 2. **② Import sources**: paste one path per line (forensic images on one side,
    folders/files on the other). "Analyse paths" builds the list of sources to
    import and measures the ones with no size yet — already-indexed sources are
@@ -55,6 +60,10 @@ you are, not a row of tabs in disguise.
    (dynamic T1/T2… columns, one per task in the loaded task file; the real task
    name is in the column's tooltip), pick an analysis profile per source, then
    run the whole import with one button.
+
+   *(screenshot below: an earlier version of this screen)*
+
+![Import sources screen](https://github.com/jmcierniewski/IntellaFeeder/blob/af051dbbe7d74d94a02028b0f5778c62b67a52b0/Pictures/IF3.png)
 
 The tools, on the right of the trail:
 
@@ -68,6 +77,16 @@ The tools, on the right of the trail:
   reference list, and a "Files" screen saying where everything lives.
 - **Help**: end-user oriented, searchable, with drawn diagrams (the trail, the
   include/exclude filter, a multi-segment image).
+
+*(screenshots below: an earlier version of these screens)*
+
+![Case detail screen](https://github.com/jmcierniewski/IntellaFeeder/blob/af051dbbe7d74d94a02028b0f5778c62b67a52b0/Pictures/IF2.png)
+
+![Profiles screen](https://github.com/jmcierniewski/IntellaFeeder/blob/af051dbbe7d74d94a02028b0f5778c62b67a52b0/Pictures/IF4.png)
+
+![Profiles screen, type filter](https://github.com/jmcierniewski/IntellaFeeder/blob/af051dbbe7d74d94a02028b0f5778c62b67a52b0/Pictures/IF5.png)
+
+![Journal / Help screen](https://github.com/jmcierniewski/IntellaFeeder/blob/af051dbbe7d74d94a02028b0f5778c62b67a52b0/Pictures/IF6.png)
 
 ## What gets generated
 
@@ -86,6 +105,10 @@ The `.bat` is **resilient**: one command per source means a single source
 failing does not abort the rest of the batch. A "Valider les opérations"
 button re-reads the latest run's logs afterwards to confirm what actually got
 imported.
+
+*(screenshot below: an earlier version of this step)*
+
+![Import summary and validation](https://github.com/jmcierniewski/IntellaFeeder/blob/1d80a992335fbe71c401ede5147ae5c79f5e4f95/Pictures/IF3.5.png)
 
 ## Size guard-rail (no automatic compound cases)
 
@@ -242,6 +265,11 @@ en est, il n'est pas une barre d'onglets déguisée.
    pour afficher le contenu actuel du cas et pour éviter la double indexation.
    Lire un cas apprend aussi à l'outil les noms de types MIME qu'Intella écrit
    dans les filtres de ce cas.
+
+   *(capture ci-dessous : une version antérieure de cet écran)*
+
+![Écran Le cas](https://github.com/jmcierniewski/IntellaFeeder/blob/af051dbbe7d74d94a02028b0f5778c62b67a52b0/Pictures/IF1.png)
+
 2. **② Import des sources** : on colle un chemin par ligne (images forensiques
    d'un côté, dossiers/fichiers de l'autre). « Analyser les chemins » construit
    la liste des sources à importer et mesure celles qui n'ont pas encore de
@@ -250,6 +278,10 @@ en est, il n'est pas une barre d'onglets déguisée.
    dynamiques T1, T2…, une par tâche du fichier chargé ; le nom réel de la
    tâche est dans l'infobulle de la colonne), on choisit un profil d'analyse
    par source, puis un seul bouton enchaîne tout l'import.
+
+   *(capture ci-dessous : une version antérieure de cet écran)*
+
+![Écran Import des sources](https://github.com/jmcierniewski/IntellaFeeder/blob/af051dbbe7d74d94a02028b0f5778c62b67a52b0/Pictures/IF3.png)
 
 Les outils, à droite du fil :
 
@@ -264,6 +296,16 @@ Les outils, à droite du fil :
   de types MIME, et un écran « Fichiers » qui dit où tout se range.
 - **Aide** : destinée à l'utilisateur final, cherchable, avec des schémas
   dessinés (le parcours, le filtre include/exclude, une image multi-tronçons).
+
+*(captures ci-dessous : une version antérieure de ces écrans)*
+
+![Écran Détail du cas](https://github.com/jmcierniewski/IntellaFeeder/blob/af051dbbe7d74d94a02028b0f5778c62b67a52b0/Pictures/IF2.png)
+
+![Écran Profils](https://github.com/jmcierniewski/IntellaFeeder/blob/af051dbbe7d74d94a02028b0f5778c62b67a52b0/Pictures/IF4.png)
+
+![Écran Profils, filtre de types](https://github.com/jmcierniewski/IntellaFeeder/blob/af051dbbe7d74d94a02028b0f5778c62b67a52b0/Pictures/IF5.png)
+
+![Écran Journal / Aide](https://github.com/jmcierniewski/IntellaFeeder/blob/af051dbbe7d74d94a02028b0f5778c62b67a52b0/Pictures/IF6.png)
 
 ## Ce qui est généré
 
@@ -283,6 +325,10 @@ Le `.bat` est **résilient** : une commande par source signifie qu'une seule
 source en échec n'interrompt pas les autres. Un bouton « Valider les
 opérations » relit ensuite les logs du run le plus récent pour confirmer ce
 qui a réellement été importé.
+
+*(capture ci-dessous : une version antérieure de cette étape)*
+
+![Résumé de l'import et validation](https://github.com/jmcierniewski/IntellaFeeder/blob/1d80a992335fbe71c401ede5147ae5c79f5e4f95/Pictures/IF3.5.png)
 
 ## Garde-fou de volume (pas de cas composé automatique)
 
