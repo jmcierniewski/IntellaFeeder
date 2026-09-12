@@ -7,10 +7,20 @@ Hi all,
 I'd like to share **IntellaFeeder**, a small free tool I built to automate
 bulk source imports into Intella Investigator via `IntellaCmd.exe
 -addSourcesFromJson`. Instead of clicking through the web wizard for every
-image/folder, you paste a list of paths, tick a few boxes (tasks, analysis
-profile per source), and it generates the JSON descriptors plus a resilient
-`.bat` script (one IntellaCmd command per source, so one failure doesn't stop
-the rest) ready to run.
+image/folder, you build the list your way: paste paths from any tool
+(Everything, PowerGrep, a home-made script), or drag-and-drop straight from
+Explorer — whole folders onto the forensic-image side (it recursively picks
+out every image's first segment only, never a mid-image `.E02`), or a
+multi-selection of folders/files onto the other side (each drop becomes one
+source, root folder only — Intella indexes everything under it). Sources
+already in the case are de-duplicated automatically. Tick a few boxes (tasks,
+analysis profile per source), and it generates the JSON descriptors plus a
+resilient `.bat` script (one IntellaCmd command per source, so one failure
+doesn't stop the rest) ready to run.
+
+*Pasted paths turned into a list of sources, with per-source tasks and profile.*
+
+![Import sources](https://github.com/jmcierniewski/IntellaFeeder/blob/main/Pictures/V3/04_Import%20sources.jpg)
 
 A few things it handles along the way: reading a case's existing sources to
 avoid double-indexing, a size guard-rail that warns and lets you hold back the
@@ -38,10 +48,21 @@ Bonjour à tous,
 Je partage **IntellaFeeder**, un petit outil gratuit que j'ai développé pour
 automatiser l'import en masse de sources dans Intella Investigator via
 `IntellaCmd.exe -addSourcesFromJson`. Plutôt que de cliquer dans l'assistant
-web pour chaque image/dossier, on colle une liste de chemins, on coche
-quelques cases (tâches, profil d'analyse par source), et l'outil génère les
-descripteurs JSON ainsi qu'un script `.bat` résilient (une commande IntellaCmd
-par source, donc un échec n'arrête pas les autres) prêt à lancer.
+web pour chaque image/dossier, on construit la liste à sa façon : collage de
+chemins issus de n'importe quel outil (Everything, PowerGrep, un script
+maison), ou glisser-déposer direct depuis l'Explorateur — des dossiers entiers
+du côté images forensiques (seul le premier tronçon de chaque image est
+récupéré, y compris en récursif, jamais un `.E02` isolé), ou une
+multi-sélection de dossiers/fichiers de l'autre côté (chaque dépôt devient une
+source, dossier racine uniquement — Intella indexe tout ce qu'il y a dessous).
+Les sources déjà présentes dans le cas sont dédoublonnées automatiquement. On
+coche quelques cases (tâches, profil d'analyse par source), et l'outil génère
+les descripteurs JSON ainsi qu'un script `.bat` résilient (une commande
+IntellaCmd par source, donc un échec n'arrête pas les autres) prêt à lancer.
+
+*Les chemins collés, transformés en liste de sources avec tâches et profil par source.*
+
+![Import des sources](https://github.com/jmcierniewski/IntellaFeeder/blob/main/Pictures/V3/04_Import%20sources.jpg)
 
 Quelques points gérés au passage : lecture des sources déjà présentes dans un
 cas pour éviter la double indexation, un garde-fou de volume qui avertit et

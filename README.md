@@ -13,6 +13,14 @@ command per source, continues after a failure) ready to run.
 
 More info in the wiki
 
+*The case screen: identity, size, and the inventory of sources already indexed.*
+
+![Case inventory](https://github.com/jmcierniewski/IntellaFeeder/blob/main/Pictures/V3/01_Case_Inventory.jpg)
+
+*Pasted paths turned into a list of sources, with per-source tasks and profile.*
+
+![Import sources](https://github.com/jmcierniewski/IntellaFeeder/blob/main/Pictures/V3/04_Import%20sources.jpg)
+
 ## Features
 
 - **Guided two-step workflow**: ① read the case, ② import sources — with
@@ -21,9 +29,14 @@ More info in the wiki
   laptop and on a 27″ desk screen.
 - **Case inventory**: reads sources already indexed in a case (`-exportSourceList`),
   automatic de-duplication, size guard-rail (`case.xml` vs. measured total).
-- **Import**: paste paths, per-source tasks (reuses an existing Intella task file
-  as-is), configurable per-case size guard-rail, post-import validation (log
-  re-scan).
+- **Import**: build the source list your way — paste paths from any tool
+  (Everything, PowerGrep, a home-made script), drag whole folders onto
+  "Forensic images" (first segment of every image collected, recursively),
+  or multi-select folders/files in Explorer and drop them onto "Standard
+  folders" (each drop becomes one source, unexplored). Automatic
+  de-duplication against the case, per-source tasks (reuses an existing
+  Intella task file as-is), configurable per-case size guard-rail,
+  post-import validation (log re-scan).
 - **Analysis profiles**: named sets of indexing options (MIME filters, archives,
   deleted-file recovery, VSS…), reusable across cases, importable from a source
   already configured in Intella ("Info Profil").
@@ -127,6 +140,14 @@ script `.bat` résilient (1 commande IntellaCmd par source, poursuit après un
 
 Plus d'informations dans le wiki
 
+*L'écran du cas : identité, taille, et l'inventaire des sources déjà indexées.*
+
+![Inventaire du cas](https://github.com/jmcierniewski/IntellaFeeder/blob/main/Pictures/V3/01_Case_Inventory.jpg)
+
+*Les chemins collés, transformés en liste de sources avec tâches et profil par source.*
+
+![Import des sources](https://github.com/jmcierniewski/IntellaFeeder/blob/main/Pictures/V3/04_Import%20sources.jpg)
+
 ## Fonctionnalités
 
 - **Parcours guidé en deux étapes** : ① lire le cas, ② importer les sources —
@@ -135,8 +156,14 @@ Plus d'informations dans le wiki
   13″ comme sur un écran de bureau 27″.
 - **Inventaire du cas** : lit les sources déjà indexées (`-exportSourceList`),
   dédoublonnage automatique, garde-fou de volume (`case.xml` vs somme mesurée).
-- **Import** : collage de chemins, tâches par source (fichier de tâches
-  Intella réutilisé tel quel), garde-fou de taille par cas configurable,
+- **Import** : la liste se construit à votre façon — collage de chemins issus
+  de n'importe quel outil (Everything, PowerGrep, un script maison), glisser
+  des dossiers entiers sur « Images forensiques » (premier tronçon de chaque
+  image collecté, y compris en récursif), ou multi-sélection de dossiers/
+  fichiers dans l'Explorateur déposée sur « Dossiers standard » (chaque dépôt
+  devient une source, sans exploration). Dédoublonnage automatique contre le
+  cas, tâches par source (fichier de tâches Intella réutilisé tel quel),
+  garde-fou de taille par cas configurable,
   validation post-import (relecture des logs).
 - **Profils d'analyse** : jeux de paramètres d'indexation nommés (filtres MIME,
   archives, VSS…), réutilisables entre cas, importables depuis une source déjà

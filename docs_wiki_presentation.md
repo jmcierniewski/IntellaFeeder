@@ -49,9 +49,16 @@ you are, not a row of tabs in disguise.
    content and to avoid double-indexing. Reading a case also teaches the tool
    the MIME type names Intella writes in that case's filters.
 
-   *(screenshot below: an earlier version of this screen)*
+*The case screen: identity, size, and the inventory of sources already indexed.*
 
-![The case screen](https://github.com/jmcierniewski/IntellaFeeder/blob/af051dbbe7d74d94a02028b0f5778c62b67a52b0/Pictures/IF1.png)
+![Case inventory](https://github.com/jmcierniewski/IntellaFeeder/blob/main/Pictures/V3/01_Case_Inventory.jpg)
+
+*Case parameters: the case size limit (before a compound sub-case is needed),
+the task file exported from Intella (tasks run during indexing), and the "do
+not verify source integrity" checkbox — a workaround for an Intella bug that
+otherwise indexes only the first segment of a multi-segment image.*
+
+![Case parameters](https://github.com/jmcierniewski/IntellaFeeder/blob/main/Pictures/V3/02_Case_inventory_details.jpg)
 
 2. **② Import sources**: paste one path per line (forensic images on one side,
    folders/files on the other). "Analyse paths" builds the list of sources to
@@ -61,32 +68,53 @@ you are, not a row of tabs in disguise.
    name is in the column's tooltip), pick an analysis profile per source, then
    run the whole import with one button.
 
-   *(screenshot below: an earlier version of this screen)*
+*Pasted paths turned into a list of sources, with per-source tasks and profile.*
 
-![Import sources screen](https://github.com/jmcierniewski/IntellaFeeder/blob/af051dbbe7d74d94a02028b0f5778c62b67a52b0/Pictures/IF3.png)
+![Import sources](https://github.com/jmcierniewski/IntellaFeeder/blob/main/Pictures/V3/04_Import%20sources.jpg)
 
-The tools, on the right of the trail:
+## Feeding the import: three ways to build the list
 
-- **Case detail**: a read-only, human-friendly view of `case.xml`,
-  `case.prefs` and the case's task list (`tasks2.json`).
-- **Profiles**: named sets of Intella indexing options, in two sub-tabs —
-  *Settings* (the thematic form) and *File types to index* (the MIME filter,
-  composed by picking entries from the reference list; see below).
-- **Maintenance**: the activity log (searchable, filtered by All / Warnings /
-  Errors), the preferences (language, density, text scale), the MIME type
-  reference list, and a "Files" screen saying where everything lives.
-- **Help**: end-user oriented, searchable, with drawn diagrams (the trail, the
-  include/exclude filter, a multi-segment image).
+This is where the real time is saved: getting from "a pile of paths" to
+"sources ready to import" without opening Intella's web wizard once per item.
+The two panels of step ② each accept paths in three different ways, and they
+can be mixed freely on the same import.
 
-*(screenshots below: an earlier version of these screens)*
+1. **Paste a list built by any other tool.** Both panels accept a plain block
+   of text, one path per line, however that list was produced — a search
+   exported from **Everything** (the filename search tool), a **PowerGrep**
+   search-and-list job, or the output of a home-made `.bat`, `.py` or `.ps1`
+   script all work as-is. Surrounding quotes are stripped automatically, blank
+   lines are ignored, and exact duplicates within the pasted block are removed
+   before anything is added.
 
-![Case detail screen](https://github.com/jmcierniewski/IntellaFeeder/blob/af051dbbe7d74d94a02028b0f5778c62b67a52b0/Pictures/IF2.png)
+2. **Drag entire folders onto "Forensic images."** Drop one or several folders
+   here and the panel explores them: every file with a recognised forensic
+   image extension is added, but **only its first segment** — `.E01`, `.Ex01`,
+   `.L01`, `.Lx01`, `.S01`, `.AD1`, `.001` (a split raw image), plus `.DD`,
+   `.VMDK`, `.VHD`, `.VHDX`. A 40-segment image still becomes a single line;
+   giving anything but the first segment breaks the import. Descending into
+   sub-folders is an explicit choice (a checkbox), not automatic — a folder of
+   forensic images often sits next to unrelated cases or working copies — but
+   once ticked, the same first-segment-only rule applies at any depth. Anything
+   that isn't a first segment (a lone `.E02`, a VMDK annex file) is left out and
+   reported, never added silently.
 
-![Profiles screen](https://github.com/jmcierniewski/IntellaFeeder/blob/af051dbbe7d74d94a02028b0f5778c62b67a52b0/Pictures/IF4.png)
+3. **Multi-select and drag onto "Standard folders/files."** Select several
+   folders and/or files in Explorer (Ctrl/Shift-click) and drop the whole
+   selection here: each item becomes one source line exactly as given, with no
+   inspection. Drop a folder here and only that folder is added as a single
+   source, never its contents one by one — Intella indexes everything
+   underneath a folder source on its own, so listing its children separately
+   would only duplicate the work.
 
-![Profiles screen, type filter](https://github.com/jmcierniewski/IntellaFeeder/blob/af051dbbe7d74d94a02028b0f5778c62b67a52b0/Pictures/IF5.png)
+Either panel can also be filled without touching a mouse, via its
+"Add: Folders… / Files…" buttons — the same rules apply.
 
-![Journal / Help screen](https://github.com/jmcierniewski/IntellaFeeder/blob/af051dbbe7d74d94a02028b0f5778c62b67a52b0/Pictures/IF6.png)
+**Sources are always de-duplicated against what the case already has.** Every
+pasted or dropped path is checked against the sources the case already reports
+as indexed (read in step ①) before generation — the comparison ignores the
+host part of a network path, so a share reached once by server name and once
+by IP address is still recognised as the same source and is not re-imported.
 
 ## What gets generated
 
@@ -106,9 +134,15 @@ failing does not abort the rest of the batch. A "Valider les opérations"
 button re-reads the latest run's logs afterwards to confirm what actually got
 imported.
 
-*(screenshot below: an earlier version of this step)*
 
-![Import summary and validation](https://github.com/jmcierniewski/IntellaFeeder/blob/1d80a992335fbe71c401ede5147ae5c79f5e4f95/Pictures/IF3.5.png)
+*The generated `.bat`, one resilient IntellaCmd command per source.*
+
+![Import sources, generated .bat](https://github.com/jmcierniewski/IntellaFeeder/blob/main/Pictures/V3/05_Import%20sources%20bat.jpg)
+
+
+*The latest run's logs re-read to confirm what actually got imported.*
+
+![Import verification](https://github.com/jmcierniewski/IntellaFeeder/blob/main/Pictures/V3/06_Import%20sources%20verification.jpg)
 
 ## Size guard-rail (no automatic compound cases)
 
@@ -127,6 +161,57 @@ adjustable, fractional GB allowed):
   active case, and re-ticks/re-imports the remainder.
 
 A source larger than the limit on its own is flagged as "cannot be split."
+
+The tools, on the right of the trail:
+
+- **Case detail**: a read-only, human-friendly view of `case.xml`,
+  `case.prefs` and the case's task list (`tasks2.json`).
+- **Profiles**: named sets of Intella indexing options, in two sub-tabs —
+  *Settings* (the thematic form) and *File types to index* (the MIME filter,
+  composed by picking entries from the reference list; see below).
+- **Maintenance**: the activity log (searchable, filtered by All / Warnings /
+  Errors), the preferences (language, density, text scale), the MIME type
+  reference list, and a "Files" screen saying where everything lives.
+- **Help**: end-user oriented, searchable, with drawn diagrams (the trail, the
+  include/exclude filter, a multi-segment image).
+
+*Case detail: a read-only view of `case.xml`, `case.prefs` and the task list.*
+
+![Case detail screen](https://github.com/jmcierniewski/IntellaFeeder/blob/main/Pictures/V3/03_Case_Details.jpg)
+
+*Profiles, Settings: the thematic form of Intella indexing options.*
+
+![Profile settings](https://github.com/jmcierniewski/IntellaFeeder/blob/main/Pictures/V3/07_Profil_settings.jpg)
+
+*Profiles, File types to index: composing a filter by picking entries from the reference list.*
+
+![Profile, file types to index](https://github.com/jmcierniewski/IntellaFeeder/blob/main/Pictures/V3/08_Profil_filetype%20to%20index.jpg)
+
+*The same filter, read in exclude mode.*
+
+![Profile, file types excluded](https://github.com/jmcierniewski/IntellaFeeder/blob/main/Pictures/V3/09_Profil_filestoIndex_Exclude.jpg)
+
+*Maintenance, activity log: searchable, filtered by All / Warnings / Errors.*
+
+![Maintenance log](https://github.com/jmcierniewski/IntellaFeeder/blob/main/Pictures/V3/10_Maintenance-log.jpg)
+
+*Maintenance, preferences: language, density and text scale.*
+
+![Maintenance options](https://github.com/jmcierniewski/IntellaFeeder/blob/main/Pictures/V3/11_Maintenance_Options.jpg)
+
+*Maintenance, the MIME type reference list.*
+
+![Maintenance, MIME types](https://github.com/jmcierniewski/IntellaFeeder/blob/main/Pictures/V3/12_Maintenance-mimetypes.jpg)
+
+*Maintenance, Files: where everything lives on disk.*
+
+![Maintenance, files](https://github.com/jmcierniewski/IntellaFeeder/blob/main/Pictures/V3/13_Maintenance_files.jpg)
+
+*The Help screen: searchable, with drawn diagrams.*
+
+![Help screen](https://github.com/jmcierniewski/IntellaFeeder/blob/main/Pictures/V3/14_Help.jpg)
+
+
 
 ## Known Intella limitation and built-in workaround
 
@@ -266,9 +351,17 @@ en est, il n'est pas une barre d'onglets déguisée.
    Lire un cas apprend aussi à l'outil les noms de types MIME qu'Intella écrit
    dans les filtres de ce cas.
 
-   *(capture ci-dessous : une version antérieure de cet écran)*
+*L'écran du cas : identité, taille, et l'inventaire des sources déjà indexées.*
 
-![Écran Le cas](https://github.com/jmcierniewski/IntellaFeeder/blob/af051dbbe7d74d94a02028b0f5778c62b67a52b0/Pictures/IF1.png)
+![Inventaire du cas](https://github.com/jmcierniewski/IntellaFeeder/blob/main/Pictures/V3/01_Case_Inventory.jpg)
+
+*Paramètres du cas : la limite de taille (avant de devoir créer un sous-cas
+compound), le fichier de tâches exporté d'Intella (tâches exécutées à
+l'indexation), et la case « ne pas vérifier l'intégrité des sources » — un
+contournement d'un bug Intella qui sinon n'indexe que le premier tronçon d'une
+image multi-segments.*
+
+![Paramètres du cas](https://github.com/jmcierniewski/IntellaFeeder/blob/main/Pictures/V3/02_Case_inventory_details.jpg)
 
 2. **② Import des sources** : on colle un chemin par ligne (images forensiques
    d'un côté, dossiers/fichiers de l'autre). « Analyser les chemins » construit
@@ -279,33 +372,58 @@ en est, il n'est pas une barre d'onglets déguisée.
    tâche est dans l'infobulle de la colonne), on choisit un profil d'analyse
    par source, puis un seul bouton enchaîne tout l'import.
 
-   *(capture ci-dessous : une version antérieure de cet écran)*
+*Les chemins collés, transformés en liste de sources avec tâches et profil par source.*
 
-![Écran Import des sources](https://github.com/jmcierniewski/IntellaFeeder/blob/af051dbbe7d74d94a02028b0f5778c62b67a52b0/Pictures/IF3.png)
+![Import des sources](https://github.com/jmcierniewski/IntellaFeeder/blob/main/Pictures/V3/04_Import%20sources.jpg)
 
-Les outils, à droite du fil :
+## Alimenter l'import : trois façons de constituer la liste
 
-- **Détail du cas** : vue lecture seule et humanisée de `case.xml`,
-  `case.prefs` et de la liste des tâches du cas (`tasks2.json`).
-- **Profils** : jeux nommés d'options d'indexation Intella, en deux
-  sous-onglets — *Réglages* (le formulaire thématique) et *Types de fichiers à
-  indexer* (le filtre MIME, composé en prenant des entrées dans le
-  référentiel ; voir plus bas).
-- **Maintenance** : le journal d'activité (cherchable, filtré Tout / Alertes /
-  Erreurs), les préférences (langue, densité, taille du texte), le référentiel
-  de types MIME, et un écran « Fichiers » qui dit où tout se range.
-- **Aide** : destinée à l'utilisateur final, cherchable, avec des schémas
-  dessinés (le parcours, le filtre include/exclude, une image multi-tronçons).
+C'est là que se joue le vrai gain de temps : passer d'un tas de chemins à des
+sources prêtes à importer, sans ouvrir l'assistant web d'Intella une fois par
+élément. Les deux panneaux de l'étape ② acceptent chacun trois façons
+d'apporter des chemins, et elles se combinent librement sur un même import.
 
-*(captures ci-dessous : une version antérieure de ces écrans)*
+1. **Coller une liste construite par n'importe quel autre outil.** Les deux
+   panneaux acceptent un simple bloc de texte, un chemin par ligne, quelle que
+   soit la façon dont cette liste a été produite — un export de résultats de
+   recherche **Everything** (l'outil de recherche de fichiers par nom), un
+   travail de recherche-et-liste sous **PowerGrep**, ou la sortie d'un script
+   maison en `.bat`, `.py` ou `.ps1` conviennent tels quels. Les guillemets
+   entourant un chemin sont retirés automatiquement, les lignes vides sont
+   ignorées, et les doublons stricts à l'intérieur du bloc collé sont supprimés
+   avant tout ajout.
 
-![Écran Détail du cas](https://github.com/jmcierniewski/IntellaFeeder/blob/af051dbbe7d74d94a02028b0f5778c62b67a52b0/Pictures/IF2.png)
+2. **Glisser des dossiers entiers sur « Images forensiques ».** On peut y
+   déposer un ou plusieurs dossiers : le panneau les explore et n'ajoute que
+   les fichiers dont l'extension est reconnue comme image forensique, et
+   **uniquement leur premier tronçon** — `.E01`, `.Ex01`, `.L01`, `.Lx01`,
+   `.S01`, `.AD1`, `.001` (une image brute découpée), ainsi que `.DD`, `.VMDK`,
+   `.VHD`, `.VHDX`. Une image à 40 tronçons ne devient qu'une seule ligne ;
+   donner autre chose que le premier tronçon casse l'import. La descente dans
+   les sous-dossiers est un choix explicite (une case à cocher), pas
+   automatique — un dossier d'images forensiques voisine souvent avec d'autres
+   cas ou des copies de travail — mais une fois cochée, la même règle du
+   premier tronçon seul s'applique à n'importe quelle profondeur. Ce qui n'est
+   pas un premier tronçon (un `.E02` isolé, un fichier annexe VMDK) est écarté
+   et signalé, jamais en silence.
 
-![Écran Profils](https://github.com/jmcierniewski/IntellaFeeder/blob/af051dbbe7d74d94a02028b0f5778c62b67a52b0/Pictures/IF4.png)
+3. **Multi-sélectionner et glisser sur « Dossiers/fichiers standard ».**
+   Sélectionner plusieurs dossiers et/ou fichiers dans l'Explorateur
+   (Ctrl/Maj-clic) et déposer toute la sélection ici : chaque élément devient
+   une ligne de source telle quelle, sans inspection. Déposer un dossier ici
+   n'ajoute que ce dossier, jamais son contenu élément par élément — Intella
+   indexe de lui-même tout ce qu'il y a sous une source « dossier », lister ses
+   enfants séparément ne ferait que doubler le travail.
 
-![Écran Profils, filtre de types](https://github.com/jmcierniewski/IntellaFeeder/blob/af051dbbe7d74d94a02028b0f5778c62b67a52b0/Pictures/IF5.png)
+Chaque panneau peut aussi se remplir sans souris, via ses boutons
+« Ajouter : Dossiers… / Fichiers… » — les mêmes règles s'appliquent.
 
-![Écran Journal / Aide](https://github.com/jmcierniewski/IntellaFeeder/blob/af051dbbe7d74d94a02028b0f5778c62b67a52b0/Pictures/IF6.png)
+**Les sources sont toujours dédoublonnées par rapport à ce que le cas contient
+déjà.** Chaque chemin collé ou déposé est comparé, avant la génération, aux
+sources que le cas signale déjà comme indexées (lues à l'étape ①) — la
+comparaison ignore la partie « hôte » d'un chemin réseau, si bien qu'un partage
+atteint une fois par son nom de serveur et une fois par son adresse IP reste
+reconnu comme la même source et n'est pas réimporté.
 
 ## Ce qui est généré
 
@@ -326,9 +444,67 @@ source en échec n'interrompt pas les autres. Un bouton « Valider les
 opérations » relit ensuite les logs du run le plus récent pour confirmer ce
 qui a réellement été importé.
 
-*(capture ci-dessous : une version antérieure de cette étape)*
+*Le `.bat` généré, une commande IntellaCmd résiliente par source.*
 
-![Résumé de l'import et validation](https://github.com/jmcierniewski/IntellaFeeder/blob/1d80a992335fbe71c401ede5147ae5c79f5e4f95/Pictures/IF3.5.png)
+![Import des sources, .bat généré](https://github.com/jmcierniewski/IntellaFeeder/blob/main/Pictures/V3/05_Import%20sources%20bat.jpg)
+
+
+*Les logs du dernier run relus pour confirmer ce qui a réellement été importé.*
+
+![Vérification de l'import](https://github.com/jmcierniewski/IntellaFeeder/blob/main/Pictures/V3/06_Import%20sources%20verification.jpg)
+
+
+Les outils, à droite du fil :
+
+- **Détail du cas** : vue lecture seule et humanisée de `case.xml`,
+  `case.prefs` et de la liste des tâches du cas (`tasks2.json`).
+- **Profils** : jeux nommés d'options d'indexation Intella, en deux
+  sous-onglets — *Réglages* (le formulaire thématique) et *Types de fichiers à
+  indexer* (le filtre MIME, composé en prenant des entrées dans le
+  référentiel ; voir plus bas).
+- **Maintenance** : le journal d'activité (cherchable, filtré Tout / Alertes /
+  Erreurs), les préférences (langue, densité, taille du texte), le référentiel
+  de types MIME, et un écran « Fichiers » qui dit où tout se range.
+- **Aide** : destinée à l'utilisateur final, cherchable, avec des schémas
+  dessinés (le parcours, le filtre include/exclude, une image multi-tronçons).
+
+*Détail du cas : vue en lecture seule de `case.xml`, `case.prefs` et de la liste des tâches.*
+
+![Détail du cas](https://github.com/jmcierniewski/IntellaFeeder/blob/main/Pictures/V3/03_Case_Details.jpg)
+
+*Profils, Réglages : le formulaire thématique des options d'indexation Intella.*
+
+![Réglages du profil](https://github.com/jmcierniewski/IntellaFeeder/blob/main/Pictures/V3/07_Profil_settings.jpg)
+
+*Profils, Types de fichiers à indexer : composer un filtre en prenant des entrées dans le référentiel.*
+
+![Profil, types de fichiers à indexer](https://github.com/jmcierniewski/IntellaFeeder/blob/main/Pictures/V3/08_Profil_filetype%20to%20index.jpg)
+
+*Le même filtre, lu en mode exclusion.*
+
+![Profil, types de fichiers exclus](https://github.com/jmcierniewski/IntellaFeeder/blob/main/Pictures/V3/09_Profil_filestoIndex_Exclude.jpg)
+
+*Maintenance, journal d'activité : cherchable, filtré Tout / Alertes / Erreurs.*
+
+![Journal de maintenance](https://github.com/jmcierniewski/IntellaFeeder/blob/main/Pictures/V3/10_Maintenance-log.jpg)
+
+*Maintenance, préférences : langue, densité et taille du texte.*
+
+![Options de maintenance](https://github.com/jmcierniewski/IntellaFeeder/blob/main/Pictures/V3/11_Maintenance_Options.jpg)
+
+*Maintenance, le référentiel de types MIME.*
+
+![Types MIME (maintenance)](https://github.com/jmcierniewski/IntellaFeeder/blob/main/Pictures/V3/12_Maintenance-mimetypes.jpg)
+
+*Maintenance, Fichiers : où tout se range sur le disque.*
+
+![Fichiers (maintenance)](https://github.com/jmcierniewski/IntellaFeeder/blob/main/Pictures/V3/13_Maintenance_files.jpg)
+
+*L'écran d'aide : cherchable, avec des schémas dessinés.*
+
+![Écran d'aide](https://github.com/jmcierniewski/IntellaFeeder/blob/main/Pictures/V3/14_Help.jpg)
+
+
 
 ## Garde-fou de volume (pas de cas composé automatique)
 
