@@ -2,7 +2,7 @@
 
 *(English version below — [version française plus bas](#intellafeeder-fr))*
 
-Automatic source-import generator for **Vound Intella Investigator 3.1**, driving
+Automatic source-import generator for **Vound Intella Investigator 3**, driving
 `IntellaCmd.exe -addSourcesFromJson`. Tkinter GUI, bilingual (EN/FR), no external
 dependency (Python standard library only).
 
@@ -13,18 +13,12 @@ command per source, continues after a failure) ready to run.
 
 More info in the wiki
 
-## Interface (v3)
-
-> What changed since v2.5, and why: **[V3.md](V3.md)**.
-
-The window is a **two-step trail** — ① the case, ② import sources — with four
-tools alongside it (case detail, profiles, maintenance, help). Each step
-carries a state computed from real progress. Density and text scale are
-adjustable from Maintenance → Options, so the same window works on a 13″
-laptop and on a 27″ desk screen.
-
 ## Features
 
+- **Guided two-step workflow**: ① read the case, ② import sources — with
+  dedicated tools alongside (case detail, profiles, maintenance, help).
+  Density and text scale are adjustable, so the same window works on a 13″
+  laptop and on a 27″ desk screen.
 - **Case inventory**: reads sources already indexed in a case (`-exportSourceList`),
   automatic de-duplication, size guard-rail (`case.xml` vs. measured total).
 - **Import**: paste paths, per-source tasks (reuses an existing Intella task file
@@ -52,7 +46,10 @@ laptop and on a 27″ desk screen.
 
 ## Requirements
 
-- Windows, with **Vound Intella Investigator 3.1** installed (`IntellaCmd.exe`).
+- Windows, with **Vound Intella Investigator 3** or later installed
+  (`IntellaCmd.exe`). It also appears to work against Intella **Pro**
+  editions of the same generation, though this hasn't been extensively
+  tested.
 - Python 3.10+ if run from source (no package to install, standard library only —
   `tkinter` ships with the official Python installer).
 
@@ -98,9 +95,8 @@ python tests\manuel_construction.py        # builds the window WITHOUT showing i
 python tests\manuel_fumee_v3.py <screen>   # opens it on one screen, to look at
 ```
 
-`manuel_construction.py` never steals focus, so it is usable while someone is
-working on the machine — it is what caught a profile filter silently losing its
-value.
+`manuel_construction.py` never steals focus, so it can run while someone is
+working on the machine.
 
 ## Architecture
 
@@ -119,7 +115,7 @@ MIT — see [LICENSE](LICENSE).
 
 *(Version anglaise plus haut — [English version above](#intellafeeder))*
 
-Générateur d'import automatique de sources pour **Vound Intella Investigator 3.1**,
+Générateur d'import automatique de sources pour **Vound Intella Investigator 3**,
 via `IntellaCmd.exe -addSourcesFromJson`. Interface graphique (Tkinter), multi-langue
 (FR/EN), sans dépendance externe (bibliothèque standard Python uniquement).
 
@@ -131,18 +127,12 @@ script `.bat` résilient (1 commande IntellaCmd par source, poursuit après un
 
 Plus d'informations dans le wiki
 
-## Interface (v3)
-
-> Ce qui a changé depuis la v2.5, et pourquoi : **[V3.md](V3.md)**.
-
-La fenêtre est un **fil de deux étapes** — ① le cas, ② l'import des sources —
-avec quatre outils à côté (détail du cas, profils, maintenance, aide). Chaque
-étape porte un état calculé sur l'avancement réel. La densité et la taille du
-texte se règlent dans Maintenance → Options : la même fenêtre sert sur un
-portable 13″ comme sur un écran de bureau de 27″.
-
 ## Fonctionnalités
 
+- **Parcours guidé en deux étapes** : ① lire le cas, ② importer les sources —
+  avec des outils dédiés à côté (détail du cas, profils, maintenance, aide).
+  Densité et taille du texte réglables : la même fenêtre sert sur un portable
+  13″ comme sur un écran de bureau 27″.
 - **Inventaire du cas** : lit les sources déjà indexées (`-exportSourceList`),
   dédoublonnage automatique, garde-fou de volume (`case.xml` vs somme mesurée).
 - **Import** : collage de chemins, tâches par source (fichier de tâches
@@ -172,7 +162,10 @@ portable 13″ comme sur un écran de bureau de 27″.
 
 ## Prérequis
 
-- Windows, avec **Vound Intella Investigator 3.1** installé (`IntellaCmd.exe`).
+- Windows, avec **Vound Intella Investigator 3** ou une version ultérieure
+  installée (`IntellaCmd.exe`). Il semble également fonctionner avec les
+  éditions **Pro** d'Intella de la même génération, sans que cela ait été
+  largement éprouvé.
 - Python 3.10+ si lancé depuis les sources (aucun paquet à installer, seulement
   la bibliothèque standard — `tkinter` inclus avec l'installeur officiel Python).
 
@@ -221,9 +214,8 @@ python tests\manuel_construction.py        # construit la fenêtre SANS l'affich
 python tests\manuel_fumee_v3.py <écran>    # l'ouvre sur un écran, pour regarder
 ```
 
-`manuel_construction.py` ne vole jamais le focus : il reste utilisable pendant
-que quelqu'un travaille sur le poste — c'est lui qui a attrapé un filtre de
-profil qui perdait sa valeur en silence.
+`manuel_construction.py` ne vole jamais le focus : il peut tourner pendant que
+quelqu'un travaille sur le poste.
 
 ## Architecture
 

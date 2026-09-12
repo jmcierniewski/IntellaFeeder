@@ -5,7 +5,7 @@
 ## What is IntellaFeeder?
 
 IntellaFeeder is a free, standalone Windows GUI tool that prepares and drives
-bulk source imports into **Vound Intella Investigator 3.1**, using its
+bulk source imports into **Vound Intella Investigator 3**, using its
 command-line companion `IntellaCmd.exe -addSourcesFromJson`. It is written in
 Python (Tkinter, standard library only) and distributed as a single `.exe`
 (PyInstaller), with no installation or external dependency.
@@ -28,10 +28,18 @@ sources were already indexed.
 IntellaFeeder turns that into: paste paths → review a table → tick boxes →
 click "Generate" → run the resulting `.bat`.
 
+## Requirements
+
+Windows, with **Vound Intella Investigator 3** or later installed
+(`IntellaCmd.exe` is what IntellaFeeder drives). It also appears to work
+against Intella **Pro** editions of the same generation, though this hasn't
+been extensively tested — the `-addSourcesFromJson` command-line surface it
+relies on is the same across editions.
+
 ## Core workflow
 
-Since v3 the window is organised as a **two-step trail** — the actual job —
-with four **tools** kept to one side. Each step carries a state (to do / in
+The window is organised as a **two-step trail** — the actual job — with
+four **tools** kept to one side. Each step carries a state (to do / in
 progress / done) computed from real progress, so the trail is a map of where
 you are, not a row of tabs in disguise.
 
@@ -188,7 +196,7 @@ means your Intella is newer than the tool's catalogue).
 
 IntellaFeeder est un outil Windows gratuit et autonome, avec interface
 graphique, qui prépare et pilote l'import en masse de sources dans
-**Vound Intella Investigator 3.1**, via son compagnon en ligne de commande
+**Vound Intella Investigator 3**, via son compagnon en ligne de commande
 `IntellaCmd.exe -addSourcesFromJson`. Écrit en Python (Tkinter, bibliothèque
 standard uniquement) et distribué sous forme d'un exécutable unique
 (PyInstaller), sans installation ni dépendance externe.
@@ -212,10 +220,19 @@ ou perte de vue des sources déjà indexées.
 IntellaFeeder ramène tout cela à : coller des chemins → relire un tableau →
 cocher des cases → cliquer « Générer » → lancer le `.bat` produit.
 
+## Prérequis
+
+Windows, avec **Vound Intella Investigator 3** ou une version ultérieure
+installée (c'est `IntellaCmd.exe` qu'IntellaFeeder pilote). Il semble
+également fonctionner avec les éditions **Pro** d'Intella de la même
+génération, sans que cela ait été largement éprouvé — la surface en ligne
+de commande `-addSourcesFromJson` sur laquelle il s'appuie est la même
+selon les éditions.
+
 ## Déroulé général
 
-Depuis la v3, la fenêtre s'organise en un **fil de deux étapes** — le travail
-lui-même — et quatre **outils** rangés à côté. Chaque étape porte un état
+La fenêtre s'organise en un **fil de deux étapes** — le travail lui-même —
+et quatre **outils** rangés à côté. Chaque étape porte un état
 (à faire / en cours / fait) calculé sur l'avancement réel : le fil dit où l'on
 en est, il n'est pas une barre d'onglets déguisée.
 
