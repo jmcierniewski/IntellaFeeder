@@ -2,7 +2,7 @@
 
 *(English version below — [version française plus bas](#intellafeeder-fr))*
 
-Automatic source-import generator for **Vound Intella Investigator 3.1**, driving
+Automatic source-import generator for **Vound Intella Investigator 3**, driving
 `IntellaCmd.exe -addSourcesFromJson`. Tkinter GUI, bilingual (EN/FR), no external
 dependency (Python standard library only).
 
@@ -13,19 +13,44 @@ command per source, continues after a failure) ready to run.
 
 More info in the wiki
 
+*The case screen: identity, size, and the inventory of sources already indexed.*
+
+![Case inventory](https://github.com/jmcierniewski/IntellaFeeder/blob/main/Pictures/V3/01_Case_Inventory.jpg)
+
+*Pasted paths turned into a list of sources, with per-source tasks and profile.*
+
+![Import sources](https://github.com/jmcierniewski/IntellaFeeder/blob/main/Pictures/V3/04_Import%20sources.jpg)
 
 ## Features
 
+- **Guided two-step workflow**: ① read the case, ② import sources — with
+  dedicated tools alongside (case detail, profiles, maintenance, help).
+  Density and text scale are adjustable, so the same window works on a 13″
+  laptop and on a 27″ desk screen.
 - **Case inventory**: reads sources already indexed in a case (`-exportSourceList`),
   automatic de-duplication, size guard-rail (`case.xml` vs. measured total).
-- **Import**: paste paths, per-source tasks (reuses an existing Intella task file
-  as-is), configurable per-case size guard-rail, post-import validation (log
-  re-scan).
+- **Import**: build the source list your way — paste paths from any tool
+  (Everything, PowerGrep, a home-made script), drag whole folders onto
+  "Forensic images" (first segment of every image collected, recursively),
+  or multi-select folders/files in Explorer and drop them onto "Standard
+  folders" (each drop becomes one source, unexplored). Automatic
+  de-duplication against the case, per-source tasks (reuses an existing
+  Intella task file as-is), configurable per-case size guard-rail,
+  post-import validation (log re-scan).
 - **Analysis profiles**: named sets of indexing options (MIME filters, archives,
   deleted-file recovery, VSS…), reusable across cases, importable from a source
   already configured in Intella ("Info Profil").
+- **MIME type reference**: 679 descriptions and 800 type names built into the
+  executable, enriched automatically from every case you read. A source's type
+  filter is shown with what it actually *does* (exclude vs. include, in
+  colour), and four states tell a valid-but-unlabelled synonym apart from a
+  genuinely unknown name — 18 % of a real filter is the former.
+- **Maintenance**: activity log (searchable, All / Warnings / Errors),
+  preferences, MIME reference, and a "Files" screen telling you where
+  everything lives.
 - **Bilingual**: French and English built into the executable; adding a language
-  requires no rebuild (see `lang/`).
+  requires no rebuild (see `lang/`, which is optional — Maintenance → Files →
+  "Write the languages here…" seeds it).
 - **Known Vound multi-segment image bug — built-in workaround**: Intella's own
   integrity check can fail on forensic images split into multiple segments
   (`.E01/.E02…`, `.ad1/.ad2…`). The Import tab exposes a "Do not verify source
@@ -34,7 +59,10 @@ More info in the wiki
 
 ## Requirements
 
-- Windows, with **Vound Intella Investigator 3.1** installed (`IntellaCmd.exe`).
+- Windows, with **Vound Intella Investigator 3** or later installed
+  (`IntellaCmd.exe`). It also appears to work against Intella **Pro**
+  editions of the same generation, though this hasn't been extensively
+  tested.
 - Python 3.10+ if run from source (no package to install, standard library only —
   `tkinter` ships with the official Python installer).
 
@@ -60,6 +88,29 @@ embedded in the exe (`lang_data.py`) — the `lang/` folder is optional, but can
 shipped alongside the exe to add or fix a translation without rebuilding (see
 `i18n.py`).
 
+## Tests
+
+```powershell
+python -m pip install -r requirements-dev.txt
+python -m pytest
+```
+
+432 tests, about 3 seconds. The suite covers the non-GUI modules only (path
+parsing, sizing, task files, import JSON, profile catalog and XML translation,
+log analysis, case info file, upfront validation, MIME reference): no
+IntellaCmd, no network. pytest is a **development** dependency — the
+application itself needs the standard library only.
+
+The GUI is checked by two scripts instead, since pytest covers no widget:
+
+```powershell
+python tests\manuel_construction.py        # builds the window WITHOUT showing it
+python tests\manuel_fumee_v3.py <screen>   # opens it on one screen, to look at
+```
+
+`manuel_construction.py` never steals focus, so it can run while someone is
+working on the machine.
+
 ## Architecture
 
 Modular layout (one module = one responsibility): see the docstring at the top
@@ -77,7 +128,7 @@ MIT — see [LICENSE](LICENSE).
 
 *(Version anglaise plus haut — [English version above](#intellafeeder))*
 
-Générateur d'import automatique de sources pour **Vound Intella Investigator 3.1**,
+Générateur d'import automatique de sources pour **Vound Intella Investigator 3**,
 via `IntellaCmd.exe -addSourcesFromJson`. Interface graphique (Tkinter), multi-langue
 (FR/EN), sans dépendance externe (bibliothèque standard Python uniquement).
 
@@ -89,19 +140,46 @@ script `.bat` résilient (1 commande IntellaCmd par source, poursuit après un
 
 Plus d'informations dans le wiki
 
+*L'écran du cas : identité, taille, et l'inventaire des sources déjà indexées.*
+
+![Inventaire du cas](https://github.com/jmcierniewski/IntellaFeeder/blob/main/Pictures/V3/01_Case_Inventory.jpg)
+
+*Les chemins collés, transformés en liste de sources avec tâches et profil par source.*
+
+![Import des sources](https://github.com/jmcierniewski/IntellaFeeder/blob/main/Pictures/V3/04_Import%20sources.jpg)
 
 ## Fonctionnalités
 
+- **Parcours guidé en deux étapes** : ① lire le cas, ② importer les sources —
+  avec des outils dédiés à côté (détail du cas, profils, maintenance, aide).
+  Densité et taille du texte réglables : la même fenêtre sert sur un portable
+  13″ comme sur un écran de bureau 27″.
 - **Inventaire du cas** : lit les sources déjà indexées (`-exportSourceList`),
   dédoublonnage automatique, garde-fou de volume (`case.xml` vs somme mesurée).
-- **Import** : collage de chemins, tâches par source (fichier de tâches
-  Intella réutilisé tel quel), garde-fou de taille par cas configurable,
+- **Import** : la liste se construit à votre façon — collage de chemins issus
+  de n'importe quel outil (Everything, PowerGrep, un script maison), glisser
+  des dossiers entiers sur « Images forensiques » (premier tronçon de chaque
+  image collecté, y compris en récursif), ou multi-sélection de dossiers/
+  fichiers dans l'Explorateur déposée sur « Dossiers standard » (chaque dépôt
+  devient une source, sans exploration). Dédoublonnage automatique contre le
+  cas, tâches par source (fichier de tâches Intella réutilisé tel quel),
+  garde-fou de taille par cas configurable,
   validation post-import (relecture des logs).
 - **Profils d'analyse** : jeux de paramètres d'indexation nommés (filtres MIME,
   archives, VSS…), réutilisables entre cas, importables depuis une source déjà
   réglée dans Intella (« Info Profil »).
+- **Référentiel de types MIME** : 679 descriptions et 800 noms de types
+  embarqués dans l'exécutable, enrichis automatiquement à chaque cas lu. Le
+  filtre de types d'une source est affiché avec ce qu'il **fait** réellement
+  (exclure ou inclure, en couleur), et quatre états distinguent un synonyme
+  valide mais sans libellé d'un nom réellement inconnu — 18 % d'un filtre réel
+  relèvent du premier cas.
+- **Maintenance** : journal d'activité (cherchable, Tout / Alertes / Erreurs),
+  préférences, référentiel MIME, et un écran « Fichiers » qui dit où tout se
+  range.
 - **Multi-langue** : français et anglais intégrés à l'exécutable ; ajout d'une
-  langue possible sans recompiler (voir `lang/`).
+  langue possible sans recompiler (voir `lang/`, facultatif — Maintenance →
+  Fichiers → « Écrire les langues ici… » le remplit).
 - **Bug connu Vound sur les images multi-tronçons — contournement intégré** : la
   vérification d'intégrité d'Intella peut échouer sur des images forensiques
   découpées en plusieurs fichiers (`.E01/.E02…`, `.ad1/.ad2…`). L'onglet Import
@@ -111,7 +189,10 @@ Plus d'informations dans le wiki
 
 ## Prérequis
 
-- Windows, avec **Vound Intella Investigator 3.1** installé (`IntellaCmd.exe`).
+- Windows, avec **Vound Intella Investigator 3** ou une version ultérieure
+  installée (`IntellaCmd.exe`). Il semble également fonctionner avec les
+  éditions **Pro** d'Intella de la même génération, sans que cela ait été
+  largement éprouvé.
 - Python 3.10+ si lancé depuis les sources (aucun paquet à installer, seulement
   la bibliothèque standard — `tkinter` inclus avec l'installeur officiel Python).
 
@@ -137,6 +218,31 @@ pyinstaller --onefile --noconsole --name IntellaFeeder intellaFeeder.py
 embarquées dans l'exe (`lang_data.py`) — le dossier `lang/` est facultatif,
 mais peut être livré à côté pour permettre d'ajouter/corriger une traduction
 sans recompiler (voir `i18n.py`).
+
+## Tests
+
+```powershell
+python -m pip install -r requirements-dev.txt
+python -m pytest
+```
+
+432 tests, environ 3 secondes. La suite couvre uniquement les modules **sans
+interface** (analyse de chemins, calcul de tailles, fichiers de tâches, JSON
+d'import, catalogue de profils et traduction XML, analyse des logs, fichier
+d'info du cas, validation amont, référentiel MIME) : pas d'IntellaCmd, pas de
+réseau. pytest est une dépendance de **développement** — l'application, elle,
+n'utilise que la bibliothèque standard.
+
+L'interface se vérifie par deux scripts, puisqu'aucun widget n'est couvert par
+pytest :
+
+```powershell
+python tests\manuel_construction.py        # construit la fenêtre SANS l'afficher
+python tests\manuel_fumee_v3.py <écran>    # l'ouvre sur un écran, pour regarder
+```
+
+`manuel_construction.py` ne vole jamais le focus : il peut tourner pendant que
+quelqu'un travaille sur le poste.
 
 ## Architecture
 
