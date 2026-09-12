@@ -11,6 +11,8 @@ Avoids the repetitive clicks of the Intella web wizard: paste lists of paths
 tool generates the JSON files plus a resilient `.bat` script (one IntellaCmd
 command per source, continues after a failure) ready to run.
 
+More info in the wiki
+
 ## Interface (v3)
 
 > What changed since v2.5, and why: **[V3.md](V3.md)**.
@@ -126,6 +128,8 @@ chemins (images forensiques / dossiers), on choisit les tâches et le profil
 d'analyse à appliquer par source, et l'outil génère les fichiers JSON et un
 script `.bat` résilient (1 commande IntellaCmd par source, poursuit après un
 échec) prêt à lancer.
+
+Plus d'informations dans le wiki
 
 ## Interface (v3)
 
