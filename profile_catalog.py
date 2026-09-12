@@ -42,11 +42,22 @@ GROUPS = [
     ]),
     ("Chats & conversations", [
         {"key": "indexChatMessages", "label": "Indexer les messages de chat", "type": "bool", "default": True},
+        # « Present chat messages as » / « Split chat conversations » de la GUI
+        # Intella. Le manuel (§25) ne cite QUE CONVERSATIONS_AND_MESSAGES et
+        # PER_DAY ; les autres constantes sont déduites de la même forme et
+        # restent « à éprouver » — un export XML d'une source réglée dans la GUI
+        # (chatsProcessingMode / chatSplitMode) les confirmera.
         {"key": "processingMode", "label": "Mode de traitement des chats", "type": "enum",
          "default": "CONVERSATIONS_AND_MESSAGES",
-         "choices": ["CONVERSATIONS_AND_MESSAGES", "MESSAGES_ONLY"], "confirmed": False},
+         "choices": ["CONVERSATIONS_AND_MESSAGES", "CONVERSATIONS_ONLY", "MESSAGES_ONLY"],
+         "confirmed": False},
         {"key": "splitMode", "label": "Découpage des conversations", "type": "enum",
-         "default": "PER_DAY", "choices": ["NONE", "PER_DAY", "PER_MONTH"], "confirmed": False},
+         "default": "PER_DAY",
+         # NONE est conservé bien qu'absent de la GUI : il est déjà exposé depuis
+         # la v2.4 et pourrait figurer dans un profil enregistré.
+         "choices": ["NONE", "PER_HOUR", "PER_12_HOURS", "PER_DAY", "PER_WEEK",
+                     "PER_MONTH", "PER_YEAR"],
+         "confirmed": False},
         {"key": "numberMessagesPerConversation", "label": "Messages max / conversation", "type": "int", "default": 100},
     ]),
     ("Archives & bases de données", [
@@ -156,6 +167,15 @@ def diff_from_default(values: dict) -> dict:
         mode = coerce("sourceTypeFilterMode",
                       values.get("sourceTypeFilterMode", OPTIONS["sourceTypeFilterMode"]["default"]))
         emit["sourceTypeFilterMode"] = mode or "exclude"
+    # 🐞 …et RÉCIPROQUEMENT : jamais de mode sans filtre (09/09/2026). Basculer
+    # le combo sur « include » en laissant le champ vide émettait
+    # ``{"sourceTypeFilterMode": "include"}`` tout seul — soit, littéralement,
+    # « n'indexer que rien ». L'erreur ne se verrait qu'après l'import, et
+    # Intella ne permet pas de revoir les réglages d'une source. Un mode sans
+    # filtre n'a de toute façon aucun sens dans l'autre cas non plus (exclure
+    # une liste vide, c'est le comportement par défaut).
+    if "sourceTypeFilterMode" in emit and "sourceTypeFilter" not in emit:
+        del emit["sourceTypeFilterMode"]
     return emit
 
 

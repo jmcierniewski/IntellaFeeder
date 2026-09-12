@@ -9,6 +9,23 @@ Trois fichiers utiles dans un dossier de cas :
 
 La présence de ``case.xml`` sert à valider qu'on pointe bien sur un dossier de cas
 et à récupérer automatiquement le nom du cas, l'utilisateur et la taille occupée.
+
+**Cas compound** : la racine porte ``compound="true"`` et un bloc ``<subcases>``
+listant un ``<subcase>`` par sous-cas. Un compound ne contient **aucune source
+en propre** : il ne référence que des sous-cas — lesquels portent les sources —
+et il n'y a **pas de sous-cas de sous-cas**. Il porte la taille TOTALE de
+l'ensemble et la liste des utilisateurs autorisés.
+
+Les ``<subcase>`` observés sont **absolus**, mais un chemin **relatif** y est
+accepté et résolu depuis le dossier du compound (un compound recopié avec ses
+sous-cas reste alors lisible). Ce que fait Intella d'un ``<subcase>`` relatif
+n'est pas documenté : le manuel (§25.5) ne parle que des paramètres de
+``IntellaCmd.exe``, qui doivent être absolus.
+``IntellaCmd -addSourcesFromJson`` ne peut donc PAS y ajouter de source (il faut
+viser un sous-cas) → l'onglet Import est neutralisé pour ce type de cas.
+Les chemins de sous-cas peuvent pointer hors du poste courant (partage réseau
+démonté, cas recopié sans ses sous-cas) : ``read_subcases`` le signale au lieu
+de lever.
 """
 
 import json
@@ -16,6 +33,7 @@ import os
 import xml.etree.ElementTree as ET
 
 import i18n
+import path_parser
 
 CASE_XML = "case.xml"
 PREFS_DIR = "prefs"
@@ -25,6 +43,11 @@ TASKS2_JSON = "tasks2.json"
 
 def case_xml_path(folder: str) -> str:
     return os.path.join(folder, CASE_XML)
+
+
+def tasks2_path(folder: str) -> str:
+    """Chemin de ``prefs\\tasks2.json`` (peut ne pas exister)."""
+    return os.path.join(folder, PREFS_DIR, TASKS2_JSON)
 
 
 def has_case_xml(folder: str) -> bool:
@@ -59,7 +82,25 @@ def read_case_xml(folder: str) -> dict:
         "size": gi("size"),
         "originalVersion": _text(root, "originalVersion"),
         "caseVersion": _text(root, "caseVersion"),
+        # Cas compound : marqueur + chemins des sous-cas référencés.
+        "compound": (root.get("compound", "") or "").strip().lower() == "true",
+        "subcase_paths": _subcase_paths(root),
     }
+
+
+def _subcase_paths(root) -> list[str]:
+    """Chemins des sous-cas déclarés par ``<subcases><subcase>…``. [] si absent."""
+    node = root.find("subcases")
+    if node is None:
+        return []
+    return [el.text.strip() for el in node.findall("subcase")
+            if el.text and el.text.strip()]
+
+
+def authorized_users(prefs: dict) -> list[str]:
+    """Utilisateurs autorisés du cas, depuis ``InitialAuthorizedUsers`` (CSV)."""
+    raw = prefs.get("InitialAuthorizedUsers", "") or ""
+    return [u.strip() for u in raw.split(",") if u.strip()]
 
 
 def read_prefs(folder: str) -> dict:
@@ -83,7 +124,7 @@ def read_prefs(folder: str) -> dict:
 
 def read_tasks2(folder: str) -> list[str]:
     """Noms des tâches de ``prefs\\tasks2.json`` (post-indexation). [] si absent."""
-    path = os.path.join(folder, PREFS_DIR, TASKS2_JSON)
+    path = tasks2_path(folder)
     names: list[str] = []
     if not os.path.isfile(path):
         return names
@@ -97,6 +138,92 @@ def read_tasks2(folder: str) -> list[str]:
     except (ValueError, OSError, AttributeError):
         pass
     return names
+
+
+def read_subcases(folder: str, paths: list[str] | None = None) -> list[dict]:
+    """Détaille les sous-cas d'un cas compound, sans IntellaCmd.
+
+    ``paths`` évite une relecture du ``case.xml`` parent quand l'appelant les a
+    déjà (``xml["subcase_paths"]``).
+
+    Chaque entrée : ``path`` (chemin à utiliser — hôte UNC aligné sur celui du
+    compound si le partage est le même, cf. ``path_parser.align_unc_host``),
+    ``declared_path`` (chemin tel qu'écrit dans le ``case.xml``), ``exists``
+    (dossier + ``case.xml`` lisibles), ``name``, ``user``, ``size``,
+    ``authorized_users``, ``optimization`` (dossier d'optimisation du sous-cas)
+    et ``error``
+    (motif de l'échec, sinon ""). Ne lève jamais : un sous-cas hors du poste
+    (partage démonté, cas recopié seul) reste une ligne d'inventaire signalée,
+    pas une erreur bloquante.
+    """
+    if paths is None:
+        try:
+            paths = read_case_xml(folder)["subcase_paths"]
+        except (ET.ParseError, OSError):
+            return []
+
+    out: list[dict] = []
+    for raw in paths:
+        # Un `<subcase>` relatif se lit depuis le dossier du COMPOUND, jamais
+        # depuis le repertoire courant : resolu autrement, un compound portable
+        # (ou recopie ailleurs avec ses sous-cas) serait declare introuvable
+        # selon l'endroit d'ou l'application a ete lancee.
+        path = os.path.normpath(raw if os.path.isabs(raw)
+                                else os.path.join(folder, raw))
+        declared = path
+        # Même partage, hôte différent (IP vs nom NetBIOS) : Windows y voit deux
+        # serveurs, donc deux sessions SMB aux droits possiblement différents. On
+        # préfère l'hôte par lequel le compound est DÉJÀ ouvert — l'autre peut
+        # être lisible mais refusé en écriture, ce qui fait échouer
+        # `-exportSourceList` sur le verrou case.xml.lock (07/09/2026).
+        aligned = path_parser.align_unc_host(path, folder)
+        if aligned != path and os.path.isdir(aligned):
+            path = aligned
+        entry = {
+            "path": path,
+            # Chemin tel qu'écrit dans le case.xml du compound : conservé pour
+            # l'affichage et comme repli si l'hôte aligné se révèle mauvais.
+            "declared_path": declared,
+            "exists": False,
+            # Repli d'affichage tant que le case.xml n'est pas lisible : le nom
+            # du dossier, presque toujours celui du sous-cas.
+            "name": os.path.basename(path.rstrip(r"\\/")) or path,
+            "user": "",
+            "size": 0,
+            "authorized_users": [],
+            "optimization": "",
+            "error": "",
+        }
+        if not os.path.isdir(path):
+            entry["error"] = i18n.t(
+                "case_meta.subcase_missing_dir",
+                "Dossier introuvable depuis ce poste.")
+        elif not has_case_xml(path):
+            entry["error"] = i18n.t(
+                "case_meta.subcase_no_case_xml",
+                "Dossier présent mais case.xml absent.")
+        else:
+            try:
+                sub = read_case_xml(path)
+                prefs = read_prefs(path)
+            except (ET.ParseError, OSError) as exc:
+                entry["error"] = i18n.t(
+                    "case_meta.subcase_unreadable",
+                    "case.xml illisible : {e}", e=exc)
+            else:
+                entry.update({
+                    "exists": True,
+                    "name": sub["name"] or entry["name"],
+                    "user": sub["user"],
+                    "size": sub["size"],
+                    "authorized_users": authorized_users(prefs),
+                    # Un sous-cas porte SON dossier d'optimisation : deux
+                    # sous-cas d'un même lot peuvent ne pas pointer au même
+                    # endroit, et l'écart se paie en performances d'indexation.
+                    "optimization": prefs.get("OptimizationFolderPath", ""),
+                })
+        out.append(entry)
+    return out
 
 
 def read_case(folder: str) -> dict:
@@ -123,4 +250,8 @@ def read_case(folder: str) -> dict:
         "user": xml["user"],
         "size": xml["size"],
         "optimization": prefs.get("OptimizationFolderPath", ""),
+        "authorized_users": authorized_users(prefs),
+        # Cas compound : pas de source en propre, import interdit (cf. docstring).
+        "is_compound": xml["compound"],
+        "subcases": read_subcases(folder, xml["subcase_paths"]) if xml["compound"] else [],
     }

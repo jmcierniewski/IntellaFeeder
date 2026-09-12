@@ -5,7 +5,9 @@ import sys
 from datetime import datetime
 
 APP_NAME = "IntellaFeeder"
-APP_VERSION = "2.5"
+# Affichée dans le titre de la fenêtre et le journal → à incrémenter à CHAQUE
+# construction d'exe livrée, sinon impossible de savoir quel build tourne.
+APP_VERSION = "3.1b"
 APP_TITLE = "IntellaFeeder — Générateur de sources d'import Intella"
 
 # --- Réglages forensiques par défaut ---
@@ -32,8 +34,7 @@ def type_label(source_type: str) -> str:
     return i18n.t(key, TYPE_LABELS.get(source_type, source_type)) if key else source_type
 
 # --- Fichiers produits ---
-SOURCES_JSON = "sources.json"
-BAT_NAME = "import_intella.bat"
+# (les noms des JSON/.bat sont dérivés du nom du cas, cf. generator.py)
 DEFAULT_TASKS_FILENAME = "tasks.json"
 INI_NAME = "intellafeeder.ini"
 
@@ -48,13 +49,52 @@ PROFILS_DIRNAME = "profils"
 # --- Langues de l'interface : 1 fichier JSON (.lang) par langue ---
 LANG_DIRNAME = "lang"
 
+# --- Référentiel des types MIME d'Intella (descriptions + noms observés) ---
+# Rien n'est livré avec l'application : le fichier de descriptions appartient à
+# Vound et s'importe depuis l'installation d'Intella (onglet Maintenance).
+MIME_DIRNAME = "mimetypes"
+
 # --- Glyphes des cases à cocher ---
 CHECK = "☑"
 UNCHECK = "☐"
 
-# --- Couleurs d'onglets (pastilles + boutons « cross-onglet ») ---
-INVENTORY_TAB_COLOR = "#3b82f6"   # onglet « 1. Inventaire du cas »
-PROFILE_TAB_COLOR = "#8b5cf6"     # onglet « Profils » (bouton « Info Profil »)
+# --- Couleurs : UN SIGNAL, PAS UNE DÉCORATION -------------------------------
+# Règle du chantier de lisibilité (proposée le 07/09/2026, acceptée) : quand
+# tout est coloré, plus rien ne ressort et l'œil ne sait plus où est l'action de
+# l'écran. Quatre rôles, et rien d'autre :
+#
+#   VERT   = l'action qui fait avancer le travail. **Une seule par panneau.**
+#   ROUGE  = destructif, ou anomalie à traiter.
+#   ORANGE = attention, il reste quelque chose à faire.
+#   BLEU / VIOLET = renvoi vers un AUTRE onglet (couleur de l'onglet visé).
+#
+# Un bouton qui n'entre dans aucun de ces rôles reste neutre. Avant d'en colorer
+# un nouveau, vérifier qu'aucun autre du même panneau ne porte déjà ce rôle.
+INVENTORY_TAB_COLOR = "#3b82f6"   # bleu : renvoi vers « 1. Inventaire du cas »
+PROFILE_TAB_COLOR = "#8b5cf6"     # violet : renvoi vers « Profils »
+ACTION_COLOR = "#15803d"          # vert : l'action du panneau
+DANGER_COLOR = "#a4262c"          # rouge : destructif ou anomalie
+WARN_COLOR = "#9a5b00"            # orange : attention
+
+# --- Apparence v3 (direction « Parcours », choisie le 11/09/2026) ----------
+# Teinte de CHROME (navigation, sélection, en-têtes) — volontairement distincte
+# des quatre couleurs de rôle ci-dessus : le fil d'étapes n'est pas un bouton,
+# il ne doit donc pas emprunter le vert de l'action. Elle n'apparaît jamais en
+# aplat sous un libellé de bouton, seulement en fond clair + liseré.
+ACCENT = "#0f5c67"                # teal profond : l'étape courante, le focus
+ACCENT_SOFT = "#e2f0f2"           # son fond clair
+
+UI_BG = "#e9edf1"                 # fond de la fenêtre
+UI_SURFACE = "#ffffff"            # fond d'un panneau
+UI_SURFACE_2 = "#f5f7f9"          # fond secondaire (pieds de panneau, champs ro)
+UI_LINE = "#c6cfd8"               # filet structurant
+UI_LINE_SOFT = "#dde4ea"          # filet interne (séparation de lignes)
+UI_INK = "#0f172a"                # texte principal
+UI_INK_2 = "#4a5866"              # texte secondaire (libellés)
+UI_INK_3 = "#7d8b99"              # texte d'appoint (indications, unités)
+UI_SEL = "#d9e9ec"                # ligne sélectionnée d'un tableau
+UI_ZEBRA = "#f7f9fa"              # une ligne sur deux
+UI_HEAD = "#e7edf1"               # en-tête de tableau
 
 
 def glyph(state: bool) -> str:
@@ -152,3 +192,8 @@ def profiles_dir() -> str:
 def lang_dir() -> str:
     """Dossier des fichiers de langue (``base\\lang``)."""
     return os.path.join(base_dir(), LANG_DIRNAME)
+
+
+def mime_dir() -> str:
+    """Dossier du référentiel de types MIME (``base\\mimetypes``)."""
+    return os.path.join(base_dir(), MIME_DIRNAME)

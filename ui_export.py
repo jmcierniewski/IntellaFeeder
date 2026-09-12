@@ -6,12 +6,13 @@ Première étape du workflow :
    et verrouille le cas dans l'onglet Import).
 2. « Lire les sources » → ``-exportSourceList`` (IntellaCmd) : liste des sources
    déjà indexées (dédoublonnage) ; publié sur ``app.inventory``.
-3. « Scanner les dossiers à 0 » → mesure facultative des sources « dossier » dont
-   la taille n'est pas reportée par Intella.
+3. « Scanner les dossiers à mesurer » → mesure facultative des sources
+   « dossier » dont la taille n'est pas reportée par Intella.
 """
 
 import json
 import os
+import queue
 import shutil
 import threading
 import tkinter as tk
@@ -22,10 +23,11 @@ import case_info
 import case_meta
 import config
 import i18n
+import mime_catalog
 import path_parser
 import profile_translate
 import sizing
-from ui_widgets import make_button
+from ui_widgets import MeasureBar, attach_tip, make_button
 
 # En-têtes affichés du tableau (les clés internes des lignes restent en
 # français partout dans le code — ``case_export``, CSV… — pour ne rien casser ;
@@ -34,6 +36,7 @@ _COLUMN_LABEL_KEYS = {
     "Nom": "col.name", "Type": "col.type", "Fuseau": "col.timezone",
     "Taille": "col.size", "Octets": "col.bytes", "Segments": "col.segments",
     "Chemin": "col.path", "Tâches": "col.tasks",
+    "Sous-cas": "col.subcase",
 }
 
 
@@ -47,7 +50,15 @@ class ExportTab(ttk.Frame):
         self.app = app
         self.rows: list[dict] = []
         self.columns: list[str] = []
-
+        # Colonnes du CSV : suivent le type de cas lu (cf. _done).
+        self.csv_columns: list[str] = list(case_export.CSV_COLUMNS)
+        self._scan_running = False   # scan des dossiers à 0 en cours
+        self._scan_cancel = False    # annulation demandée (lue par le worker)
+        self._scan_owners: dict = {}     # chemin mesuré -> (dossier, nom) du cas propriétaire
+        self._cache_info_names: list = []  # fichiers .info d'où viennent les tailles reprises
+        self._view: list[int] = []       # indices de `rows` affichés (filtre + tri)
+        self._sort_col: str = ""         # colonne de tri courante ("" = ordre du XML)
+        self._sort_desc = False
 
         top = ttk.LabelFrame(self, text=i18n.t("inventory.case_frame", "Cas à inventorier"))
         top.pack(fill="x", padx=8, pady=8)
@@ -77,41 +88,88 @@ class ExportTab(ttk.Frame):
             row=2, column=0, sticky="w", padx=6, pady=4)
         ttk.Entry(top, textvariable=self.var_extra).grid(row=2, column=1, sticky="ew", padx=6, pady=4)
 
-        # Tous les boutons d'action ont la même apparence (tk.Button classique,
-        # comme « Scanner les dossiers à 0 ») ; seule la couleur peut différer.
+        # Tous les boutons d'action ont la même apparence (tk.Button classique) ;
+        # seule la couleur peut différer.
         actions = ttk.Frame(top)
         actions.grid(row=3, column=1, columnspan=2, sticky="w", padx=6, pady=4)
-        self.btn_run = self._mk_btn(actions, i18n.t("inventory.run", "Lire les sources (IntellaCmd)"),
-                                    self._run)
-        self.btn_run.pack(side="left")
-        self.btn_scan = self._mk_btn(actions, i18n.t("inventory.scan", "Scanner les dossiers à 0"),
+        # --- Groupe « Lire » : ce qui fait avancer l'inventaire -------------
+        grp_lire = ttk.LabelFrame(actions, text=i18n.t("inventory.grp_read", "Lire"))
+        grp_lire.pack(side="left", padx=(0, 10))
+        # Vert = l'action de l'ecran (une seule, cf. `config`). C'est par la
+        # qu'on commence, et rien ne le disait.
+        self.btn_run = self._mk_btn(grp_lire, i18n.t("inventory.run", "Lire les sources (IntellaCmd)"),
+                                    self._run, color=config.ACTION_COLOR)
+        self.btn_run.pack(side="left", padx=4, pady=4)
+        self.btn_scan = self._mk_btn(grp_lire, i18n.t("inventory.scan", "Scanner les dossiers à mesurer"),
                                      self._scan_zero)
-        self.btn_scan.pack(side="left", padx=6)
+        self.btn_scan.pack(side="left", padx=(0, 4), pady=4)
         self._scan_btn_default = {
             "bg": self.btn_scan.cget("bg"), "fg": self.btn_scan.cget("fg"),
             "activebackground": self.btn_scan.cget("activebackground"),
             "activeforeground": self.btn_scan.cget("activeforeground"),
         }
-        self._mk_btn(actions, i18n.t("common.export_csv", "Exporter en CSV…"),
-                    self._export_csv).pack(side="left")
-        self.btn_export_xml = self._mk_btn(actions, i18n.t("inventory.export_xml", "Exporter le XML…"),
+        # --- Groupe « Exporter » : les sorties, toutes neutres --------------
+        # Lecture, mesure et exports etaient meles sur une seule rangee de cinq
+        # boutons de trois couleurs. Les separer dit ce qui fait avancer le
+        # travail et ce qui n'en est qu'une sortie.
+        grp_exp = ttk.LabelFrame(actions, text=i18n.t("inventory.grp_export", "Exporter"))
+        grp_exp.pack(side="left", padx=(0, 10))
+        self._mk_btn(grp_exp, i18n.t("inventory.export_csv_short", "CSV…"),
+                    self._export_csv).pack(side="left", padx=4, pady=4)
+        self.btn_export_xml = self._mk_btn(grp_exp, i18n.t("inventory.export_xml_short", "XML…"),
                                            self._export_xml)
-        self.btn_export_xml.pack(side="left", padx=6)
-        # « Exporter les tâches du cas » : recyclage des tâches de l'inventaire
-        # (placé ici, à gauche d'« Info Profil », car il dépend de l'inventaire lu).
-        self._mk_btn(actions, i18n.t("inventory.export_tasks", "Exporter les tâches du cas…"),
-                    self._export_case_tasks).pack(side="left")
-        # « Info Profil » : couleur de l'onglet Profils (violet) pour le rattacher
-        # visuellement (réglages de la source sélectionnée → onglet Profils).
-        self._mk_btn(actions, i18n.t("inventory.info_profile", "Info Profil →"), self._info_profile,
-                     color=config.PROFILE_TAB_COLOR).pack(side="left", padx=6)
+        self.btn_export_xml.pack(side="left", padx=(0, 4), pady=4)
+        # « Exporter les tâches du cas » : recyclage des tâches de l'inventaire.
+        self._mk_btn(grp_exp, i18n.t("inventory.export_tasks_short", "Tâches du cas…"),
+                    self._export_case_tasks).pack(side="left", padx=(0, 4), pady=4)
+        # NEUTRE comme ses voisins (11/09/2026). Il portait la couleur de
+        # l'onglet visé, mais entouré de quatre boutons neutres dans la même
+        # barre, un violet isolé ne se lisait pas comme « renvoi » : il se
+        # lisait comme une faute de goût. La flèche « → » dit le renvoi, et
+        # l'infobulle dit où il mène — c'est suffisant et plus sobre.
+        # ⚠ Dans son propre groupe, et non nu à côté des deux autres : un
+        # LabelFrame descend son contenu de la hauteur de son titre, si bien
+        # qu'un bouton posé à côté flottait **plus haut que ses voisins**
+        # (constaté à l'écran le 11/09/2026). L'alignement se règle par la
+        # structure, pas par un `pady` deviné.
+        grp_profil = ttk.LabelFrame(actions, text=i18n.t("inventory.grp_profile",
+                                                         "Reprendre"))
+        grp_profil.pack(side="left")
+        btn_profil = self._mk_btn(grp_profil, i18n.t("inventory.info_profile", "Info Profil →"),
+                                  self._info_profile)
+        btn_profil.pack(side="left", padx=4, pady=4)
+        attach_tip(btn_profil, i18n.t(
+            "inventory.info_profile_tip",
+            "Reprend les réglages d'indexation de la source sélectionnée et "
+            "ouvre l'onglet Profils pour les enregistrer sous un nom."))
+
+        # Bandeau de progression du scan des dossiers à 0 (masqué au repos) :
+        # même widget que l'onglet Import (progression + annulation).
+        self.scan_bar = MeasureBar(self, pack_opts={"fill": "x", "padx": 12, "pady": (0, 4)})
 
         self.lbl_summary = ttk.Label(self, text=i18n.t("inventory.no_case", "Aucun cas sélectionné."))
         self.lbl_summary.pack(anchor="w", padx=12, pady=(0, 4))
 
+        # Filtre : un cas réel dépasse la quarantaine de sources ; retrouver
+        # celles d'un scellé se fait plus vite en tapant trois lettres qu'en
+        # faisant défiler.
+        filtre = ttk.Frame(self)
+        filtre.pack(fill="x", padx=12, pady=(0, 4))
+        ttk.Label(filtre, text=i18n.t("inventory.filter", "Filtrer")).pack(side="left")
+        self.var_filter = tk.StringVar()
+        self.var_filter.trace_add("write", lambda *_a: self._rebuild_view())
+        ttk.Entry(filtre, textvariable=self.var_filter, width=32).pack(side="left", padx=6)
+        self.lbl_filter = ttk.Label(filtre, text="", foreground="#64748b")
+        self.lbl_filter.pack(side="left")
+        ttk.Label(filtre, foreground="#64748b", text=i18n.t(
+            "inventory.table_hint",
+            "En-tête = tri · Ctrl+A tout sélectionner · Ctrl+C copier")).pack(side="right")
+
         holder = ttk.Frame(self)
         holder.pack(fill="both", expand=True, padx=8, pady=(0, 8))
-        self.tree = ttk.Treeview(holder, show="headings", selectmode="browse")
+        # « extended » : on copie souvent plusieurs lignes d'un coup vers un
+        # tableur ou un compte rendu.
+        self.tree = ttk.Treeview(holder, show="headings", selectmode="extended")
         vsb = ttk.Scrollbar(holder, orient="vertical", command=self.tree.yview)
         hsb = ttk.Scrollbar(holder, orient="horizontal", command=self.tree.xview)
         self.tree.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
@@ -120,6 +178,17 @@ class ExportTab(ttk.Frame):
         hsb.grid(row=1, column=0, sticky="ew")
         holder.rowconfigure(0, weight=1)
         holder.columnconfigure(0, weight=1)
+        # Source mesurée à 0 octet = vide pour de bon (≠ « à mesurer », ≠ « 0.0 Mo »
+        # qui pèse quelques Ko) : à voir avant l'import, pas après.
+        self.tree.tag_configure("empty", foreground=config.DANGER_COLOR)
+        # Zébrage : sur un tableau de sept colonnes et vingt lignes, l'œil
+        # perd la ligne en route. Le tag est posé à l'insertion (cf. plus bas),
+        # pas par un style — ttk n'a pas de sélecteur « ligne paire ».
+        self.tree.tag_configure("odd", background=config.UI_ZEBRA)
+        self.tree.bind("<Control-c>", self._copy_selection)
+        self.tree.bind("<Control-C>", self._copy_selection)
+        self.tree.bind("<Control-a>", self._select_all)
+        self.tree.bind("<Control-A>", self._select_all)
 
         if case_meta.has_case_xml(path_parser.clean_field(self.var_case.get())):
             self._detect_case()
@@ -165,14 +234,45 @@ class ExportTab(ttk.Frame):
                 i18n.t("inventory.xml_read_failed", "Lecture de case.xml impossible :\n{e}", e=exc))
             return
         self.app.set_case_meta(meta)
+        # Nouveau cas : la lecture des sources redevient utile (le bouton est
+        # grisé tant qu'on reste sur le cas déjà lu).
+        self.btn_run.config(state="normal")
         self.app.log.log(i18n.t(
             "inventory.case_detected_log",
             "Cas détecté : « {n} » — créé par {u}, {s} occupé(s).",
             n=meta['name'], u=meta['user'], s=config.human_size(meta['size'])))
+        if meta.get("is_compound"):
+            self._announce_compound(meta)
+            return
         self.lbl_summary.config(text=i18n.t(
             "inventory.case_detected_summary",
             "Cas « {n} » — {s} occupé(s). « Lire les sources » pour le dédoublonnage.",
             n=meta['name'], s=config.human_size(meta['size'])))
+
+    def _announce_compound(self, meta):
+        """Cas compound : dire ce qu'il est et pourquoi l'Import est fermé.
+
+        Le compound ne contient aucune source en propre ; il référence des
+        sous-cas et porte la taille TOTALE de l'ensemble. Les sources se lisent
+        sous-cas par sous-cas (« Lire les sources » s'en charge).
+        """
+        subs = meta.get("subcases", [])
+        missing = [sc for sc in subs if not sc.get("exists")]
+        txt = i18n.t(
+            "inventory.compound_summary",
+            "Cas COMPOUND « {n} » — {c} sous-cas, {s} au total. Aucune source en propre : "
+            "l'onglet Import est désactivé (ajoutez les sources dans un sous-cas).",
+            n=meta['name'], c=len(subs), s=config.human_size(meta['size']))
+        if missing:
+            txt += "  •  " + i18n.t(
+                "inventory.compound_missing",
+                "{n} sous-cas inaccessible(s) depuis ce poste", n=len(missing))
+        self.lbl_summary.config(text=txt)
+        self.app.log.log(i18n.t(
+            "inventory.compound_log",
+            "Cas compound : {c} sous-cas déclaré(s), {m} inaccessible(s).",
+            c=len(subs), m=len(missing)),
+            level="WARN" if missing else "INFO")
 
     # ------------------------------------------------------------------ #
     def _extra_args(self) -> str:
@@ -210,9 +310,19 @@ class ExportTab(ttk.Frame):
 
     def _worker(self, exe, user, case):
         try:
-            rows, columns, inventory = case_export.run_export_source_list(
-                exe, user, case, self.app.log.log, extra_args=self._extra_args()
-            )
+            meta = self.app.case_meta or {}
+            if meta.get("is_compound"):
+                # Un compound n'a pas de source en propre : on interroge chacun
+                # de ses sous-cas et on concatène (colonne « Sous-cas »).
+                rows, columns, inventory = case_export.run_export_subcases(
+                    exe, user, meta.get("subcases", []), self.app.log.log,
+                    extra_args=self._extra_args(),
+                    case_name=meta.get("name", ""), case_path=case,
+                )
+            else:
+                rows, columns, inventory = case_export.run_export_source_list(
+                    exe, user, case, self.app.log.log, extra_args=self._extra_args()
+                )
             self.after(0, self._done, rows, columns, inventory)
         except Exception as exc:  # FileNotFound, RuntimeError, parse…
             self.after(0, self._error, str(exc))
@@ -224,13 +334,24 @@ class ExportTab(ttk.Frame):
         messagebox.showerror(i18n.t("inventory.sources_title", "Inventaire des sources"), msg)
 
     def _done(self, rows, columns, inventory):
-        self.btn_run.config(state="normal")
+        # Lecture réussie : le bouton reste grisé jusqu'au prochain changement de
+        # cas (demande du 08/09/2026). Relire le même cas ne sert à rien et coûte
+        # un appel IntellaCmd de plusieurs secondes.
+        self.btn_run.config(state="disabled")
         self.rows, self.columns = rows, columns
+        self.csv_columns = list(case_export.CSV_COLUMNS_COMPOUND
+                                if inventory.get("is_compound")
+                                else case_export.CSV_COLUMNS)
         self.app.inventory = inventory
+        # Apprend les types MIME des filtres du cas : un nom écrit par Intella
+        # est valide même si le référentiel ne le décrit pas (ce sont souvent
+        # des alias). Sans cet apprentissage, un filtre réel afficherait plus de
+        # cent noms « inconnus » — et la couleur ne voudrait plus rien dire.
+        self._learn_mime_types(inventory)
         # Réutilise les tailles de dossiers déjà mesurées (fichier IF_<cas>.info) :
         # on ne re-scannera que les éventuels NOUVEAUX dossiers à 0.
         cached = self._apply_cached_folder_sizes(inventory)
-        self._fill_tree()
+        self._rebuild_view()
         self._update_summary(inventory)
         # Retrait automatique des sources déjà indexées côté Import.
         if hasattr(self.app, "import_tab"):
@@ -240,12 +361,15 @@ class ExportTab(ttk.Frame):
         # Bouton de scan en vert s'il reste des dossiers à taille 0.
         self._set_scan_alert(bool(unk))
         msg = i18n.t("inventory.n_sources_read", "{n} source(s) lue(s) dans le cas.", n=n)
+        if inventory.get("is_compound"):
+            msg = self._compound_report(inventory, n)
         if cached:
-            info_name = os.path.basename(
-                case_info.info_path(self.app.case_meta["folder"], self.app.case_meta["name"]))
+            # Compound : un fichier .info par sous-cas concerné, jamais un seul
+            # au niveau du compound (cf. `_cache_scope`).
             msg += "\n" + i18n.t(
                 "inventory.n_cached_folders",
-                "{n} dossier(s) déjà mesuré(s) repris du fichier {f}.", n=cached, f=info_name)
+                "{n} dossier(s) déjà mesuré(s) repris du fichier {f}.",
+                n=cached, f=", ".join(self._cache_info_names))
         if unk:
             msg += "\n" + i18n.t(
                 "inventory.n_unknown_folders",
@@ -255,21 +379,138 @@ class ExportTab(ttk.Frame):
         # Consigne1 : cohérence taille du cas (case.xml) vs somme des sources.
         self._check_size_consistency()
 
+    def _compound_report(self, inventory, n_sources) -> str:
+        """Résumé « Lire les sources » d'un cas compound : une ligne par sous-cas.
+
+        Les sous-cas en échec (dossier hors du poste, IntellaCmd en erreur) sont
+        listés explicitement : l'inventaire est alors PARTIEL et il ne faut pas
+        laisser croire qu'il est complet.
+        """
+        reports = inventory.get("subcase_reports", [])
+        ok = [r for r in reports if r["ok"]]
+        msg = i18n.t(
+            "inventory.compound_read",
+            "{n} source(s) lue(s) sur {k}/{t} sous-cas.",
+            n=n_sources, k=len(ok), t=len(reports))
+        for r in reports:
+            if r["ok"]:
+                msg += "\n  • " + i18n.t(
+                    "inventory.compound_sub_ok", "{n} : {c} source(s)",
+                    n=r["name"], c=r["source_count"])
+            else:
+                msg += "\n  ✕ " + i18n.t(
+                    "inventory.compound_sub_ko", "{n} : non lu — {e}",
+                    n=r["name"], e=r["error"])
+        if len(ok) < len(reports):
+            msg += "\n\n" + i18n.t(
+                "inventory.compound_partial",
+                "Inventaire PARTIEL : les sources des sous-cas non lus manquent.")
+        return msg
+
+    def _cache_scope(self, folder_entry) -> tuple:
+        """Cas propriétaire du cache de tailles pour un dossier à 0.
+
+        Compound : **le sous-cas d'où vient la source**, jamais le compound —
+        un sous-cas peut être retiré du lot ou recevoir de nouvelles sources, et
+        son `IF_<cas>.info` doit le suivre. Il est d'ailleurs le même fichier que
+        celui lu si l'utilisateur ouvre ce sous-cas comme cas courant.
+        Cas simple : le cas lui-même.
+        """
+        meta = self.app.case_meta or {}
+        if folder_entry.get("subcase_path"):
+            return (folder_entry["subcase_path"],
+                    folder_entry.get("case_name") or folder_entry.get("subcase") or "")
+        return meta.get("folder", ""), meta.get("name", "")
+
+    def _learn_mime_types(self, inventory) -> None:
+        """Enrichit le référentiel des types MIME avec ceux des filtres du cas.
+
+        Silencieux et sans conséquence en cas d'échec : c'est un service rendu
+        à l'affichage des profils, jamais une condition de la lecture du cas.
+        """
+        sources = inventory.get("sources_detail") or []
+        # AVANT d'apprendre : ce que le référentiel ne décrivait pas. Après,
+        # tout serait « observé » et le signal serait perdu.
+        try:
+            inedits = self._undescribed_types(sources)
+            nouveaux = mime_catalog.learn_from_sources(sources)
+        except Exception:       # référentiel indisponible, disque plein…
+            return
+        if nouveaux:
+            self.app.log.log(i18n.t(
+                "inventory.mime_learned",
+                "{n} type(s) MIME appris depuis les filtres du cas.",
+                n=len(nouveaux)))
+        if inedits:
+            self._warn_stale_reference(inedits)
+        else:
+            # Cas suivant entièrement décrit : effacer, sinon l'onglet Profils
+            # continuerait d'afficher la liste du cas précédent.
+            self.app.undescribed_types = []
+            tab = getattr(self.app, "profiles_tab", None)
+            if tab is not None:
+                tab.refresh_reference()
+
+    @staticmethod
+    def _undescribed_types(sources) -> list:
+        """Types filtrés par ce cas qu'aucune description ne nomme."""
+        vus = set()
+        for src in sources:
+            db = (src or {}).get("domain_boundaries") or {}
+            brut = (db.get("mimeTypes") or "").strip()
+            if brut:
+                vus.update(mime_catalog.split_filter(brut))
+        return sorted(n for n in vus if n and mime_catalog.label(n) is None)
+
+    def _warn_stale_reference(self, inedits) -> None:
+        """Consigne les types filtrés qu'aucune description ne nomme.
+
+        🔴 **Plus de popup** (retiré le 10/09/2026, à la demande de
+        l'utilisateur). Il s'ouvrait à chaque lecture de cas pour annoncer une
+        situation sur laquelle il n'y a **rien à faire** quand on a déjà la
+        dernière version d'Intella — un nom non décrit n'est pas une erreur,
+        ce sont des alias qu'Intella écrit sans les nommer (121 sur un filtre
+        réel). Une fenêtre qu'on ferme sans la lire n'informe personne et coûte
+        un clic à chaque fois.
+
+        L'information reste disponible là où elle sert : au journal, et dans
+        l'onglet Profils → « Référentiel », **avec la liste**.
+        """
+        self.app.log.log(i18n.t(
+            "inventory.mime_undescribed",
+            "{n} type(s) filtré(s) par ce cas ne sont décrits par aucun "
+            "référentiel : {ex}…",
+            n=len(inedits), ex=", ".join(inedits[:5])), level="WARN")
+        # Publié pour l'onglet Profils, qui l'affiche avec la liste complète.
+        self.app.undescribed_types = list(inedits)
+        tab = getattr(self.app, "profiles_tab", None)
+        if tab is not None:
+            tab.refresh_reference()
+
     def _apply_cached_folder_sizes(self, inventory) -> int:
         """Applique les tailles de dossiers déjà mémorisées (IF_<cas>.info).
 
-        Pour chaque dossier à 0 dont la taille est connue du cache : renseigne la
-        ligne, l'intègre à ``known_bytes`` et le retire de ``folder_unknown``.
-        Retourne le nombre de dossiers résolus par le cache.
+        Pour chaque dossier à 0 dont la taille est connue du cache de SON cas
+        (cf. ``_cache_scope``) : renseigne la ligne, l'intègre à ``known_bytes``
+        et le retire de ``folder_unknown``. Retourne le nombre de dossiers
+        résolus ; les fichiers utilisés sont mémorisés dans ``_cache_info_names``.
         """
         meta = self.app.case_meta
+        self._cache_info_names = []
         if not meta:
             return 0
-        cache = case_info.get_folder_sizes(meta["folder"], meta["name"])
-        if not cache:
-            return 0
-        applied, extra, still_unknown = 0, 0, []
+        caches: dict = {}
+
+        def cache_of(scope):
+            if scope not in caches:
+                caches[scope] = (case_info.get_folder_sizes(*scope)
+                                 if scope[0] and scope[1] else {})
+            return caches[scope]
+
+        applied, extra, still_unknown, used = 0, 0, [], []
         for f in inventory.get("folder_unknown", []):
+            scope = self._cache_scope(f)
+            cache = cache_of(scope)
             key = path_parser.normalize_path(f["path"]).lower()
             if key in cache:
                 b = int(cache[key])
@@ -279,22 +520,31 @@ class ExportTab(ttk.Frame):
                         r["Octets"] = str(b)
                 extra += b
                 applied += 1
+                name = os.path.basename(case_info.info_path(*scope))
+                if name not in used:
+                    used.append(name)
             else:
                 still_unknown.append(f)
+        self._cache_info_names = used
         if applied:
             inventory["folder_unknown"] = still_unknown
             inventory["known_bytes"] = (inventory.get("known_bytes", 0) or 0) + extra
-            info_name = os.path.basename(case_info.info_path(meta["folder"], meta["name"]))
             self.app.log.log(i18n.t(
                 "inventory.cache_applied_log",
                 "{n} dossier(s) à 0 repris du cache {f} (total {t}).",
-                n=applied, f=info_name, t=config.human_size(extra)))
+                n=applied, f=", ".join(used), t=config.human_size(extra)))
         return applied
 
     def _set_scan_alert(self, on: bool):
+        """Orange quand des dossiers restent a mesurer.
+
+        Etait vert jusqu'au 10/09/2026 — la couleur de l'action du moment, alors
+        qu'il s'agit d'un RESTE A FAIRE. Deux verts sur la meme rangee ne
+        disaient plus par ou commencer (cf. la regle dans `config`).
+        """
         if on:
-            self.btn_scan.config(bg="#16a34a", fg="white",
-                                 activebackground="#15803d", activeforeground="white")
+            self.btn_scan.config(bg=config.WARN_COLOR, fg="white",
+                                 activebackground="#92400e", activeforeground="white")
         else:
             self.btn_scan.config(**self._scan_btn_default)
 
@@ -339,6 +589,14 @@ class ExportTab(ttk.Frame):
     def _update_summary(self, inv):
         meta = self.app.case_meta
         size_txt = config.human_size(meta["size"]) if meta else "?"
+        if inv.get("is_compound"):
+            reports = inv.get("subcase_reports", [])
+            ok = sum(1 for r in reports if r["ok"])
+            self.lbl_summary.config(text=i18n.t(
+                "inventory.compound_case_summary",
+                "Cas COMPOUND « {n} » — {c} source(s) sur {k}/{t} sous-cas — total {s}",
+                n=inv['case_name'], c=inv['source_count'], k=ok, t=len(reports), s=size_txt))
+            return
         if inv["source_count"] == 0:
             self.lbl_summary.config(text=i18n.t(
                 "inventory.case_empty", "Cas « {n} » — vide (aucune source indexée).",
@@ -352,120 +610,308 @@ class ExportTab(ttk.Frame):
                 "inventory.n_scannable_folders", "{n} dossier(s) à 0 (scannables)", n=unk)
         self.lbl_summary.config(text=txt)
 
+    # ------------------------------------------------------------------ #
+    # Tableau : vue (filtre + tri), remplissage, copie                    #
+    # ------------------------------------------------------------------ #
+    @staticmethod
+    def _is_empty_source(row) -> bool:
+        """Source **mesurée** et vraiment vide (0 octet), à distinguer de
+        « pas encore mesurée » et de « 0.0 Mo » (quelques Ko, donc non vide)."""
+        return (row.get("Octets") == "0"
+                and row.get("Taille") != case_export.SIZE_UNKNOWN_LABEL)
+
+    def _sort_key(self, idx: int):
+        """Clé de tri : numérique sur les colonnes de nombres, texte sinon.
+
+        Trier « Taille » sur son libellé mettrait « 9.9 Mo » après « 10 Go » :
+        on trie sur les octets, qui sont dans la ligne même s'ils ne sont pas
+        affichés.
+        """
+        row = self.rows[idx]
+        col = self._sort_col
+        if col in ("Taille", "Octets", "Segments"):
+            brut = row.get("Octets" if col == "Taille" else col, "")
+            try:
+                return (0, float(brut))
+            except (TypeError, ValueError):
+                return (1, 0.0)          # non mesuré → toujours en fin de tri
+        return (0, str(row.get(col, "")).casefold())
+
+    def _rebuild_view(self):
+        """Recalcule les lignes affichées (filtre puis tri) et remplit l'arbre."""
+        motif = (self.var_filter.get() or "").strip().casefold()
+        vue = []
+        for i, r in enumerate(self.rows):
+            if motif and motif not in " ".join(
+                    str(r.get(c, "")) for c in self.columns).casefold():
+                continue
+            vue.append(i)
+        if self._sort_col:
+            vue.sort(key=self._sort_key, reverse=self._sort_desc)
+        self._view = vue
+        self._fill_tree()
+        self._update_filter_label()
+
+    def _sort_by(self, col: str):
+        """Un clic trie, un second inverse (flèche dans l'en-tête)."""
+        if self._sort_col == col:
+            self._sort_desc = not self._sort_desc
+        else:
+            self._sort_col, self._sort_desc = col, False
+        self._rebuild_view()
+
+    def _update_filter_label(self):
+        total, montre = len(self.rows), len(self._view)
+        self.lbl_filter.config(
+            text="" if montre == total else i18n.t(
+                "inventory.filter_count", "{m} / {t} ligne(s)", m=montre, t=total))
+
     def _fill_tree(self):
         self.tree.delete(*self.tree.get_children())
         self.tree["columns"] = self.columns
         widths = {"Nom": 240, "Type": 110, "Fuseau": 70, "Taille": 90,
-                  "Octets": 110, "Segments": 70, "Chemin": 360, "Tâches": 360}
+                  "Octets": 110, "Segments": 70, "Chemin": 360, "Tâches": 360,
+                  "Sous-cas": 200}
         for c in self.columns:
             label = i18n.t(_COLUMN_LABEL_KEYS.get(c, ""), c) if c in _COLUMN_LABEL_KEYS else c
-            self.tree.heading(c, text=label)
-            self.tree.column(c, width=widths.get(c, 150), anchor="w", stretch=False)
-        for r in self.rows:
-            self.tree.insert("", "end", values=[r.get(c, "") for c in self.columns])
+            if c == self._sort_col:
+                label += " ▼" if self._sort_desc else " ▲"
+            self.tree.heading(c, text=label, command=lambda col=c: self._sort_by(col))
+            # Les nombres se comparent à l'œil quand ils sont alignés à droite.
+            anchor = "e" if c in ("Taille", "Octets", "Segments") else "w"
+            self.tree.column(c, width=widths.get(c, 150), anchor=anchor, stretch=False)
+        # `iid` = index dans self.rows : la vue peut être triée ou filtrée, mais
+        # « Info Profil » doit retrouver la bonne source dans `sources_detail`.
+        # `_view` fait foi — il est recalculé par `_rebuild_view`, seul point
+        # d'entrée du remplissage.
+        for rang, idx in enumerate(self._view):
+            r = self.rows[idx]
+            tags = ["empty"] if self._is_empty_source(r) else []
+            if rang % 2:
+                tags.append("odd")
+            self.tree.insert("", "end", iid=str(idx),
+                             values=[r.get(c, "") for c in self.columns],
+                             tags=tuple(tags))
+
+    def _copy_selection(self, _event=None):
+        """Copie les lignes sélectionnées (TSV : collable dans un tableur)."""
+        sel = self.tree.selection()
+        if not sel:
+            return "break"
+        lignes = ["\t".join(self.columns)]
+        for iid in sel:
+            r = self.rows[int(iid)]
+            lignes.append("\t".join(str(r.get(c, "")) for c in self.columns))
+        self.clipboard_clear()
+        self.clipboard_append("\n".join(lignes))
+        self.app.log.log(i18n.t("inventory.copied_log",
+                                "{n} ligne(s) copiée(s) dans le presse-papiers.", n=len(sel)))
+        return "break"
+
+    def _select_all(self, _event=None):
+        self.tree.selection_set(self.tree.get_children())
+        return "break"
 
     # ------------------------------------------------------------------ #
     # Scan facultatif des dossiers à taille 0                            #
     # ------------------------------------------------------------------ #
     def _scan_zero(self):
+        """Mesure les dossiers que l'export XML reporte à 0 (mesure INDICATIVE).
+
+        Contrairement à l'onglet Import, ces sources sont **déjà indexées** :
+        leur volume ne conditionne pas le garde-fou (``case.xml/size`` fait foi),
+        il affine seulement l'affichage. D'où deux différences assumées :
+        les résultats partiels sont **conservés et persistés immédiatement**
+        (une source du cas ne bougera plus), et l'annulation est sans conséquence.
+        """
         inv = self.app.inventory
         if not inv or not inv.get("folder_unknown"):
+            # 🐞 « Lisez d'abord les sources » était accolé au constat sans
+            # condition (signalé le 11/09/2026) : il s'affichait alors même que
+            # les sources VENAIENT d'être lues, et laissait croire à un échec de
+            # lecture là où il n'y a simplement rien à mesurer. Deux situations,
+            # deux phrases.
             messagebox.showinfo(
                 i18n.t("inventory.zero_folders_title", "Dossiers à 0"),
                 i18n.t("inventory.zero_folders_none",
-                      "Aucun dossier sans taille à mesurer.\nLisez d'abord les sources du cas."))
+                       "Aucun dossier sans taille à mesurer : tous les volumes "
+                       "de ce cas sont connus.")
+                if self._inventory_read() else
+                i18n.t("inventory.zero_folders_unread",
+                       "Les sources de ce cas n'ont pas encore été lues.\n"
+                       "Lancez « Lire les sources » d'abord."))
+            return
+        if self._scan_running:
             return
         folders = list(inv["folder_unknown"])
+        # Propriétaire du cache figé AVANT la mesure : `folder_unknown` est
+        # rectifié en fin de scan, la correspondance chemin → cas doit survivre.
+        self._scan_owners = {f["path"]: self._cache_scope(f) for f in folders}
+        self._scan_running = True
+        self._scan_cancel = False
         self.btn_scan.config(state="disabled")
-        self._show_scan_progress(len(folders))
+        self.scan_bar.start(len(folders), on_cancel=self._cancel_scan,
+                            cancel_text=i18n.t("common.cancel_btn", "✕ Interrompre le scan"))
+        self.scan_bar.set_step(1, len(folders), i18n.t(
+            "inventory.measuring_progress", "Mesure des dossiers… {i}/{n}", i=1, n=len(folders)))
         self.app.log.log(i18n.t(
             "inventory.scan_start_log", "Scan de {n} dossier(s) à taille 0…", n=len(folders)))
-        threading.Thread(target=self._scan_zero_worker,
-                         args=(folders,), daemon=True).start()
+        # Moteur de mesure partagé avec l'onglet Import (cf. `sizing`) : le worker
+        # ne touche aucun widget, `_poll_scan` draine la file côté UI.
+        self._scan_queue = queue.Queue()
+        items = [{"key": f["path"], "path": f["path"],
+                  "label": f.get("name") or f["path"], "type": config.SOURCE_TYPE_FOLDER}
+                 for f in folders]
+        threading.Thread(
+            target=sizing.measure_sources,
+            args=(items, self._scan_queue, lambda: self._scan_cancel),
+            daemon=True).start()
+        self.after(100, self._poll_scan)
 
-    def _show_scan_progress(self, total):
-        """Affiche une barre de progression déterminée pour le scan en cours."""
-        if not hasattr(self, "scan_progress") or not self.scan_progress.winfo_exists():
-            self.scan_progress = ttk.Progressbar(self, mode="determinate")
-        self.scan_progress.config(maximum=max(1, total), value=0)
-        self.scan_progress.pack(fill="x", padx=12, pady=(0, 4))
-        self.lbl_summary.config(text=i18n.t(
-            "inventory.measuring_progress", "Mesure des dossiers… {i}/{n}", i=0, n=total))
+    def _cancel_scan(self):
+        self._scan_cancel = True
+        self.scan_bar.cancelling(i18n.t("common.cancelling", "Interruption en cours…"))
+        self.app.log.log(i18n.t("inventory.scan_cancel_log", "Scan des dossiers : annulation demandée."))
 
-    def _scan_zero_worker(self, folders):
-        total = len(folders)
-        results = []
-        for i, f in enumerate(folders, start=1):
-            # Signale le dossier en cours AVANT la mesure (folder_size peut être
-            # long sur de gros volumes) puis incrémente la barre une fois mesuré.
-            self.after(0, self._scan_zero_progress, i, total, f.get("name") or f["path"])
-            results.append((f["path"], sizing.folder_size(f["path"])))
-        self.after(0, self._scan_zero_done, results)
+    def _poll_scan(self):
+        try:
+            while True:
+                msg = self._scan_queue.get_nowait()
+                if msg[0] == "progress":
+                    self._scan_zero_progress(*msg[1:])
+                elif msg[0] == "row":
+                    self.scan_bar.step_done()
+                else:
+                    self._scan_zero_done(msg[1], msg[3])
+                    return
+        except queue.Empty:
+            pass
+        self.after(100, self._poll_scan)
 
-    def _scan_zero_progress(self, i, total, name):
-        if hasattr(self, "scan_progress") and self.scan_progress.winfo_exists():
-            self.scan_progress["value"] = i - 1
-        self.lbl_summary.config(text=i18n.t(
-            "inventory.measuring_progress_named", "Mesure des dossiers… {i}/{n} : {f}",
-            i=i, n=total, f=name))
+    def _scan_zero_progress(self, i, total, label, files, nbytes, elapsed):
+        if self._scan_cancel:
+            return
+        text = i18n.t("inventory.measuring_progress_named", "Mesure des dossiers… {i}/{n} : {f}",
+                      i=i, n=total, f=label)
+        if files:
+            text += "  —  " + i18n.t(
+                "common.scan_stats", "{f} fichiers, {b}, {s}s ({r}/s)",
+                f=files, b=config.human_size(nbytes), s=int(elapsed),
+                r=config.human_size(int(nbytes / elapsed)) if elapsed >= 1 else "…")
+        self.scan_bar.set_step(i, total, text)
 
-    def _scan_zero_done(self, results):
+    def _scan_zero_done(self, results_map, cancelled=False):
+        self._scan_running = False
+        self._scan_cancel = False
         self.btn_scan.config(state="normal")
-        if hasattr(self, "scan_progress") and self.scan_progress.winfo_exists():
-            self.scan_progress.pack_forget()
+        self.scan_bar.stop()
+        results = list(results_map.items())
         by_path = dict(results)
         for r in self.rows:
             b = by_path.get(r.get("Chemin"))
             if b is not None:
                 r["Taille"] = config.human_size(b) if b else "0"
                 r["Octets"] = str(b)
-        self._fill_tree()
+        self._rebuild_view()
         total = sum(b for _p, b in results)
-        # Intègre les dossiers mesurés à la somme inventaire et lève l'alerte
-        # (plus de taille à 0), puis ré-évalue la cohérence des tailles.
+        # Intègre les dossiers mesurés à la somme inventaire. Après une
+        # interruption, les dossiers NON mesurés restent listés (l'alerte de scan
+        # reste donc allumée) : on ne prétend pas connaître ce qu'on n'a pas vu.
+        restants = []
         if self.app.inventory is not None:
+            restants = [f for f in (self.app.inventory.get("folder_unknown") or [])
+                        if f["path"] not in by_path]
             self.app.inventory["known_bytes"] = self._inventory_total_bytes() + total
-            self.app.inventory["folder_unknown"] = []
-        self._set_scan_alert(False)
-        # Persiste les mesures dans IF_<cas>.info pour ne pas re-scanner ensuite.
+            self.app.inventory["folder_unknown"] = restants
+        self._set_scan_alert(bool(restants))
+        # Persistance IMMÉDIATE (contrairement à l'onglet Import) : ces sources
+        # sont déjà indexées dans le cas, leur contenu ne bougera plus — même les
+        # mesures d'un scan interrompu sont bonnes à garder.
+        # Compound : une écriture PAR SOUS-CAS concerné (aucun .info déposé au
+        # niveau du compound — la composition du lot peut changer).
         meta = self.app.case_meta
         if meta and results:
-            if case_info.update_folder_sizes(meta["folder"], meta["name"], dict(results)):
-                info_name = os.path.basename(case_info.info_path(meta['folder'], meta['name']))
+            by_scope: dict = {}
+            fallback = (meta.get("folder", ""), meta.get("name", ""))
+            for p, b in results:
+                scope = self._scan_owners.get(p) or fallback
+                by_scope.setdefault(scope, {})[p] = b
+            saved, failed = [], []
+            for scope, measured in by_scope.items():
+                if not (scope[0] and scope[1]):
+                    continue
+                name = os.path.basename(case_info.info_path(*scope))
+                (saved if case_info.update_folder_sizes(*scope, measured)
+                 else failed).append(name)
+            if saved:
                 self.app.log.log(i18n.t(
-                    "inventory.sizes_saved_log", "Tailles mémorisées dans {f}.", f=info_name))
+                    "inventory.sizes_saved_log", "Tailles mémorisées dans {f}.",
+                    f=", ".join(saved)))
+            if failed:
+                self.app.log.log(i18n.t(
+                    "inventory.sizes_save_failed_log",
+                    "Écriture impossible dans {f} (droits ?) : tailles non mémorisées.",
+                    f=", ".join(failed)), level="WARN")
         self.app.log.log(i18n.t(
             "inventory.folders_measured_log", "Dossiers mesurés : {n} — total {t}.",
             n=len(results), t=config.human_size(total)))
-        self.lbl_summary.config(text=i18n.t(
-            "inventory.folders_measured_summary",
-            "{n} dossier(s) mesuré(s) — total {t} (intégré à la somme inventaire).",
-            n=len(results), t=config.human_size(total)))
+        if cancelled:
+            self.app.log.log(i18n.t(
+                "inventory.scan_cancelled_log",
+                "Scan interrompu : {n} dossier(s) mesuré(s), {m} restant(s) à 0.",
+                n=len(results), m=len(restants)), level="WARN")
+            self.lbl_summary.config(text=i18n.t(
+                "inventory.scan_cancelled_summary",
+                "Scan interrompu — {n} dossier(s) mesuré(s) (total {t}), {m} restant(s) à 0.",
+                n=len(results), t=config.human_size(total), m=len(restants)))
+        else:
+            self.lbl_summary.config(text=i18n.t(
+                "inventory.folders_measured_summary",
+                "{n} dossier(s) mesuré(s) — total {t} (intégré à la somme inventaire).",
+                n=len(results), t=config.human_size(total)))
         self._check_size_consistency()
 
-    def _info_profile(self):
-        """Réglages d'indexation de la source sélectionnée → onglet Profils."""
-        inv = self.app.inventory
-        details = (inv or {}).get("sources_detail")
-        title = i18n.t("inventory.info_profile", "Info Profil →")
+    def _inventory_read(self) -> bool:
+        """L'inventaire du cas a-t-il déjà été lu ?
+
+        Sert à choisir entre deux messages qui se ressemblent mais n'appellent
+        pas le même geste : « il n'y a rien à faire » (l'outil a travaillé) et
+        « lisez d'abord les sources » (il reste un geste à faire).
+        """
+        inv = self.app.inventory or {}
+        return bool(inv.get("sources_detail") is not None or inv.get("sources"))
+
+    def _selected_source(self, title: str):
+        """Source sélectionnée dans le tableau, ou ``None`` (message affiché)."""
+        details = (self.app.inventory or {}).get("sources_detail")
         if not details:
             messagebox.showinfo(
                 title, i18n.t("inventory.info_profile_no_inventory",
                               "Lisez d'abord les sources du cas (« Lire les sources »)."))
-            return
+            return None
         sel = self.tree.selection()
         if not sel:
             messagebox.showinfo(
                 title, i18n.t("inventory.info_profile_no_selection",
                              "Sélectionnez une source dans le tableau."))
-            return
-        idx = self.tree.index(sel[0])
+            return None
+        # `iid` = index d'origine dans `rows` (et donc dans `sources_detail`) :
+        # `tree.index()` donnerait la position AFFICHÉE, fausse dès qu'on trie
+        # ou qu'on filtre.
+        idx = int(sel[0])
         if idx >= len(details):
             messagebox.showerror(
                 title, i18n.t("inventory.info_profile_not_found",
                               "Source introuvable (re-lisez les sources)."))
+            return None
+        return details[idx]
+
+    def _info_profile(self):
+        """Réglages d'indexation de la source sélectionnée → onglet Profils."""
+        title = i18n.t("inventory.info_profile", "Info Profil →")
+        src = self._selected_source(title)
+        if src is None:
             return
-        src = details[idx]
         values = profile_translate.from_xml_source(src)
         name = src.get("name") or i18n.t("inventory.default_profile_name", "profil")
         if not values:
@@ -475,17 +921,34 @@ class ExportTab(ttk.Frame):
                     "La source « {n} » n'expose aucun réglage exploitable "
                     "(indexOptions/domainBoundaries vides).", n=name))
             return
-        self.app.open_profiles_with(values, name)
+        self.app.open_profiles_with(values, name, src)
         self.app.log.log(i18n.t(
             "inventory.info_profile_log",
             "Info Profil : réglages de « {n} » transférés à l'onglet Profils ({c} option(s)).",
             n=name, c=len(values)))
+        # Ce qui n'entre pas dans le catalogue est PERDU : un profil n'émet que
+        # les options pilotables par `-addSourcesFromJson`. Le taire laisserait
+        # croire qu'il rejoue tous les réglages de la source (question du
+        # 08/09/2026).
+        ignores = profile_translate.unsupported_keys(src)
+        if ignores:
+            self.app.log.log(i18n.t(
+                "inventory.info_profile_ignored",
+                "Non repris (non pilotables à l'import) : {k}. "
+                "« Voir les réglages… » les affiche en détail.",
+                k=", ".join(ignores)),
+                level="WARN")
 
     def _export_xml(self):
         """Enregistre une copie du XML produit par « Lire les sources »."""
         inv = self.app.inventory or {}
         xml_path = inv.get("xml_path")
         title = i18n.t("inventory.export_xml", "Exporter le XML…")
+        # Cas compound : un XML par sous-cas lu → on exporte le lot dans un
+        # dossier, sinon on n'en enregistrerait qu'un sur N sans le dire.
+        if inv.get("is_compound") and len(inv.get("xml_paths") or []) > 1:
+            self._export_xml_compound(inv, title)
+            return
         if not xml_path or not os.path.isfile(xml_path):
             messagebox.showinfo(
                 title, i18n.t("inventory.export_xml_none",
@@ -506,6 +969,47 @@ class ExportTab(ttk.Frame):
         except OSError as exc:
             messagebox.showerror(title, i18n.t("common.export_failed", "Échec :\n{e}", e=exc))
 
+    def _export_xml_compound(self, inv, title):
+        """Copie les XML de tous les sous-cas lus dans un dossier choisi.
+
+        Un fichier par sous-cas, nommé d'après lui : le lot reste exploitable
+        source par source (« Info Profil » travaille, lui, sur l'inventaire en
+        mémoire, pas sur ces copies).
+        """
+        paths = [p for p in inv.get("xml_paths", []) if os.path.isfile(p)]
+        if not paths:
+            messagebox.showinfo(
+                title, i18n.t("inventory.export_xml_none",
+                              "Aucun XML disponible.\nLancez d'abord « Lire les sources »."))
+            return
+        dest = filedialog.askdirectory(title=i18n.t(
+            "inventory.export_xml_dir", "Dossier où déposer les XML des sous-cas"))
+        if not dest:
+            return
+        # Les XML sont dans l'ordre des sous-cas LUS (les autres n'en ont pas).
+        names = [r["name"] for r in inv.get("subcase_reports", []) if r["ok"]]
+        stamp = config.now_compact()
+        written, failed = [], []
+        for i, src in enumerate(paths):
+            label = config.sanitize_filename(names[i] if i < len(names) else f"souscas_{i + 1}")
+            out = os.path.join(dest, f"sources_{label}_{stamp}.xml")
+            try:
+                shutil.copyfile(src, out)
+                written.append(out)
+            except OSError as exc:
+                failed.append(f"{label} : {exc}")
+        self.app.log.log(i18n.t(
+            "inventory.export_xml_compound_log",
+            "XML des sous-cas exportés : {n} fichier(s) dans {d}.", n=len(written), d=dest))
+        msg = i18n.t("inventory.export_xml_compound_msg",
+                     "{n} XML exporté(s) dans :\n{d}", n=len(written), d=dest)
+        if failed:
+            msg += "\n\n" + i18n.t("inventory.export_xml_compound_failed",
+                                    "Échecs :\n{e}", e="\n".join(failed))
+            messagebox.showwarning(title, msg)
+        else:
+            messagebox.showinfo(title, msg)
+
     def _export_case_tasks(self):
         """Exporte les tâches dédupliquées de l'inventaire du cas (JSON).
 
@@ -517,9 +1021,13 @@ class ExportTab(ttk.Frame):
         title = i18n.t("inventory.export_tasks", "Exporter les tâches du cas…")
         if not objs:
             messagebox.showinfo(
-                title, i18n.t("inventory.export_tasks_none",
-                              "Aucune tâche sur les sources de ce cas.\n"
-                              "Lisez d'abord les sources (« Lire les sources »)."))
+                title,
+                i18n.t("inventory.export_tasks_none",
+                       "Aucune tâche n'est définie sur les sources de ce cas.")
+                if self._inventory_read() else
+                i18n.t("inventory.export_tasks_unread",
+                       "Les sources de ce cas n'ont pas encore été lues.\n"
+                       "Lancez « Lire les sources » d'abord."))
             return
         meta = self.app.case_meta
         case_name = (meta["name"] if meta else "") or "Case"
@@ -561,7 +1069,8 @@ class ExportTab(ttk.Frame):
         if not path:
             return
         try:
-            case_export.export_csv(self.rows, case_export.CSV_COLUMNS, path)
+            case_export.export_csv([self.rows[i] for i in self._view],
+                                   self.csv_columns, path)
             self.app.log.log(i18n.t("inventory.export_csv_log", "Inventaire exporté en CSV : {p}", p=path))
             messagebox.showinfo(title, i18n.t("common.exported_to", "Exporté :\n{p}", p=path))
         except OSError as exc:

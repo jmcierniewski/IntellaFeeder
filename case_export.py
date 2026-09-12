@@ -36,11 +36,22 @@ CSV_COLUMNS = [
 # l'affichage (redondant avec « Taille ») mais reste présent dans les `rows`
 # pour le CSV. Conserve l'ordre du CSV en filtrant « Octets ».
 DISPLAY_COLUMNS = [c for c in CSV_COLUMNS if c != "Octets"]
+# Cas compound : les sources proviennent des sous-cas, une colonne dit lequel.
+# Placée en tête (c'est la clé de lecture du tableau), aussi bien à l'écran
+# qu'au CSV — d'où les listes dérivées plutôt qu'une modification des constantes.
+SUBCASE_COLUMN = "Sous-cas"
+CSV_COLUMNS_COMPOUND = [SUBCASE_COLUMN] + CSV_COLUMNS
+DISPLAY_COLUMNS_COMPOUND = [SUBCASE_COLUMN] + DISPLAY_COLUMNS
 
 _TYPE_MAP = {
     "Disk Image": config.SOURCE_TYPE_DISK_IMAGE,
     "File or Folder": config.SOURCE_TYPE_FOLDER,
 }
+# Libellé de la colonne « Taille » quand Intella ne reporte rien (source
+# « dossier »). Partagé avec l'UI, qui doit distinguer « pas encore mesuré » de
+# « mesuré et vraiment vide » — deux choses très différentes à l'import.
+SIZE_UNKNOWN_LABEL = "à mesurer"
+
 _TYPE_LABEL = {
     config.SOURCE_TYPE_DISK_IMAGE: "Image",
     config.SOURCE_TYPE_FOLDER: "Dossier/Fichier",
@@ -56,6 +67,37 @@ def _split_args(extra: str) -> list[str]:
         return shlex.split(extra, posix=False)
     except ValueError:
         return extra.split()
+
+
+def diagnose_no_xml(stdout: str, stderr: str) -> str:
+    """Motif probable d'un ``-exportSourceList`` qui n'écrit aucun XML.
+
+    IntellaCmd **renvoie 0 même en échec** : seul le contenu des flux dit ce qui
+    s'est passé. Sans ce tri, tout échec était imputé à la licence — ce qui a
+    envoyé chercher au mauvais endroit un refus d'écriture sur un partage
+    (07/09/2026, cas compound dont les sous-cas sont déclarés par IP).
+    """
+    blob = (stdout or "") + "\n" + (stderr or "")
+    if "AccessDeniedException" in blob and ".lock" in blob:
+        return (
+            "Accès refusé au verrou « case.xml.lock » : IntellaCmd doit pouvoir "
+            "ÉCRIRE dans le dossier du cas, pas seulement le lire. À vérifier : "
+            "droits d'écriture sur le partage (une connexion par ADRESSE IP peut "
+            "être plus restreinte que par nom de serveur), attribut « lecture "
+            "seule » sur le dossier, ou cas déjà ouvert ailleurs."
+        )
+    if "AccessDeniedException" in blob or "NoSuchFileException" in blob:
+        return ("Accès refusé ou fichier introuvable côté IntellaCmd "
+                "(voir la trace Java dans le journal).")
+    # « Using license: … » figure aussi dans les exécutions RÉUSSIES : ne conclure
+    # à la licence que sur un marqueur d'absence ou de sélection interactive.
+    low = blob.lower()
+    for marker in ("no license", "no valid license", "select a license",
+                   "licenses available: 0", "aucune licence"):
+        if marker in low:
+            return ("Aucune licence utilisable n'a été sélectionnée (argument "
+                    "-autoSelectFullProcessingLicense).")
+    return ""
 
 
 def run_export_source_list(exe: str, user: str, case_loc: str, log,
@@ -100,9 +142,11 @@ def run_export_source_list(exe: str, user: str, case_loc: str, log,
             f"IntellaCmd a renvoyé le code {proc.returncode}. Voir le journal."
         )
     if not os.path.isfile(xml_path) or os.path.getsize(xml_path) == 0:
+        detail = diagnose_no_xml(proc.stdout, proc.stderr)
         raise RuntimeError(
-            "Aucun fichier XML produit par IntellaCmd. Vérifiez la licence "
-            "(argument -autoSelectFullProcessingLicense) et le journal."
+            "Aucun fichier XML produit par IntellaCmd. "
+            + (detail or "Vérifiez la licence (argument "
+                         "-autoSelectFullProcessingLicense) et le journal.")
         )
 
     parsed = parse_source_list_xml(xml_path)
@@ -113,6 +157,140 @@ def run_export_source_list(exe: str, user: str, case_loc: str, log,
     log(f"{len(parsed['sources'])} source(s) lue(s) dans le cas "
         f"« {parsed['case'].get('name', '?')} ». XML : {xml_path}")
     return rows, columns, inventory
+
+
+def run_export_subcases(exe: str, user: str, subcases: list, log,
+                        extra_args: str = "", timeout_min: int = 30,
+                        case_name: str = "", case_path: str = ""):
+    """Inventaire d'un cas COMPOUND : un ``-exportSourceList`` par sous-cas.
+
+    Un compound ne porte aucune source en propre — il référence des sous-cas
+    (cf. ``case_meta``). On interroge donc chaque sous-cas accessible, puis on
+    concatène les résultats en ajoutant la colonne « Sous-cas ».
+
+    ``subcases`` : sortie de ``case_meta.read_subcases`` (les entrées dont
+    ``exists`` est faux sont reportées sans être interrogées).
+
+    **Un sous-cas en échec n'interrompt pas les autres** : chacun a sa ligne dans
+    ``inventory["subcase_reports"]`` (``ok`` / ``error``). ``RuntimeError`` n'est
+    levée que si AUCUN sous-cas n'a pu être lu — sinon l'inventaire partiel est
+    plus utile que rien, à condition que l'appelant affiche les échecs.
+
+    Retourne ``(rows, columns, inventory)``, comme ``run_export_source_list``.
+    """
+    rows: list = []
+    reports: list = []
+    xml_paths: list = []
+    existing_paths: set = set()
+    existing_share_keys: set = set()
+    folder_unknown: list = []
+    sources_detail: list = []
+    case_tasks: list = []
+    seen_task_sigs: set = set()
+    known_bytes = 0
+    ok_count = 0
+
+    for sc in subcases:
+        name, path = sc.get("name", ""), sc.get("path", "")
+        report = {"name": name, "path": path, "ok": False, "error": "",
+                  "source_count": 0, "bytes": 0}
+        if not sc.get("exists"):
+            report["error"] = sc.get("error", "") or "inaccessible"
+            log(f"Sous-cas ignoré « {name} » : {report['error']}")
+            reports.append(report)
+            continue
+        # Deux écritures possibles du même sous-cas quand le compound et son
+        # `<subcase>` ne nomment pas le serveur pareil (nom NetBIOS vs IP) :
+        # `case_meta.read_subcases` a mis en tête celle du compound, on garde
+        # l'autre en repli — une session SMB peut réussir là où l'autre échoue.
+        candidates = [path]
+        declared = sc.get("declared_path", "")
+        if declared and declared != path:
+            log(f"Sous-cas « {name} » : lu via {path} "
+                f"(déclaré {declared} dans le case.xml du compound).")
+            if os.path.isdir(declared):
+                candidates.append(declared)
+
+        sub_rows = sub_inv = None
+        for attempt, cand in enumerate(candidates):
+            if attempt:
+                log(f"Nouvel essai du sous-cas « {name} » via {cand}")
+            try:
+                sub_rows, _cols, sub_inv = run_export_source_list(
+                    exe, user, cand, log, extra_args=extra_args,
+                    timeout_min=timeout_min)
+            except Exception as exc:  # noqa: BLE001 — un sous-cas KO n'arrête pas les autres
+                report["error"] = str(exc)
+                log(f"Échec de lecture du sous-cas « {name} » : {exc}")
+                sub_rows = sub_inv = None
+                continue
+            report["error"] = ""
+            path = report["path"] = cand
+            break
+        if sub_inv is None:
+            reports.append(report)
+            continue
+
+        ok_count += 1
+        for r in sub_rows:
+            merged = {SUBCASE_COLUMN: name}
+            merged.update(r)
+            rows.append(merged)
+        for d in sub_inv.get("sources_detail", []):
+            d["subcase"] = name
+            d["subcase_path"] = path
+            sources_detail.append(d)
+        existing_paths |= sub_inv.get("existing_paths", set())
+        existing_share_keys |= sub_inv.get("existing_share_keys", set())
+        # Chaque dossier à 0 porte SON sous-cas : c'est là (et pas au niveau du
+        # compound) que se lit et s'écrit le cache de tailles `IF_<cas>.info` —
+        # un sous-cas peut être retiré du lot, ou recevoir de nouvelles sources,
+        # sans que le reste de l'ensemble ait à en souffrir.
+        for f in sub_inv.get("folder_unknown", []):
+            f["subcase"] = name
+            f["subcase_path"] = path
+            f["case_name"] = sub_inv.get("case_name", "") or name
+            folder_unknown.append(f)
+        known_bytes += sub_inv.get("known_bytes", 0) or 0
+        # Tâches : même déduplication par signature qu'au sein d'un cas simple,
+        # poursuivie d'un sous-cas à l'autre (les UUID diffèrent par source).
+        for obj in sub_inv.get("case_tasks", []):
+            sig = _task_signature(obj)
+            if sig not in seen_task_sigs:
+                seen_task_sigs.add(sig)
+                case_tasks.append(obj)
+        if sub_inv.get("xml_path"):
+            xml_paths.append(sub_inv["xml_path"])
+        report.update({"ok": True, "source_count": len(sub_rows),
+                       "bytes": sub_inv.get("known_bytes", 0) or 0})
+        reports.append(report)
+
+    if subcases and not ok_count:
+        raise RuntimeError(
+            "Aucun sous-cas n'a pu être lu (voir le journal). Vérifiez que les "
+            "emplacements des sous-cas sont accessibles depuis ce poste."
+        )
+
+    inventory = {
+        "case_name": case_name,
+        "case_path": case_path,
+        "case_path_key": _norm(case_path),
+        "existing_paths": existing_paths,
+        "existing_share_keys": existing_share_keys,
+        "known_bytes": known_bytes,
+        "folder_unknown": folder_unknown,
+        "source_count": len(rows),
+        "case_tasks": case_tasks,
+        "sources_detail": sources_detail,
+        # Un XML par sous-cas lu ; ``xml_path`` garde le premier pour les
+        # appelants qui n'attendent qu'un fichier.
+        "xml_paths": xml_paths,
+        "xml_path": xml_paths[0] if xml_paths else "",
+        "is_compound": True,
+        "subcase_reports": reports,
+    }
+    log(f"Cas compound : {len(rows)} source(s) sur {ok_count}/{len(subcases)} sous-cas lu(s).")
+    return rows, list(DISPLAY_COLUMNS_COMPOUND), inventory
 
 
 # --------------------------------------------------------------------------- #
@@ -151,6 +329,39 @@ def _domain_boundaries(elem) -> dict:
         return {}
     out = {}
     for child in node:
+        out[child.tag] = (child.text or "").strip()
+    return out
+
+
+# Balises de `<source>` qui ne sont PAS des réglages : identité de la source et
+# **résultats** de l'indexation (taille, nombre de segments, tâches exécutées).
+# `timeZone` est un réglage, mais il est déjà lu à part (`timezone`) et réémis
+# par l'onglet Import : le compter deux fois le ferait passer pour perdu.
+_SOURCE_NON_OPTION_TAGS = {
+    "id", "name", "type", "timeZone", "size", "totalSize", "partsCount",
+    "firstPartName", "lastPartName", "diskImagePath", "path", "tasks",
+    "indexOptions", "domainBoundaries",
+}
+
+
+def _source_options(elem) -> dict:
+    """Réglages portés par ``<source>`` lui-même, hors ``<indexOptions>``.
+
+    Constatés sur des exports réels : ``includeHiddenResources``,
+    ``carveUnallocatedSpace`` (images), ``scriptEnabled``/``scriptValidated``/
+    ``scriptType``/``scriptLogEnabled``. Ils n'étaient **pas lus** jusqu'au
+    10/09/2026, si bien que le décompte des réglages non rejoués annoncé à
+    l'utilisateur était sous-estimé.
+
+    ⚠ **Liste NOIRE, pas liste blanche.** On prend tout ce qui n'est pas
+    identifié comme identité ou résultat : une balise ajoutée par une future
+    version d'Intella doit **apparaître** (en rouge dans le visualiseur), pas
+    disparaître en silence — c'est tout l'intérêt de la vue.
+    """
+    out = {}
+    for child in elem:
+        if child.tag in _SOURCE_NON_OPTION_TAGS or len(child):
+            continue
         out[child.tag] = (child.text or "").strip()
     return out
 
@@ -249,6 +460,7 @@ def parse_source_list_xml(xml_path: str) -> dict:
             # Réglages d'indexation (pour « Info Profil » → onglet Profils).
             "index_options": _index_options(elem),
             "domain_boundaries": _domain_boundaries(elem),
+            "source_options": _source_options(elem),
             # Volume inconnu = source « dossier/fichier » dont la taille vaut 0
             # (Intella ne reporte pas la taille des dossiers).
             "size_unknown": (not is_image) and size == 0,
@@ -262,7 +474,7 @@ def to_display_rows(parsed: dict):
     rows = []
     for s in parsed["sources"]:
         if s["size_unknown"]:
-            taille = "à mesurer"
+            taille = SIZE_UNKNOWN_LABEL
         else:
             taille = config.human_size(s["bytes"])
         rows.append({
@@ -296,18 +508,24 @@ def build_inventory(parsed: dict) -> dict:
     - ``folder_unknown`` : sources dossier à la taille non reportée.
     """
     existing_paths: set[str] = set()
+    # Mêmes chemins, hôte UNC neutralisé : un cas mélange les écritures (nom
+    # NetBIOS et IP) et une source redéposée sous l'autre forme repartait à
+    # l'import en double (08/09/2026). Cf. `path_parser.share_key`.
+    existing_share_keys: set[str] = set()
     known_bytes = 0
     folder_unknown = []
 
     case_tasks: list = []          # définitions de tâches recyclables (dédupliquées)
     seen_task_sigs: set = set()
     for s in parsed["sources"]:
-        for p in s["paths"]:
-            existing_paths.add(_norm(p))
+        chemins = list(s["paths"])
         if s["disk_image_path"]:
-            existing_paths.add(_norm(s["disk_image_path"]))
+            chemins.append(s["disk_image_path"])
         if s["primary_path"]:
-            existing_paths.add(_norm(s["primary_path"]))
+            chemins.append(s["primary_path"])
+        for p in chemins:
+            existing_paths.add(_norm(p))
+            existing_share_keys.add(path_parser.share_key(p))
         if s["size_unknown"]:
             folder_unknown.append({"name": s["name"], "path": s["primary_path"]})
         else:
@@ -324,6 +542,7 @@ def build_inventory(parsed: dict) -> dict:
         "case_path": parsed["case"].get("path", ""),
         "case_path_key": _norm(parsed["case"].get("path", "")),
         "existing_paths": existing_paths,
+        "existing_share_keys": existing_share_keys,
         "known_bytes": known_bytes,
         "folder_unknown": folder_unknown,
         "source_count": len(parsed["sources"]),
