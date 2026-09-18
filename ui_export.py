@@ -785,8 +785,11 @@ class ExportTab(ttk.Frame):
                     self._scan_zero_progress(*msg[1:])
                 elif msg[0] == "row":
                     self.scan_bar.step_done()
-                else:
-                    self._scan_zero_done(msg[1], msg[3])
+                elif msg[0] == "done":
+                    # Test explicite sur « done » (et non un `else` attrape-tout) :
+                    # le message porte un 5ᵉ élément depuis le 18/09/2026, et un
+                    # type inconnu ne doit pas passer pour une fin de mesure.
+                    self._scan_zero_done(msg[1], msg[3], msg[4])
                     return
         except queue.Empty:
             pass
@@ -804,11 +807,20 @@ class ExportTab(ttk.Frame):
                 r=config.human_size(int(nbytes / elapsed)) if elapsed >= 1 else "…")
         self.scan_bar.set_step(i, total, text)
 
-    def _scan_zero_done(self, results_map, cancelled=False):
+    def _scan_zero_done(self, results_map, cancelled=False, failed=None):
         self._scan_running = False
         self._scan_cancel = False
         self.btn_scan.config(state="normal")
         self.scan_bar.stop()
+        # `failed` : dossiers dont la lecture a échoué (partage déconnecté,
+        # sous-dossier illisible). Non mesurés volontairement — mieux vaut une
+        # taille manquante, visible, qu'une taille fausse (cf. `sizing`).
+        if failed:
+            self.app.log.log(i18n.t(
+                "common.measure_io_error",
+                "Mesure incomplète pour {n} source(s) : lecture impossible "
+                "(partage déconnecté ou fichier verrouillé). Elles restent à mesurer.",
+                n=len(failed)))
         results = list(results_map.items())
         by_path = dict(results)
         for r in self.rows:

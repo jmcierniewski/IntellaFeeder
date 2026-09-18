@@ -1710,8 +1710,11 @@ class ImportTab(ttk.Frame):
                     self._size_progress(*msg[1:])
                 elif msg[0] == "row":
                     self._size_row_done(msg[1], msg[2])
-                else:
-                    self._size_done(msg[1], msg[2], msg[3])
+                elif msg[0] == "done":
+                    # Test explicite sur « done » (et non un `else` attrape-tout) :
+                    # le message porte un 5ᵉ élément depuis le 18/09/2026, et un
+                    # type inconnu ne doit pas passer pour une fin de mesure.
+                    self._size_done(*msg[1:])
                     return
         except queue.Empty:
             pass
@@ -1738,7 +1741,16 @@ class ImportTab(ttk.Frame):
                 self.tree.set(rid, "size", self._size_text(source))
         self.size_bar.step_done()
 
-    def _size_done(self, results=None, cached_keys=None, cancelled=False):
+    def _size_done(self, results=None, cached_keys=None, cancelled=False, failed=None):
+        # `failed` : sources dont la lecture a échoué (partage déconnecté,
+        # dossier ou fichier illisible). Elles ne sont PAS mesurées — mieux vaut
+        # une taille manquante, visible, qu'une taille fausse (cf. `sizing`).
+        if failed:
+            self.app.log.log(i18n.t(
+                "common.measure_io_error",
+                "Mesure incomplète pour {n} source(s) : lecture impossible "
+                "(partage déconnecté ou fichier verrouillé). Elles restent à mesurer.",
+                n=len(failed)))
         # try/finally : une erreur d'affichage ne doit jamais laisser l'UI grisée.
         try:
             self._size_finish(results or {}, cached_keys or set(), cancelled)

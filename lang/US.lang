@@ -11,6 +11,7 @@
         "topbar.restart_failed": "Restart failed:\n{e}\n\nClose and reopen the application to apply the language.",
         "topbar.language_restart": "The selected language will apply the next time the application starts.",
         "common.scan_stats": "{f} files, {b}, {s}s ({r}/s)",
+        "common.measure_io_error": "Incomplete measurement for {n} source(s): unable to read (disconnected share or locked file). They remain to be measured.",
         "common.cancelling": "Stopping…",
         "common.cancel_btn": "✕ Stop the scan",
         "common.browse": "Browse…",

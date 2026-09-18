@@ -6,6 +6,7 @@ massivement le volume.
 """
 
 import os
+import queue
 
 import pytest
 
@@ -17,6 +18,19 @@ from conftest import make_file
 
 def _source(path, source_type=config.SOURCE_TYPE_FOLDER):
     return models.Source(name="s", path=path, source_type=source_type)
+
+
+def _vider(q) -> list:
+    """Tous les messages postés dans la file, dans l'ordre."""
+    msgs = []
+    while not q.empty():
+        msgs.append(q.get_nowait())
+    return msgs
+
+
+def _raise(exc):
+    """Lève depuis une lambda — pour simuler un accès disque en échec."""
+    raise exc
 
 
 class TestFolderSize:
@@ -126,6 +140,99 @@ class TestSourceSize:
 
     def test_chemin_inexistant(self, tmp_path):
         assert sizing.source_size(_source(str(tmp_path / "nope"))) == 0
+
+
+class TestErreursIO:
+    """Une mesure incomplète ne doit jamais être enregistrée (contrat du module).
+
+    🐞 Le contrat ne couvrait que l'arrêt coopératif (``should_stop``). Les
+    échecs de lecture passaient dessous : ``os.walk`` avale par défaut toute
+    erreur de listage et poursuit, si bien qu'un partage SMB déconnecté à
+    mi-parcours rendait un total tronqué — tenu pour complet, posté, mis en
+    cache et persisté. C'est le scénario même que le contrat prétendait
+    empêcher (audit du 18/09/2026).
+    """
+
+    def test_dossier_illisible_signale_par_on_error(self, tmp_path, monkeypatch):
+        """``os.walk`` reçoit bien ``onerror`` — sans lui, silence total."""
+        vrai_walk = os.walk
+
+        def walk_qui_echoue(path, onerror=None, **kw):
+            if onerror:
+                onerror(OSError("partage déconnecté"))
+            return vrai_walk(path, **kw)
+
+        make_file(str(tmp_path / "a.bin"), 100)
+        monkeypatch.setattr(os, "walk", walk_qui_echoue)
+        erreurs = []
+        total = sizing.folder_size(str(tmp_path), on_error=erreurs.append)
+        assert len(erreurs) == 1
+        assert total == 100          # le total rendu reste partiel, d'où le signal
+
+    def test_fichier_verrouille_signale(self, tmp_path, monkeypatch):
+        """Un fichier illisible vaut 0 — mais l'appelant doit l'apprendre."""
+        make_file(str(tmp_path / "ok.bin"), 100)
+        make_file(str(tmp_path / "verrouille.bin"), 900)
+        vrai_getsize = os.path.getsize
+
+        def getsize(p):
+            if "verrouille" in os.path.basename(p):
+                raise OSError("fichier verrouillé par un autre processus")
+            return vrai_getsize(p)
+
+        monkeypatch.setattr(os.path, "getsize", getsize)
+        erreurs = []
+        total = sizing.folder_size(str(tmp_path), on_error=erreurs.append)
+        assert len(erreurs) == 1
+        assert total == 100          # 900 manquants : sous-évaluation détectée
+
+    def test_source_illisible_non_enregistree(self, tmp_path, monkeypatch):
+        """Verdict identique à celui d'une interruption : la source est jetée."""
+        dossier_ok = tmp_path / "bon"
+        dossier_ko = tmp_path / "casse"
+        make_file(str(dossier_ok / "a.bin"), 100)
+        make_file(str(dossier_ko / "verrouille.bin"), 900)
+        vrai_getsize = os.path.getsize
+
+        def getsize(p):
+            if "verrouille" in os.path.basename(p):
+                raise OSError("partage déconnecté")
+            return vrai_getsize(p)
+
+        monkeypatch.setattr(os.path, "getsize", getsize)
+        q = queue.Queue()
+        sizing.measure_sources([
+            {"key": "k_ok", "path": str(dossier_ok), "label": "bon",
+             "type": config.SOURCE_TYPE_FOLDER},
+            {"key": "k_ko", "path": str(dossier_ko), "label": "casse",
+             "type": config.SOURCE_TYPE_FOLDER},
+        ], q)
+        messages = _vider(q)
+        _kind, results, _cached, cancelled, failed = messages[-1]
+        assert results == {"k_ok": 100}      # la source illisible n'y est pas
+        assert failed == {"k_ko"}
+        assert cancelled is False            # ce n'est pas une annulation
+        # Aucune ligne « row » pour la source illisible : rien à afficher, donc
+        # rien à persister — elle reste « à mesurer ».
+        assert [m[1] for m in messages if m[0] == "row"] == ["k_ok"]
+
+    def test_une_source_illisible_n_arrete_pas_les_suivantes(self, tmp_path, monkeypatch):
+        make_file(str(tmp_path / "casse" / "verrouille.bin"), 900)
+        make_file(str(tmp_path / "apres" / "b.bin"), 50)
+        vrai_getsize = os.path.getsize
+        monkeypatch.setattr(os.path, "getsize", lambda p: (
+            _raise(OSError("illisible")) if "verrouille" in os.path.basename(p)
+            else vrai_getsize(p)))
+        q = queue.Queue()
+        sizing.measure_sources([
+            {"key": "k1", "path": str(tmp_path / "casse"), "label": "c",
+             "type": config.SOURCE_TYPE_FOLDER},
+            {"key": "k2", "path": str(tmp_path / "apres"), "label": "a",
+             "type": config.SOURCE_TYPE_FOLDER},
+        ], q)
+        _kind, results, _cached, _cancelled, failed = _vider(q)[-1]
+        assert results == {"k2": 50}
+        assert failed == {"k1"}
 
 
 class TestProgression:
