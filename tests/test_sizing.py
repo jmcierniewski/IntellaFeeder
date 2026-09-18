@@ -69,6 +69,27 @@ class TestImageSize:
         attendu = 100 + sum(100 * i for i in range(2, len(suivants) + 2))
         assert sizing.image_size(str(tmp_path / f"img{premier}")) == attendu
 
+    @pytest.mark.parametrize("demande", ["img.E01", "IMG.E01", "Img.e01", "img.e01"])
+    def test_casse_du_chemin_demande_sans_effet(self, tmp_path, demande):
+        """Non-régression : le radical se comparait à l'identique, l'extension non.
+
+        Windows ne distingue pas la casse : « IMG.E01 » désigne bien le fichier
+        « img.E01 » du disque, et ``image_size`` y entrait. Mais le radical
+        « IMG » ne correspondait à aucune entrée réelle, ``segments`` sortait
+        vide, on retombait sur le fichier seul — 100 octets rendus au lieu de
+        350. Un chemin simplement collé dans une autre casse sous-évaluait donc
+        le volume du cas (audit du 18/09/2026).
+        """
+        for ext, size in ((".E01", 100), (".E02", 200), (".E03", 50)):
+            make_file(str(tmp_path / f"img{ext}"), size)
+        assert sizing.image_size(str(tmp_path / demande)) == 350
+
+    def test_casse_ne_fusionne_pas_deux_images_distinctes(self, tmp_path):
+        """La tolérance à la casse ne doit pas rapprocher deux radicaux différents."""
+        make_file(str(tmp_path / "scelle_a.E01"), 100)
+        make_file(str(tmp_path / "scelle_b.E01"), 900)
+        assert sizing.image_size(str(tmp_path / "SCELLE_A.E01")) == 100
+
     def test_ewf_au_dela_de_e99(self, tmp_path):
         """EWF passe de .E99 aux lettres (.EAA) : même image, même total."""
         for ext, size in ((".E01", 100), (".E99", 200), (".EAA", 300), (".EAB", 400)):

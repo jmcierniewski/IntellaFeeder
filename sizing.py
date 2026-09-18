@@ -89,9 +89,20 @@ def _image_segments(path: str) -> list[str]:
     incomplète (EWF, brut découpé et AD1 seulement) : une image LEF, SMART ou
     EWF v2 n'y matchait rien et seul son 1er segment était compté, ce qui
     sous-évaluait le volume du cas (corrigé le 18/09/2026).
+
+    ⚠ **Radical et extension se comparent tous deux sans tenir compte de la
+    casse.** Windows ne la distingue pas : un chemin collé ou tapé en
+    « IMG.E01 » désigne bien le fichier « img.E01 » du disque, et
+    ``os.path.exists`` le confirme. Comparer le radical à l'identique faisait
+    alors échouer le rapprochement des segments, retomber sur le fichier seul
+    et ne compter que le 1er tronçon — la même sous-évaluation que ci-dessus,
+    par un autre déclencheur (audit du 18/09/2026, reproduit : 100 octets
+    rendus au lieu de 350). L'extension, elle, était déjà abaissée ; c'est
+    cette asymétrie qui a trahi l'oubli.
     """
     directory = os.path.dirname(path)
     stem, ext = os.path.splitext(os.path.basename(path))
+    stem = stem.lower()
 
     motifs = image_families.segment_patterns(ext)
     if not motifs:
@@ -102,7 +113,7 @@ def _image_segments(path: str) -> list[str]:
     except OSError:
         return [path]
     segments = [os.path.join(directory, n) for n in entries
-                if os.path.splitext(n)[0] == stem
+                if os.path.splitext(n)[0].lower() == stem
                 and any(m.match(os.path.splitext(n)[1].lower()) for m in motifs)]
     return segments or [path]
 
