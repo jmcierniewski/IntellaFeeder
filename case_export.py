@@ -155,6 +155,57 @@ def run_export_source_list(exe: str, user: str, case_loc: str, log,
     return rows, columns, inventory
 
 
+def _merge_subcase_inventories(lus: list) -> dict:
+    """Fusionne N inventaires de sous-cas en un seul jeu d'accumulateurs.
+
+    ``lus`` : une entrée ``(nom, chemin retenu, rows, inventaire)`` par sous-cas
+    **effectivement lu**, dans l'ordre de lecture. Retourne un dict de champs
+    fusionnés, que l'appelant complète de ce qui est propre au compound
+    (identité du cas, rapports par sous-cas).
+
+    Chaque ligne, chaque source détaillée et chaque dossier à mesurer ressort
+    marqué de son sous-cas : c'est au niveau du sous-cas — et non du compound —
+    que se lit et s'écrit le cache de tailles ``IF_<cas>.info``. Un sous-cas
+    peut ainsi être retiré du lot, ou recevoir de nouvelles sources, sans que le
+    reste de l'ensemble ait à en souffrir.
+
+    Fonction pure : ni lecture disque, ni journal, ni exception. Elle était
+    auparavant étalée dans la boucle de ``run_export_subcases`` sous forme de
+    neuf accumulateurs locaux (audit du 18/09/2026).
+    """
+    fusion = {
+        "rows": [], "sources_detail": [], "folder_unknown": [],
+        "existing_paths": set(), "existing_share_keys": set(),
+        "case_tasks": [], "xml_paths": [], "known_bytes": 0,
+    }
+    seen_task_sigs: set = set()
+
+    for name, path, sub_rows, sub_inv in lus:
+        for r in sub_rows:
+            ligne = {SUBCASE_COLUMN: name}
+            ligne.update(r)
+            fusion["rows"].append(ligne)
+        for d in sub_inv.get("sources_detail", []):
+            d["subcase"] = name
+            d["subcase_path"] = path
+            fusion["sources_detail"].append(d)
+        for f in sub_inv.get("folder_unknown", []):
+            f["subcase"] = name
+            f["subcase_path"] = path
+            f["case_name"] = sub_inv.get("case_name", "") or name
+            fusion["folder_unknown"].append(f)
+        fusion["existing_paths"] |= sub_inv.get("existing_paths", set())
+        fusion["existing_share_keys"] |= sub_inv.get("existing_share_keys", set())
+        fusion["known_bytes"] += sub_inv.get("known_bytes", 0) or 0
+        # Tâches : même déduplication par signature qu'au sein d'un cas simple,
+        # poursuivie d'un sous-cas à l'autre (les UUID diffèrent par source).
+        _add_unique_tasks(fusion["case_tasks"], sub_inv.get("case_tasks", []),
+                          seen_task_sigs)
+        if sub_inv.get("xml_path"):
+            fusion["xml_paths"].append(sub_inv["xml_path"])
+    return fusion
+
+
 def run_export_subcases(exe: str, user: str, subcases: list, log,
                         extra_args: str = "", timeout_min: int = 30,
                         case_name: str = "", case_path: str = ""):
@@ -174,17 +225,8 @@ def run_export_subcases(exe: str, user: str, subcases: list, log,
 
     Retourne ``(rows, columns, inventory)``, comme ``run_export_source_list``.
     """
-    rows: list = []
     reports: list = []
-    xml_paths: list = []
-    existing_paths: set = set()
-    existing_share_keys: set = set()
-    folder_unknown: list = []
-    sources_detail: list = []
-    case_tasks: list = []
-    seen_task_sigs: set = set()
-    known_bytes = 0
-    ok_count = 0
+    lus: list = []          # (nom, chemin retenu, rows, inventaire) par sous-cas lu
 
     for sc in subcases:
         name, path = sc.get("name", ""), sc.get("path", "")
@@ -227,65 +269,39 @@ def run_export_subcases(exe: str, user: str, subcases: list, log,
             reports.append(report)
             continue
 
-        ok_count += 1
-        for r in sub_rows:
-            merged = {SUBCASE_COLUMN: name}
-            merged.update(r)
-            rows.append(merged)
-        for d in sub_inv.get("sources_detail", []):
-            d["subcase"] = name
-            d["subcase_path"] = path
-            sources_detail.append(d)
-        existing_paths |= sub_inv.get("existing_paths", set())
-        existing_share_keys |= sub_inv.get("existing_share_keys", set())
-        # Chaque dossier à 0 porte SON sous-cas : c'est là (et pas au niveau du
-        # compound) que se lit et s'écrit le cache de tailles `IF_<cas>.info` —
-        # un sous-cas peut être retiré du lot, ou recevoir de nouvelles sources,
-        # sans que le reste de l'ensemble ait à en souffrir.
-        for f in sub_inv.get("folder_unknown", []):
-            f["subcase"] = name
-            f["subcase_path"] = path
-            f["case_name"] = sub_inv.get("case_name", "") or name
-            folder_unknown.append(f)
-        known_bytes += sub_inv.get("known_bytes", 0) or 0
-        # Tâches : même déduplication par signature qu'au sein d'un cas simple,
-        # poursuivie d'un sous-cas à l'autre (les UUID diffèrent par source).
-        for obj in sub_inv.get("case_tasks", []):
-            sig = _task_signature(obj)
-            if sig not in seen_task_sigs:
-                seen_task_sigs.add(sig)
-                case_tasks.append(obj)
-        if sub_inv.get("xml_path"):
-            xml_paths.append(sub_inv["xml_path"])
+        lus.append((name, path, sub_rows, sub_inv))
         report.update({"ok": True, "source_count": len(sub_rows),
                        "bytes": sub_inv.get("known_bytes", 0) or 0})
         reports.append(report)
 
-    if subcases and not ok_count:
+    if subcases and not lus:
         raise RuntimeError(
             "Aucun sous-cas n'a pu être lu (voir le journal). Vérifiez que les "
             "emplacements des sous-cas sont accessibles depuis ce poste."
         )
 
+    fusion = _merge_subcase_inventories(lus)
+    rows = fusion["rows"]
     inventory = {
         "case_name": case_name,
         "case_path": case_path,
         "case_path_key": _norm(case_path),
-        "existing_paths": existing_paths,
-        "existing_share_keys": existing_share_keys,
-        "known_bytes": known_bytes,
-        "folder_unknown": folder_unknown,
+        "existing_paths": fusion["existing_paths"],
+        "existing_share_keys": fusion["existing_share_keys"],
+        "known_bytes": fusion["known_bytes"],
+        "folder_unknown": fusion["folder_unknown"],
         "source_count": len(rows),
-        "case_tasks": case_tasks,
-        "sources_detail": sources_detail,
+        "case_tasks": fusion["case_tasks"],
+        "sources_detail": fusion["sources_detail"],
         # Un XML par sous-cas lu ; ``xml_path`` garde le premier pour les
         # appelants qui n'attendent qu'un fichier.
-        "xml_paths": xml_paths,
-        "xml_path": xml_paths[0] if xml_paths else "",
+        "xml_paths": fusion["xml_paths"],
+        "xml_path": fusion["xml_paths"][0] if fusion["xml_paths"] else "",
         "is_compound": True,
         "subcase_reports": reports,
     }
-    log(f"Cas compound : {len(rows)} source(s) sur {ok_count}/{len(subcases)} sous-cas lu(s).")
+    log(f"Cas compound : {len(rows)} source(s) sur "
+        f"{len(lus)}/{len(subcases)} sous-cas lu(s).")
     return rows, list(DISPLAY_COLUMNS_COMPOUND), inventory
 
 
@@ -413,6 +429,20 @@ def _task_signature(obj: dict) -> str:
     return json.dumps(_canonical(stripped), sort_keys=True, ensure_ascii=False)
 
 
+def _add_unique_tasks(dest: list, objs, seen: set) -> None:
+    """Ajoute à ``dest`` les tâches de ``objs`` non déjà vues (``seen``).
+
+    Même union dédupliquée par signature d'un bout à l'autre : entre les sources
+    d'un cas (``build_inventory``) comme entre les sous-cas d'un compound
+    (``_merge_subcase_inventories``), où les UUID diffèrent d'un cas à l'autre.
+    """
+    for obj in objs or []:
+        sig = _task_signature(obj)
+        if sig not in seen:
+            seen.add(sig)
+            dest.append(obj)
+
+
 def parse_source_list_xml(xml_path: str) -> dict:
     """Parse le XML en ``{case: {...}, sources: [ {...}, ... ]}``."""
     tree = ET.parse(xml_path)
@@ -527,11 +557,7 @@ def build_inventory(parsed: dict) -> dict:
         else:
             known_bytes += s["bytes"]
         # Recyclage des tâches : union dédupliquée par signature (hors UUID).
-        for obj in s.get("task_objs", []):
-            sig = _task_signature(obj)
-            if sig not in seen_task_sigs:
-                seen_task_sigs.add(sig)
-                case_tasks.append(obj)
+        _add_unique_tasks(case_tasks, s.get("task_objs", []), seen_task_sigs)
 
     return {
         "case_name": parsed["case"].get("name", ""),
