@@ -36,6 +36,14 @@ _VERBATIM_MAP = {
 _INT_MAP = {
     "chatMaxNumberOfMessages": "numberMessagesPerConversation",
 }
+# XML -> (clé JSON, diviseur) : valeur entière à changer d'unité. Intella
+# exporte des octets là où `-addSourcesFromJson` attend des Mo.
+# Cette table existe pour une seule clé, mais elle remplace un cas particulier
+# qu'il fallait répéter à l'identique dans les TROIS fonctions ci-dessous — et
+# donc oublier dans l'une d'elles au prochain ajout (audit du 18/09/2026).
+_SCALED_INT_MAP = {
+    "crawlerMaxBinarySize": ("maxBinarySizeToStore", 1024 ** 2),
+}
 # Réglages portés par ``<source>`` (hors ``<indexOptions>``) que le catalogue
 # sait rejouer. ``carveUnallocatedSpace`` est réservé aux images disque —
 # `profile_catalog.options_for_source` l'écarte des sources dossier/fichier.
@@ -94,7 +102,7 @@ def _as_bool(text: str) -> bool:
 def _mapped_xml_keys() -> set:
     """Noms XML que le catalogue sait rejouer, toutes échelles confondues."""
     return (set(_BOOL_MAP) | set(_VERBATIM_MAP) | set(_INT_MAP)
-            | set(_SOURCE_BOOL_MAP) | {"crawlerMaxBinarySize"})
+            | set(_SOURCE_BOOL_MAP) | set(_SCALED_INT_MAP))
 
 
 def _xml_settings(src: dict) -> dict:
@@ -145,7 +153,8 @@ def describe_settings(src: dict) -> list:
     mappes = {}
     for table in (_BOOL_MAP, _VERBATIM_MAP, _INT_MAP, _SOURCE_BOOL_MAP):
         mappes.update(table)
-    mappes["crawlerMaxBinarySize"] = "maxBinarySizeToStore"
+    mappes.update({xml_key: json_key
+                   for xml_key, (json_key, _diviseur) in _SCALED_INT_MAP.items()})
 
     rangs = {STATUS_MAPPED: 0, STATUS_UNSUPPORTED: 1, STATUS_UNKNOWN: 2}
     lignes = []
@@ -210,11 +219,13 @@ def from_xml_source(src: dict) -> dict:
             except (ValueError, TypeError):
                 pass
 
-    # crawlerMaxBinarySize (octets) -> maxBinarySizeToStore (Mo).
-    raw = io.get("crawlerMaxBinarySize")
-    if raw not in (None, ""):
+    # Valeurs entières à changer d'unité (octets -> Mo, cf. _SCALED_INT_MAP).
+    for xml_key, (json_key, diviseur) in _SCALED_INT_MAP.items():
+        raw = io.get(xml_key)
+        if raw in (None, ""):
+            continue
         try:
-            values["maxBinarySizeToStore"] = int(round(int(str(raw).strip()) / (1024 ** 2)))
+            values[json_key] = int(round(int(str(raw).strip()) / diviseur))
         except (ValueError, TypeError):
             pass
 
