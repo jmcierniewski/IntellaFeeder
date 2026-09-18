@@ -27,22 +27,7 @@ d'en retirer une ligne posée à tort.
 import os
 import re
 
-# Extensions acceptées telles quelles (pas de notion de segment).
-_SINGLE = {".dd", ".vhd", ".vhdx", ".vmdk"}
-
-# Familles à segments : extension du PREMIER segment -> motif des suivants.
-# La valeur est le motif complet de l'extension de la famille ; seul le premier
-# segment est retenu, les autres sont refusés avec leur raison.
-_FAMILIES = (
-    (re.compile(r"^\.e\d{2}$", re.I), ".e01"),        # EWF : .E01 .E02 …
-    (re.compile(r"^\.e[a-z]{2}$", re.I), ".e01"),     # EWF au-delà de .E99
-    (re.compile(r"^\.ex\d{2}$", re.I), ".ex01"),      # EWF v2
-    (re.compile(r"^\.l\d{2}$", re.I), ".l01"),        # LEF (logique)
-    (re.compile(r"^\.lx\d{2}$", re.I), ".lx01"),
-    (re.compile(r"^\.s\d{2}$", re.I), ".s01"),        # SMART
-    (re.compile(r"^\.ad\d+$", re.I), ".ad1"),         # AD1 : .ad1 .ad2 …
-    (re.compile(r"^\.\d{3}$", re.I), ".001"),         # brut découpé
-)
+import image_families
 
 # Fichiers annexes d'un VMDK : ce ne sont pas des disques à ouvrir seuls.
 _VMDK_ANNEXE = re.compile(r"(-s\d+|-flat|-delta|-ctk|-rdm|-rdmp)\.vmdk$", re.I)
@@ -65,11 +50,11 @@ def image_kind(path: str) -> str:
         return ""
     if ext == ".vmdk":
         return "" if _VMDK_ANNEXE.search(name) else ".vmdk"
-    if ext in _SINGLE:
+    if ext in image_families.SINGLE:
         return ext
-    for motif, premier in _FAMILIES:
-        if motif.match(ext):
-            return premier if ext == premier else ""
+    premier = image_families.first_segment_ext(ext)
+    if premier:
+        return premier if ext == premier else ""
     return ""
 
 
@@ -81,9 +66,8 @@ def refusal_reason(path: str) -> str:
         return ""
     if ext == ".vmdk":
         return REASON_VMDK_PART
-    for motif, _premier in _FAMILIES:
-        if motif.match(ext):
-            return REASON_SEGMENT
+    if image_families.is_segment_ext(ext):
+        return REASON_SEGMENT
     return REASON_UNKNOWN
 
 

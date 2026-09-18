@@ -7,6 +7,8 @@ massivement le volume.
 
 import os
 
+import pytest
+
 import config
 import models
 import sizing
@@ -47,6 +49,31 @@ class TestImageSize:
         for ext, size in ((".ad1", 5), (".ad2", 7)):
             make_file(str(tmp_path / f"ad{ext}"), size)
         assert sizing.image_size(str(tmp_path / "ad.ad1")) == 12
+
+    @pytest.mark.parametrize("premier,suivants", [
+        (".ex01", (".ex02", ".ex03")),   # EWF v2
+        (".L01", (".L02",)),             # LEF (logique)
+        (".lx01", (".lx02",)),
+        (".s01", (".s02", ".s03")),      # SMART
+    ])
+    def test_familles_ignorees_avant_le_18_09_2026(self, tmp_path, premier, suivants):
+        """Non-régression : ``sizing`` portait une copie incomplète des familles.
+
+        Ces quatre familles sont acceptées à l'import par ``forensic_scan`` mais
+        ne matchaient aucun motif local : ``image_size`` retombait sur le fichier
+        seul et ne comptait que le 1ᵉ segment, sous-évaluant le volume du cas.
+        """
+        make_file(str(tmp_path / f"img{premier}"), 100)
+        for i, ext in enumerate(suivants, start=2):
+            make_file(str(tmp_path / f"img{ext}"), 100 * i)
+        attendu = 100 + sum(100 * i for i in range(2, len(suivants) + 2))
+        assert sizing.image_size(str(tmp_path / f"img{premier}")) == attendu
+
+    def test_ewf_au_dela_de_e99(self, tmp_path):
+        """EWF passe de .E99 aux lettres (.EAA) : même image, même total."""
+        for ext, size in ((".E01", 100), (".E99", 200), (".EAA", 300), (".EAB", 400)):
+            make_file(str(tmp_path / f"img{ext}"), size)
+        assert sizing.image_size(str(tmp_path / "img.E01")) == 1000
 
     def test_ne_melange_pas_deux_images_du_meme_dossier(self, tmp_path):
         make_file(str(tmp_path / "img1.E01"), 100)

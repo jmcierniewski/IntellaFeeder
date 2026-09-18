@@ -104,6 +104,25 @@ class TestIsNonFirstSegment:
     def test_premiers_segments_et_autres(self, path):
         assert path_parser.is_non_first_segment(path) is False
 
+    @pytest.mark.parametrize("path", [
+        "D:\\img.eaa",    # EWF au-delà de .E99
+        "D:\\img.ex02",   # EWF v2
+        "D:\\img.L02",    # LEF
+        "D:\\img.lx02",
+    ])
+    def test_familles_ignorees_avant_le_18_09_2026(self, path):
+        """Non-régression : 4 familles sur 7 étaient inconnues de ce module.
+
+        Elles sont pourtant acceptées à l'import par ``forensic_scan`` ; un
+        segment non initial de ces familles passait donc sans avertissement.
+        Table unifiée dans ``image_families`` le 18/09/2026.
+        """
+        assert path_parser.is_non_first_segment(path) is True
+
+    @pytest.mark.parametrize("path", ["D:\\img.ex01", "D:\\img.lx01"])
+    def test_premiers_segments_des_familles_ajoutees(self, path):
+        assert path_parser.is_non_first_segment(path) is False
+
 
 class TestParseLines:
     def test_lignes_vides_ignorees(self):

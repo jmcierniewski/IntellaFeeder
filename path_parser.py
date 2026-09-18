@@ -1,15 +1,9 @@
 """Analyse des chemins collés dans les panneaux et utilitaires associés."""
 
 import os
-import re
 
+import image_families
 from models import Source
-
-# Segments d'image probablement NON initiaux : .E02+, .002+, .s02+ ...
-_RE_EWF = re.compile(r"\.E(\d{2})$", re.IGNORECASE)        # .E01, .E02, ...
-_RE_DD = re.compile(r"\.(\d{3})$")                          # .001, .002, ...
-_RE_SPLIT = re.compile(r"\.s(\d{2})$", re.IGNORECASE)      # .s01, .s02, ...
-_RE_AD1 = re.compile(r"\.ad(\d+)$", re.IGNORECASE)        # .ad1, .ad2, ... .ad28
 
 
 def normalize_path(raw: str) -> str:
@@ -99,20 +93,13 @@ def is_non_first_segment(path: str) -> bool:
     """Vrai si le chemin ressemble à un segment d'image NON initial.
 
     Sert uniquement à émettre un avertissement (IntellaCmd attend le 1er segment).
+
+    Les familles reconnues viennent de ``image_families`` (table partagée avec
+    ``forensic_scan`` et ``sizing``, unifiée le 18/09/2026) : cette fonction n'en
+    connaissait que 4 sur 7 — un ``.ex02`` (EWF v2), ``.l02``/``.lx02`` (LEF) ou
+    un ``.eaa`` (EWF au-delà de .E99) passait sans avertissement.
     """
-    m = _RE_EWF.search(path)
-    if m and m.group(1) != "01":
-        return True
-    m = _RE_DD.search(path)
-    if m and m.group(1) != "001":
-        return True
-    m = _RE_SPLIT.search(path)
-    if m and m.group(1) != "01":
-        return True
-    m = _RE_AD1.search(path)
-    if m and int(m.group(1)) != 1:   # 1er segment AD1 = .ad1
-        return True
-    return False
+    return image_families.is_non_first_segment_ext(os.path.splitext(path)[1])
 
 
 def parse_lines(text: str, source_type: str) -> list[Source]:

@@ -18,15 +18,11 @@ Une taille partielle ferait passer une source volumineuse sous la limite du cas.
 """
 
 import os
-import re
 import time
 
 import config
+import image_families
 import path_parser
-
-_RE_EWF = re.compile(r"\.e\d{2}$", re.IGNORECASE)   # .E01, .E02, ...
-_RE_SPLIT_DD = re.compile(r"\.\d{3}$")              # .001, .002, ...
-_RE_AD1 = re.compile(r"\.ad\d+$", re.IGNORECASE)    # .ad1, .ad2, ... .ad28
 
 # Cadence minimale entre deux notifications de progression (secondes) : un
 # dossier de plusieurs millions de fichiers saturerait sinon la file.
@@ -86,18 +82,19 @@ def folder_size(path: str, on_progress=None, should_stop=None) -> int:
 
 
 def _image_segments(path: str) -> list[str]:
-    """Chemins de tous les segments d'une image (ou le fichier seul)."""
+    """Chemins de tous les segments d'une image (ou le fichier seul).
+
+    Les familles d'extensions viennent de ``image_families``, table partagée
+    avec ``forensic_scan`` et ``path_parser``. Ce module en portait une copie
+    incomplète (EWF, brut découpé et AD1 seulement) : une image LEF, SMART ou
+    EWF v2 n'y matchait rien et seul son 1er segment était compté, ce qui
+    sous-évaluait le volume du cas (corrigé le 18/09/2026).
+    """
     directory = os.path.dirname(path)
     stem, ext = os.path.splitext(os.path.basename(path))
 
-    pattern = None
-    if _RE_EWF.fullmatch(ext):
-        pattern = _RE_EWF
-    elif _RE_SPLIT_DD.fullmatch(ext):
-        pattern = _RE_SPLIT_DD
-    elif _RE_AD1.fullmatch(ext):
-        pattern = _RE_AD1
-    if pattern is None:
+    motifs = image_families.segment_patterns(ext)
+    if not motifs:
         return [path]
 
     try:
@@ -105,16 +102,18 @@ def _image_segments(path: str) -> list[str]:
     except OSError:
         return [path]
     segments = [os.path.join(directory, n) for n in entries
-                if os.path.splitext(n)[0] == stem and pattern.fullmatch(os.path.splitext(n)[1])]
+                if os.path.splitext(n)[0] == stem
+                and any(m.match(os.path.splitext(n)[1].lower()) for m in motifs)]
     return segments or [path]
 
 
 def image_size(path: str, on_progress=None, should_stop=None) -> int:
     """Taille d'une image, en sommant TOUS les segments le cas échéant.
 
-    Gère EWF (.E01, .E02, …), split dd (.001, .002, …) et AD1 ; sinon taille du
-    fichier unique. **Piège métier** : pointer le 1ᵉ segment doit rendre le
-    total, pas la taille de ce seul fichier.
+    Gère toutes les familles à segments de ``image_families`` (EWF et EWF v2,
+    LEF, SMART, AD1, brut découpé) ; sinon taille du fichier unique.
+    **Piège métier** : pointer le 1ᵉ segment doit rendre le total, pas la
+    taille de ce seul fichier.
     """
     if not os.path.exists(path):
         return 0
