@@ -38,37 +38,40 @@ REASON_SEGMENT = "segment non initial — indiquez seulement le 1er"
 REASON_VMDK_PART = "fichier annexe VMDK (pas un disque à ouvrir seul)"
 
 
+def _classify(path: str) -> tuple[str, str]:
+    """``(type_image, raison_de_refus)`` — le classement, en UNE passe.
+
+    Exactement l'une des deux valeurs est non vide : un fichier est retenu avec
+    son type, ou refusé avec son motif. ``image_kind`` et ``refusal_reason`` en
+    sont deux projections ; elles faisaient auparavant chacune leur propre
+    parcours des familles, et ``refusal_reason`` en faisait deux à elle seule.
+    """
+    name = os.path.basename(path)
+    ext = os.path.splitext(name)[1].lower()
+    if not ext:
+        return "", REASON_UNKNOWN
+    if ext == ".vmdk":
+        return ("", REASON_VMDK_PART) if _VMDK_ANNEXE.search(name) else (".vmdk", "")
+    if ext in image_families.SINGLE:
+        return ext, ""
+    premier = image_families.first_segment_ext(ext)
+    if not premier:
+        return "", REASON_UNKNOWN
+    return (premier, "") if ext == premier else ("", REASON_SEGMENT)
+
+
 def image_kind(path: str) -> str:
     """Type d'image d'un chemin de FICHIER, ou "" s'il n'en est pas un.
 
     Retourne l'extension normalisée du premier segment (``.e01``, ``.ad1``…),
     utilisable comme clé de décompte pour le compte rendu d'ajout.
     """
-    name = os.path.basename(path)
-    ext = os.path.splitext(name)[1].lower()
-    if not ext:
-        return ""
-    if ext == ".vmdk":
-        return "" if _VMDK_ANNEXE.search(name) else ".vmdk"
-    if ext in image_families.SINGLE:
-        return ext
-    premier = image_families.first_segment_ext(ext)
-    if premier:
-        return premier if ext == premier else ""
-    return ""
+    return _classify(path)[0]
 
 
 def refusal_reason(path: str) -> str:
     """Pourquoi ce fichier n'est pas retenu. "" s'il l'est."""
-    name = os.path.basename(path)
-    ext = os.path.splitext(name)[1].lower()
-    if image_kind(path):
-        return ""
-    if ext == ".vmdk":
-        return REASON_VMDK_PART
-    if image_families.is_segment_ext(ext):
-        return REASON_SEGMENT
-    return REASON_UNKNOWN
+    return _classify(path)[1]
 
 
 def scan_folder(root: str, on_progress=None, should_stop=None,
