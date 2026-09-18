@@ -69,15 +69,32 @@ USER_FILENAME = "descriptions_utilisateur.json"
 
 _RE_UNICODE = re.compile(r"\\u([0-9a-fA-F]{4})")
 
+class _Etat:
+    """État du référentiel, réuni en un objet plutôt qu'en six globales.
+
+    Ces six valeurs n'ont de sens qu'ensemble et changent ensemble (``load``
+    les réécrit toutes) : les tenir séparées laissait une douzaine de fonctions
+    dépendre d'une précondition invisible dans leur signature — « ``load()`` a
+    été appelé » (audit du 18/09/2026). Les rassembler rend cet état nommable,
+    remplaçable dans un test, et inspectable d'un seul coup d'œil.
+
+    L'API du module reste **fonctionnelle** : rien à changer chez les appelants,
+    qui n'ont jamais touché à ces valeurs directement.
+    """
+
+    def __init__(self):
+        self.descriptions: dict[str, str] = {}
+        self.observed: set[str] = set()
+        self.user: dict[str, str] = {}   # descriptions saisies par l'utilisateur
+        self.source_file: str = ""
+        # Descriptions venues des fichiers externes : permet de dire, entrée
+        # par entrée, ce qui vient de l'embarqué et ce qui vient d'un import.
+        self.external: dict[str, str] = {}
+        self.duplicates: list[str] = []
+
+
 # État chargé (vide tant que `load()` n'a pas tourné).
-_descriptions: dict[str, str] = {}
-_observed: set[str] = set()
-_user: dict[str, str] = {}      # descriptions saisies par l'utilisateur
-_source_file: str = ""
-# Descriptions venues des fichiers externes : permet de dire, entrée par
-# entrée, ce qui vient de l'embarqué et ce qui vient d'un import.
-_external: dict[str, str] = {}
-_duplicates: list[str] = []
+_cat = _Etat()
 
 
 # --- Lecture du format .properties ----------------------------------------
@@ -219,12 +236,11 @@ def load() -> None:
     une version, et en perdre reviendrait à réafficher des alias comme
     « inconnus ».
     """
-    global _descriptions, _observed, _user, _source_file, _duplicates, _external
-    _descriptions = dict(getattr(mime_data, "DESCRIPTIONS", {}))
-    _observed = set(getattr(mime_data, "OBSERVED", []))
-    _duplicates = []
-    _external = {}
-    _source_file = ""
+    _cat.descriptions = dict(getattr(mime_data, "DESCRIPTIONS", {}))
+    _cat.observed = set(getattr(mime_data, "OBSERVED", []))
+    _cat.duplicates = []
+    _cat.external = {}
+    _cat.source_file = ""
     for chemin in descriptions_paths():
         try:
             with open(chemin, encoding="latin-1") as fh:
@@ -233,23 +249,23 @@ def load() -> None:
             continue
         if not externes:                # fichier vide ou illisible : ignoré
             continue
-        _descriptions.update(externes)
-        _external.update(externes)
-        _duplicates.extend(doublons)
-        _source_file = chemin
-    _observed |= set(_descriptions)
+        _cat.descriptions.update(externes)
+        _cat.external.update(externes)
+        _cat.duplicates.extend(doublons)
+        _cat.source_file = chemin
+    _cat.observed |= set(_cat.descriptions)
     try:
         with open(observed_path(), encoding="utf-8") as fh:
             # Une ligne vide n'est pas une scorie : c'est le seul encodage
             # possible du type « Untyped », dont le nom EST la chaîne vide.
-            _observed |= {ligne.strip() for ligne in fh}
+            _cat.observed |= {ligne.strip() for ligne in fh}
     except OSError:
         pass
-    _user = _read_user()
+    _cat.user = _read_user()
     # Un nom qu'on a pris la peine de décrire est un nom qui existe : il rejoint
     # les observés, sinon il resterait affiché « inconnu » (rouge) juste à côté
     # de la description qu'on vient d'en donner.
-    _observed |= set(_user)
+    _cat.observed |= set(_cat.user)
 
 
 def _read_user() -> dict:
@@ -273,32 +289,31 @@ def set_user_label(nom: str, texte: str) -> None:
     revenait à un référentiel plus ancien, et l'effacer serait une perte
     silencieuse.
     """
-    global _user
     cle = (nom or "").strip()
     valeur = (texte or "").strip()
     if valeur:
-        _user[cle] = valeur
+        _cat.user[cle] = valeur
     else:
-        _user.pop(cle, None)
-    _observed.add(cle)
+        _cat.user.pop(cle, None)
+    _cat.observed.add(cle)
     os.makedirs(config.mime_dir(), exist_ok=True)
     with open(user_path(), "w", encoding="utf-8") as fh:
-        json.dump(_user, fh, ensure_ascii=False, indent=2, sort_keys=True)
+        json.dump(_cat.user, fh, ensure_ascii=False, indent=2, sort_keys=True)
 
 
 def user_labels() -> dict:
     """Copie des descriptions écrites par l'utilisateur."""
-    return dict(_user)
+    return dict(_cat.user)
 
 
 def user_label(nom: str) -> str:
     """Description utilisateur d'un type, ou ``""``."""
-    return _user.get((nom or "").strip(), "")
+    return _cat.user.get((nom or "").strip(), "")
 
 
 def is_loaded() -> bool:
     """Vrai si au moins une des deux sources a été chargée."""
-    return bool(_descriptions or _observed)
+    return bool(_cat.descriptions or _cat.observed)
 
 
 def stats() -> dict:
@@ -316,18 +331,18 @@ def stats() -> dict:
         # Noms qui ne viennent NI de l'embarqué NI des descriptions actives :
         # ce sont ceux qu'on a appris des cas lus. Les compter à part montre
         # que l'apprentissage sert (ou qu'il n'a rien trouvé de neuf).
-        "observed_learned": len(_observed - livres - set(_descriptions)),
-        "descriptions": len(_descriptions),
-        "categories": sum(1 for k in _descriptions if k.startswith("category/")),
-        "observed": len(_observed),
-        "observed_only": len(_observed - set(_descriptions)),
+        "observed_learned": len(_cat.observed - livres - set(_cat.descriptions)),
+        "descriptions": len(_cat.descriptions),
+        "categories": sum(1 for k in _cat.descriptions if k.startswith("category/")),
+        "observed": len(_cat.observed),
+        "observed_only": len(_cat.observed - set(_cat.descriptions)),
         "observed_embedded": len(getattr(mime_data, "OBSERVED", [])),
-        "duplicates": len(_duplicates),
-        "external": bool(_external),
-        "external_count": len(_external),
+        "duplicates": len(_cat.duplicates),
+        "external": bool(_cat.external),
+        "external_count": len(_cat.external),
         "external_files": len(descriptions_paths()),
         "embedded_descriptions": embarquees,
-        "source": _source_file,
+        "source": _cat.source_file,
     }
 
 
@@ -341,7 +356,7 @@ def label(nom: str) -> str | None:
     jour (demande du 10/09/2026).
     """
     cle = (nom or "").strip()
-    return _descriptions.get(cle) or _user.get(cle) or None
+    return _cat.descriptions.get(cle) or _cat.user.get(cle) or None
 
 
 def origin(nom: str) -> str:
@@ -351,11 +366,11 @@ def origin(nom: str) -> str:
     pas de réponse, et l'on ne sait pas si un import a servi à quelque chose.
     """
     cle = (nom or "").strip()
-    if cle in _external:
+    if cle in _cat.external:
         return "external"
-    if cle in _descriptions:
+    if cle in _cat.descriptions:
         return "embedded"
-    if cle in _user:
+    if cle in _cat.user:
         return "user"
     return ""
 
@@ -363,11 +378,11 @@ def origin(nom: str) -> str:
 def status(nom: str) -> str:
     """``described`` / ``observed`` / ``unknown`` — voir l'en-tête du module."""
     cle = (nom or "").strip()
-    if cle in _descriptions:
+    if cle in _cat.descriptions:
         return STATUS_DESCRIBED
-    if cle in _user:
+    if cle in _cat.user:
         return STATUS_USER
-    if cle in _observed:
+    if cle in _cat.observed:
         return STATUS_OBSERVED
     return STATUS_UNKNOWN
 
@@ -379,7 +394,7 @@ def describe(nom: str) -> str:
     laisse son libellé de référentiel, ou à défaut un texte explicite.
     """
     cle = (nom or "").strip()
-    lib = _descriptions.get(cle) or _user.get(cle)
+    lib = _cat.descriptions.get(cle) or _cat.user.get(cle)
     if lib:
         return lib
     return cle if cle else "(sans type)"
@@ -422,8 +437,8 @@ def categories() -> list[tuple[str, str]]:
     ~600 types comptent 121 alias sans libellé ; et elles bougent bien moins
     d'une version d'Intella à l'autre.
     """
-    noms = {n for n in _descriptions if n.startswith(CATEGORY_PREFIX)}
-    noms |= {n for n in _observed if n.startswith(CATEGORY_PREFIX)}
+    noms = {n for n in _cat.descriptions if n.startswith(CATEGORY_PREFIX)}
+    noms |= {n for n in _cat.observed if n.startswith(CATEGORY_PREFIX)}
     return sorted(((n, describe(n)) for n in noms), key=lambda c: c[1].lower())
 
 
@@ -459,12 +474,12 @@ def search(motif: str, limit: int = 500) -> list[tuple[str, str, str]]:
     complet fait 679 lignes, inutile d'en peindre 10 000.
     """
     m = (motif or "").strip().lower()
-    noms = sorted(set(_descriptions) | _observed)
+    noms = sorted(set(_cat.descriptions) | _cat.observed)
     out: list[tuple[str, str, str]] = []
     for nom in noms:
         if len(out) >= limit:
             break
-        if m and m not in nom.lower() and m not in (_descriptions.get(nom, "")).lower():
+        if m and m not in nom.lower() and m not in (_cat.descriptions.get(nom, "")).lower():
             continue
         out.append((nom, status(nom), describe(nom)))
     return out
@@ -491,14 +506,14 @@ def learn(noms) -> list[str]:
     légitime. N'écrit que s'il y a du nouveau, et ne lève jamais (un dossier en
     lecture seule ne doit pas interrompre un inventaire).
     """
-    nouveaux = sorted({(n or "").strip() for n in noms} - _observed)
+    nouveaux = sorted({(n or "").strip() for n in noms} - _cat.observed)
     if not nouveaux:
         return []
-    _observed.update(nouveaux)
+    _cat.observed.update(nouveaux)
     try:
         os.makedirs(config.mime_dir(), exist_ok=True)
         with open(observed_path(), "w", encoding="utf-8") as fh:
-            for nom in sorted(_observed):
+            for nom in sorted(_cat.observed):
                 fh.write(nom + "\n")
     except OSError:
         pass
@@ -599,8 +614,8 @@ def import_descriptions(chemin: str) -> dict:
     if not nouvelles:
         raise ValueError("Aucune description trouvée dans ce fichier.")
 
-    avant = dict(_descriptions)
-    cumul = dict(_external)          # ce que les fichiers externes disent déjà
+    avant = dict(_cat.descriptions)
+    cumul = dict(_cat.external)          # ce que les fichiers externes disent déjà
     cumul.update(nouvelles)          # le nouvel import a le dernier mot
 
     cible = cumul_path()
@@ -611,7 +626,7 @@ def import_descriptions(chemin: str) -> dict:
     return {
         "path": cible,
         "count": len(nouvelles),
-        "total": len(_descriptions),
+        "total": len(_cat.descriptions),
         "added": sorted(k for k in nouvelles if k not in avant),
         "updated": sorted(k for k in nouvelles
                           if k in avant and avant[k] != nouvelles[k]),
