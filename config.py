@@ -25,6 +25,17 @@ TYPE_LABELS = {
     SOURCE_TYPE_DISK_IMAGE: "Image",
     SOURCE_TYPE_FOLDER: "Dossier",
 }
+# Libellés de la colonne « Type » du tableau d'inventaire et de son CSV.
+# Volontairement DISTINCTS de ``TYPE_LABELS`` : l'inventaire liste aussi des
+# fichiers uniques, d'où « Dossier/Fichier ». Et volontairement NON traduits —
+# les en-têtes de ce tableau (``case_export.CSV_COLUMNS``) sont en français en
+# dur ; traduire les valeurs seules donnerait, en US, des en-têtes français et
+# des valeurs anglaises. Table longtemps dupliquée dans ``case_export``, où elle
+# avait silencieusement diverge (audit du 18/09/2026).
+TYPE_LABELS_INVENTORY = {
+    SOURCE_TYPE_DISK_IMAGE: "Image",
+    SOURCE_TYPE_FOLDER: "Dossier/Fichier",
+}
 
 
 def type_label(source_type: str) -> str:

@@ -52,10 +52,6 @@ _TYPE_MAP = {
 # « mesuré et vraiment vide » — deux choses très différentes à l'import.
 SIZE_UNKNOWN_LABEL = "à mesurer"
 
-_TYPE_LABEL = {
-    config.SOURCE_TYPE_DISK_IMAGE: "Image",
-    config.SOURCE_TYPE_FOLDER: "Dossier/Fichier",
-}
 
 
 def _split_args(extra: str) -> list[str]:
@@ -479,7 +475,7 @@ def to_display_rows(parsed: dict):
             taille = config.human_size(s["bytes"])
         rows.append({
             "Nom": s["name"],
-            "Type": _TYPE_LABEL.get(s["type"], s["type_raw"]),
+            "Type": config.TYPE_LABELS_INVENTORY.get(s["type"], s["type_raw"]),
             "Fuseau": s["timezone"],
             "Taille": taille,
             "Octets": str(s["bytes"]),
