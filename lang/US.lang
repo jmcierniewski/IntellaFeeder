@@ -367,6 +367,8 @@
         "import.compound_title": "Compound case",
         "type.folder": "Folder",
         "type.image": "Image",
+        "type.folder_or_file": "Folder/File",
+        "inventory.size_to_measure": "to measure",
         "validation.case_location_required": "The case location is required.",
         "validation.exe_not_found": "IntellaCmd.exe not found: {p}",
         "validation.exe_required": "The IntellaCmd.exe path is required.",

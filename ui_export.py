@@ -616,9 +616,13 @@ class ExportTab(ttk.Frame):
     @staticmethod
     def _is_empty_source(row) -> bool:
         """Source **mesurée** et vraiment vide (0 octet), à distinguer de
-        « pas encore mesurée » et de « 0.0 Mo » (quelques Ko, donc non vide)."""
-        return (row.get("Octets") == "0"
-                and row.get("Taille") != case_export.SIZE_UNKNOWN_LABEL)
+        « pas encore mesurée » et de « 0.0 Mo » (quelques Ko, donc non vide).
+
+        ⚠ Le test porte sur ``_size_unknown``, pas sur le libellé de la colonne
+        « Taille » : celui-ci est traduit, et le comparer à « à mesurer » ne
+        reconnaissait plus rien dès qu'on passait en anglais (18/09/2026).
+        """
+        return row.get("Octets") == "0" and not row.get("_size_unknown")
 
     def _sort_key(self, idx: int):
         """Clé de tri : numérique sur les colonnes de nombres, texte sinon.

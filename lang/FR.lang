@@ -367,6 +367,8 @@
         "import.compound_title": "Cas compound",
         "type.folder": "Dossier",
         "type.image": "Image",
+        "type.folder_or_file": "Dossier/Fichier",
+        "inventory.size_to_measure": "à mesurer",
         "validation.case_location_required": "L'emplacement du cas est obligatoire.",
         "validation.exe_not_found": "IntellaCmd.exe introuvable : {p}",
         "validation.exe_required": "Le chemin de IntellaCmd.exe est obligatoire.",

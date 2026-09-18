@@ -47,10 +47,8 @@ _TYPE_MAP = {
     "Disk Image": config.SOURCE_TYPE_DISK_IMAGE,
     "File or Folder": config.SOURCE_TYPE_FOLDER,
 }
-# Libellé de la colonne « Taille » quand Intella ne reporte rien (source
-# « dossier »). Partagé avec l'UI, qui doit distinguer « pas encore mesuré » de
-# « mesuré et vraiment vide » — deux choses très différentes à l'import.
-SIZE_UNKNOWN_LABEL = "à mesurer"
+# Le libellé « à mesurer » et son repli FR vivent dans ``config`` avec les autres
+# textes traduits (``config.size_unknown_label`` / ``config.SIZE_UNKNOWN_LABEL``).
 
 
 
@@ -496,22 +494,35 @@ def parse_source_list_xml(xml_path: str) -> dict:
 
 
 def to_display_rows(parsed: dict):
-    """Construit ``(rows, columns)`` lisibles pour le tableau et le CSV."""
+    """Construit ``(rows, columns)`` lisibles pour le tableau et le CSV.
+
+    Les **clés** des lignes (« Nom », « Type »…) sont des identifiants internes,
+    que le français ne rend que lisibles : c'est ``ui_export._COLUMN_LABEL_KEYS``
+    qui les traduit à l'affichage. Les **valeurs**, elles, sont du texte montré
+    tel quel — elles passent donc par ``i18n`` (corrigé le 18/09/2026 : en
+    anglais, une colonne « Type » traduite surmontait des valeurs françaises).
+
+    ``_size_unknown`` double la colonne « Taille » d'un booléen. Sans lui, le
+    seul moyen de reconnaître une source non mesurée serait de comparer son
+    libellé affiché — ce qui échouerait dès qu'il est traduit.
+    """
     rows = []
     for s in parsed["sources"]:
-        if s["size_unknown"]:
-            taille = SIZE_UNKNOWN_LABEL
-        else:
-            taille = config.human_size(s["bytes"])
+        inconnue = bool(s["size_unknown"])
         rows.append({
             "Nom": s["name"],
-            "Type": config.TYPE_LABELS_INVENTORY.get(s["type"], s["type_raw"]),
+            "Type": config.inventory_type_label(s["type"]) if s["type"] in
+                    config.TYPE_LABELS_INVENTORY else s["type_raw"],
             "Fuseau": s["timezone"],
-            "Taille": taille,
+            "Taille": config.size_unknown_label() if inconnue
+                      else config.human_size(s["bytes"]),
             "Octets": str(s["bytes"]),
             "Segments": str(s["parts_count"]) if s["parts_count"] else "",
             "Chemin": s["primary_path"],
             "Tâches": " | ".join(s["task_names"]),
+            # Hors DISPLAY_COLUMNS et CSV_COLUMNS : ni affiché, ni exporté, ni
+            # cherché par le filtre — tous parcourent les colonnes déclarées.
+            "_size_unknown": inconnue,
         })
     return rows, list(DISPLAY_COLUMNS)
 

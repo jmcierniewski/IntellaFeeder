@@ -25,17 +25,22 @@ TYPE_LABELS = {
     SOURCE_TYPE_DISK_IMAGE: "Image",
     SOURCE_TYPE_FOLDER: "Dossier",
 }
-# Libellés de la colonne « Type » du tableau d'inventaire et de son CSV.
-# Volontairement DISTINCTS de ``TYPE_LABELS`` : l'inventaire liste aussi des
-# fichiers uniques, d'où « Dossier/Fichier ». Et volontairement NON traduits —
-# les en-têtes de ce tableau (``case_export.CSV_COLUMNS``) sont en français en
-# dur ; traduire les valeurs seules donnerait, en US, des en-têtes français et
-# des valeurs anglaises. Table longtemps dupliquée dans ``case_export``, où elle
-# avait silencieusement diverge (audit du 18/09/2026).
+# Repli FRANÇAIS des libellés de la colonne « Type » du tableau d'inventaire et
+# de son CSV. Volontairement DISTINCTS de ``TYPE_LABELS`` : l'inventaire liste
+# aussi des fichiers uniques, d'où « Dossier/Fichier ». Table longtemps
+# dupliquée dans ``case_export``, où elle avait silencieusement divergé
+# (audit du 18/09/2026).
 TYPE_LABELS_INVENTORY = {
     SOURCE_TYPE_DISK_IMAGE: "Image",
     SOURCE_TYPE_FOLDER: "Dossier/Fichier",
 }
+# Repli FR du libellé de la colonne « Taille » quand Intella ne reporte rien
+# (source « dossier »). L'UI doit distinguer « pas encore mesuré » de « mesuré
+# et vraiment vide » — deux choses très différentes à l'import. ⚠ Ce texte est
+# TRADUIT à l'affichage : ne jamais s'en servir pour reconnaître une ligne non
+# mesurée, la comparaison échouerait dans toute autre langue que le français.
+# La ligne porte ``_size_unknown`` pour cela (cf. ``case_export.to_display_rows``).
+SIZE_UNKNOWN_LABEL = "à mesurer"
 
 
 def type_label(source_type: str) -> str:
@@ -43,6 +48,28 @@ def type_label(source_type: str) -> str:
     import i18n
     key = {"DISK_IMAGE": "type.image", "FOLDER_OR_FILE": "type.folder"}.get(source_type)
     return i18n.t(key, TYPE_LABELS.get(source_type, source_type)) if key else source_type
+
+
+def inventory_type_label(source_type: str) -> str:
+    """Libellé traduit du type de source, version tableau d'inventaire.
+
+    Distinct de ``type_label`` par le seul cas « dossier », que l'inventaire
+    nomme « Dossier/Fichier ». Les en-têtes de ce tableau sont traduits par
+    ``ui_export._COLUMN_LABEL_KEYS`` : laisser les valeurs en dur donnait, en
+    anglais, une colonne « Type » traduite au-dessus de valeurs françaises.
+    """
+    import i18n
+    key = {SOURCE_TYPE_DISK_IMAGE: "type.image",
+           SOURCE_TYPE_FOLDER: "type.folder_or_file"}.get(source_type)
+    if not key:
+        return source_type
+    return i18n.t(key, TYPE_LABELS_INVENTORY.get(source_type, source_type))
+
+
+def size_unknown_label() -> str:
+    """« à mesurer » traduit — colonne « Taille » d'une source non mesurée."""
+    import i18n
+    return i18n.t("inventory.size_to_measure", SIZE_UNKNOWN_LABEL)
 
 # --- Fichiers produits ---
 # (les noms des JSON/.bat sont dérivés du nom du cas, cf. generator.py)
