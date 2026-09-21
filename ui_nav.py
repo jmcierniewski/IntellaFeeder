@@ -22,6 +22,7 @@ commence-t-on ?
 
 import tkinter as tk
 from tkinter import ttk
+from typing import ClassVar
 
 import config
 import i18n
@@ -318,8 +319,10 @@ class StatusBar(tk.Frame):
     disparaissait dès qu'on changeait d'écran.
     """
 
-    LEVELS = {"ok": config.ACTION_COLOR, "warn": config.WARN_COLOR,
-              "error": config.DANGER_COLOR, "busy": config.ACCENT}
+    LEVELS: ClassVar[dict[str, str]] = {
+        "ok": config.ACTION_COLOR, "warn": config.WARN_COLOR,
+        "error": config.DANGER_COLOR, "busy": config.ACCENT,
+    }
 
     def __init__(self, parent, app):
         super().__init__(parent, background=config.UI_SURFACE,

@@ -163,7 +163,7 @@ class TestParcours:
 
     def test_sous_cas_absent_nest_pas_une_erreur(self, compound):
         parent, _s1, out = compound
-        rapport = sq.copier_cas(parent, out, ano(), options())
+        sq.copier_cas(parent, out, ano(), options())
         assert os.path.isfile(os.path.join(out, RACINE_CP, "case.xml"))
         assert os.path.isfile(os.path.join(out, SOUS(1), "case.xml"))
 

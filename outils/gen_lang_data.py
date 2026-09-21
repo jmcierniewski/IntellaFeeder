@@ -105,8 +105,9 @@ def main():
         sys.modules.pop(module, None)
     import lang_data
     assert lang_data.BUILTIN == data, "le module genere ne relit pas ses donnees"
-    print("Ecrit : %s (%d lignes)"
-          % (CIBLE, sum(1 for _ in open(CIBLE, encoding="utf-8"))))
+    with open(CIBLE, encoding="utf-8") as f:
+        nb_lignes = sum(1 for _ in f)
+    print("Ecrit : %s (%d lignes)" % (CIBLE, nb_lignes))
     return 0
 
 

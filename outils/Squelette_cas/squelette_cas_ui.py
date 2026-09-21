@@ -35,7 +35,7 @@ from tkinter import filedialog, messagebox, ttk
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-import squelette_cas as sq  # noqa: E402
+import squelette_cas as sq
 
 ROUGE = "#b91c1c"
 VERT = "#15803d"

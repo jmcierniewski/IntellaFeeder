@@ -87,5 +87,6 @@ class TestBuildComboFiles:
         tasks = task_builder.tasks_from_objs([{"id": "a", "name": "Tâche accentuée"}])
         combo = frozenset({"a"})
         path = task_builder.build_combo_files(tasks, [combo], str(tmp_path))[combo]
-        brut = open(path, encoding="utf-8").read()
+        with open(path, encoding="utf-8") as f:
+            brut = f.read()
         assert "\\u00e2" in brut and "Tâche" not in brut

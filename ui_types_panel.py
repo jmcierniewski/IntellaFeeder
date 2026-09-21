@@ -272,7 +272,7 @@ class TypesPanel(ttk.Frame):
     def _table(parent, colonnes, entetes):
         tree = ttk.Treeview(parent, columns=colonnes, show="headings",
                             selectmode="extended")
-        for col, (titre, largeur) in zip(colonnes, entetes):
+        for col, (titre, largeur) in zip(colonnes, entetes, strict=True):
             tree.heading(col, text=titre)
             tree.column(col, width=largeur, anchor="w")
         vsb = ttk.Scrollbar(parent, orient="vertical", command=tree.yview)

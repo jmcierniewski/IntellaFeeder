@@ -139,7 +139,7 @@ def accept_files(widget, callback) -> bool:
                     _shell32.DragFinish(wparam)
                 if chemins:
                     file.put(chemins)
-            except Exception:               # pragma: no cover — jamais vers Windows
+            except Exception:               # noqa: S110 — pragma: no cover, jamais vers Windows
                 pass
             return 0
         return _call_proc(ancien, h, msg, wparam, lparam)
@@ -186,5 +186,5 @@ def _release(key):
     try:
         _shell32.DragAcceptFiles(hwnd, False)
         _set_proc(hwnd, GWLP_WNDPROC, ancien)
-    except Exception:                       # pragma: no cover — fenêtre déjà morte
+    except Exception:                       # noqa: S110 — pragma: no cover, fenêtre déjà morte
         pass

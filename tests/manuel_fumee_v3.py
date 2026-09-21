@@ -22,8 +22,8 @@ import tkinter as tk
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import ui_theme                                        # noqa: E402
-from ui import MainWindow                              # noqa: E402
+import ui_theme
+from ui import MainWindow
 
 
 def _sous_onglet(app, parent, enfant):
@@ -138,7 +138,7 @@ def main(argv):
     # écraserait un simple `load()` préalable. On ne touche pas au `.ini` de
     # l'utilisateur pour une capture.
     if langue:
-        import i18n                                    # noqa: E402
+        import i18n
         _vrai_load = i18n.load
         i18n.load = lambda _c=None, _v=_vrai_load, _l=langue: _v(_l)
 

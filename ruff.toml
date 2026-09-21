@@ -1,0 +1,51 @@
+# Configuration Ruff du projet.
+#
+# Volontairement AUTONOME : un `ruff.toml` de projet REMPLACE la configuration
+# utilisateur, il ne s'y ajoute pas. La faire hériter aurait demandé un `extend`
+# vers un chemin absolu propre à un poste — à proscrire dans un dépôt public.
+#
+# Objectif : signaler les DÉFAUTS, pas le style. Les règles de mise en forme et
+# de modernisation (UP, I, FURB…) sont écartées : elles réécrivent le code.
+
+target-version = "py314"
+
+[lint]
+select = [
+    "E4",   # imports mal placés / multiples
+    "E7",   # constructions douteuses (comparaisons à None/True…)
+    "E9",   # erreurs de syntaxe et d'exécution
+    "F",    # Pyflakes : imports et variables inutilisés, noms indéfinis
+    "B",    # bugbear : pièges réels (zip non strict, défaut mutable…)
+    "BLE",  # except trop large
+    "S",    # sécurité (bandit)
+    "SIM",  # simplifications qui suppriment un vrai risque (fichier non fermé)
+    "RUF",  # règles propres à Ruff
+    "PLE",  # Pylint — erreurs
+    "PLW",  # Pylint — avertissements
+    "TRY",  # gestion des exceptions
+    "DTZ",  # datetime sans fuseau
+]
+
+ignore = [
+    "TRY003",  # message d'exception long : style
+    "S603",    # subprocess sans shell : usage légitime et maîtrisé (IntellaCmd)
+    "S607",    # exécutable désigné par un chemin partiel
+    "SIM105",  # try/except/pass -> contextlib.suppress : réécriture
+    "PLR",     # métriques de complexité
+    # Commentaires et libellés en français : « », tirets cadratins et espaces
+    # insécables signalés comme « caractères ambigus ».
+    "RUF001",
+    "RUF002",
+    "RUF003",
+    # `xml.etree` sans defusedxml (10 occurrences) : les case.xml et le
+    # référentiel MIME sont produits par Intella sur le poste, pas reçus d'un
+    # tiers. À rouvrir le jour où un case.xml d'origine extérieure est ouvert.
+    "S314",
+]
+
+# `assert` est le mode d'expression normal de pytest ; S101 ne vaut que pour du
+# code livré, où `python -O` supprimerait l'assertion.
+[lint.per-file-ignores]
+"**/test_*.py" = ["S101"]
+"**/tests/**" = ["S101"]
+"**/conftest.py" = ["S101"]
