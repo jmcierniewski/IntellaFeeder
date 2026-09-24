@@ -171,11 +171,21 @@ class MainWindow:
         self.update_steps()
 
     def refresh_context(self):
-        """Recopie l'état du cas dans la barre de contexte (une ligne)."""
+        """Recopie l'état du cas dans la barre de contexte (une ligne).
+
+        🐞 Le dossier du cas s'appelle **`folder`** dans `case_meta.read_case`,
+        pas `path` (`path` n'existe que sur une entrée de SOUS-cas). La clé
+        fautive rendait toujours `""`, donc la barre retombait sur `last_case`
+        du `.ini` — c'est-à-dire le cas **précédent** tant que les paramètres
+        n'avaient pas été réenregistrés : en changeant de cas sans fermer
+        l'application, la ligne du haut affichait l'ancien chemin (constaté en
+        réel sur la v3.1b). Le repli sur le `.ini` n'a de sens qu'au démarrage,
+        avant qu'un cas soit lu.
+        """
         meta = self.case_meta or {}
         self.context_bar.refresh(
             case_name=meta.get("name", "") or "",
-            case_path=meta.get("path", "") or self.settings.get("last_case", ""),
+            case_path=meta.get("folder", "") or self.settings.get("last_case", ""),
             user=self.var_user.get(), exe=self.var_exe.get().strip())
 
     def update_steps(self):

@@ -31,8 +31,8 @@ for flux in (sys.stdout, sys.stderr):
 
 
 def main() -> int:
-    import ui_theme                                   # noqa: E402
-    from ui import MainWindow                         # noqa: E402
+    import ui_theme
+    from ui import MainWindow
 
     root = tk.Tk()
     root.withdraw()                                   # jamais à l'écran
@@ -62,6 +62,27 @@ def main() -> int:
     verifie("deux étapes dans le fil", len(app.nav._steps) == 2)
     verifie("quatre outils à droite", len(app.nav._tools) == 4)
     verifie("six pages dans le Notebook", len(app.notebook.tabs()) == 6)
+
+    print("Barre de contexte")
+    # 🐞 Constaté en réel sur la v3.1b : en changeant de cas sans fermer
+    # l'application, la ligne du haut gardait le chemin du cas PRÉCÉDENT — la
+    # barre lisait `meta["path"]`, qui n'existe pas (c'est `folder`), et
+    # retombait sur `last_case` du .ini.
+    _last_case = app.settings.get("last_case", "")   # remis en place après coup
+    app.settings.set("last_case", r"D:\ANCIEN\Cas precedent")
+    xml_factice ={"id": "", "name": "Cas courant", "description": "",
+                   "timestamp": 0, "lastOpened": 0, "user": "u", "size": 0,
+                   "originalVersion": "", "caseVersion": "", "compound": False,
+                   "subcase_paths": []}
+    app.set_case_meta({"folder": r"D:\NOUVEAU\Cas courant", "name": "Cas courant",
+                       "user": "u", "size": 0, "is_compound": False,
+                       "subcases": [], "authorized_users": [], "optimization": "",
+                       "xml": xml_factice, "prefs": {}, "tasks2": []})
+    verifie("le chemin affiché est celui du cas courant, pas du précédent",
+            "Cas courant" in app.context_bar.lbl_path.cget("text"),
+            f"(affiché : {app.context_bar.lbl_path.cget('text')!r})")
+    app.clear_case_meta()
+    app.settings.set("last_case", _last_case)   # rien n'est écrit au .ini ici
 
     print("Onglet Import")
     imp = app.import_tab
@@ -101,7 +122,7 @@ def main() -> int:
             "image/jpeg" in prof._get_option("sourceTypeFilter"))
 
     print("Panneau de types — ce que le mode dit, et de quelle couleur")
-    import config                                     # noqa: E402
+    import config
     panneau.var_mode.set("exclude")
     rouge = str(panneau.lbl_sens.cget("foreground"))
     panneau.var_mode.set("include")
@@ -122,8 +143,8 @@ def main() -> int:
     panneau.set_editable(True)
 
     print("Réglages d'une source (la fenêtre « Voir les réglages… »)")
-    import profile_translate                          # noqa: E402
-    import ui_widgets                                 # noqa: E402
+    import profile_translate
+    import ui_widgets
     verifie("les trois états ont leur couleur",
             set(ui_widgets.SETTING_STATUS_COLORS) == {
                 profile_translate.STATUS_MAPPED,
@@ -133,6 +154,10 @@ def main() -> int:
     print("Maintenance")
     verifie("langue non vide dans Options",
             bool(app.maintenance_tab.options_tab.var_lang.get()))
+    # Diagnostic : décoché par défaut — coché, IntellaCmd journalise les chemins
+    # des pièces dans un journal exportable.
+    verifie("journalisation détaillée d'IntellaCmd décochée par défaut",
+            app.maintenance_tab.options_tab.var_debug.get() is False)
     verifie("référentiel listé au chargement",
             len(app.maintenance_tab.mime_tab.tree.get_children()) > 100)
     verifie("écran Fichiers rempli",
