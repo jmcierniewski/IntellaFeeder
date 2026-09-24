@@ -162,6 +162,19 @@ adjustable, fractional GB allowed):
 
 A source larger than the limit on its own is flagged as "cannot be split."
 
+## Compound cases
+
+IntellaFeeder recognises **compound cases** — a case that holds no sources of
+its own, only references to sub-cases. Pointing the tool at a compound case
+shows, in one place, the sources held by every sub-case, the compound's total
+size, and the users who have opened it.
+
+Since `IntellaCmd.exe` cannot add sources directly to a compound case, the
+Import step is disabled for it: adding sources means opening the relevant
+sub-case directly in Intella. The Case and Case detail screens stay fully
+usable — read-only, across every sub-case — so a compound case is easy to
+inventory even though it isn't a target for import.
+
 The tools, on the right of the trail:
 
 - **Case detail**: a read-only, human-friendly view of `case.xml`,
@@ -525,6 +538,21 @@ configurée (950 Go par défaut, ajustable, en Go fractionnaires) :
 
 Une source à elle seule plus grande que la limite est signalée comme « non
 fractionnable ».
+
+## Cas composés (compound)
+
+IntellaFeeder reconnaît les **cas composés (compound)** : un cas qui ne
+contient aucune source en propre, seulement des références vers des sous-cas.
+Pointer l'outil vers un cas composé affiche, au même endroit, les sources
+détenues par chacun des sous-cas, la taille totale du cas composé, et les
+utilisateurs qui l'ont ouvert.
+
+Comme `IntellaCmd.exe` ne peut pas ajouter de source directement à un cas
+composé, l'étape Import y est désactivée : ajouter des sources se fait en
+ouvrant le sous-cas concerné directement dans Intella. Les écrans Le cas et
+Détail du cas restent pleinement utilisables — en lecture seule, sur
+l'ensemble des sous-cas — un cas composé reste donc facile à inventorier même
+s'il n'est pas une cible d'import.
 
 ## Limitation connue d'Intella et contournement intégré
 
