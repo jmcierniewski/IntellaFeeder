@@ -35,6 +35,26 @@ def collect(sources, params: dict, tasks_loaded: bool):
     elif not os.path.isfile(exe):
         warnings.append(i18n.t("validation.exe_not_found", "IntellaCmd.exe introuvable : {p}", p=exe))
 
+    # --- Caractères impossibles à citer dans le .bat ---
+    # Le nom du cas et l'utilisateur viennent du `case.xml`, pas d'une saisie :
+    # un guillemet ou un retour à la ligne y refermerait la citation de la
+    # commande IntellaCmd et ferait exécuter ce qui suit (audit du 18/09/2026).
+    # `json_builder._q` refuse ces caractères ; ici on le dit AVANT de générer,
+    # avec le nom du champ fautif.
+    for cle, libelle in (
+        ("user", i18n.t("topbar.user", "Utilisateur (du cas)")),
+        ("casename", i18n.t("validation.field_case_name", "Nom du cas")),
+        ("case", i18n.t("validation.field_case_location", "Emplacement du cas")),
+    ):
+        valeur = str(params.get(cle, "") or "")
+        if any(ch in valeur for ch in '"\r\n'):
+            errors.append(i18n.t(
+                "validation.unquotable_char",
+                "Le champ « {f} » contient un guillemet ou un retour à la ligne, "
+                "impossible à transmettre à IntellaCmd. Corrigez-le (pour un nom "
+                "ou un utilisateur issu du case.xml, corrigez-le dans Intella).",
+                f=libelle))
+
     if not sources:
         errors.append(i18n.t(
             "validation.no_sources",

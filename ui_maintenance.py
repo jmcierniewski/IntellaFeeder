@@ -179,6 +179,33 @@ class OptionsTab(ttk.Frame):
                       "« Ajouter… ». Le changement prend effet au redémarrage.")).pack(
             anchor="w", padx=8, pady=(0, 8))
 
+        # --- Diagnostic ----------------------------------------------------- #
+        # Le niveau DEBUG était imposé et les flux d'IntellaCmd recopiés en
+        # entier au Journal, qui s'affiche et s'exporte : les traces d'un moteur
+        # d'indexation citent le chemin et le nom de chaque ressource traitée.
+        # Il redevient donc un geste volontaire, le temps d'une lecture de cas
+        # qui échoue.
+        box = ttk.LabelFrame(page, text=i18n.t("options.diagnostic", "Diagnostic"))
+        box.pack(fill="x", pady=(app.theme.gap, 0))
+        self.var_debug = tk.BooleanVar(
+            value=app.settings.get("intellacmd_debug", "0").strip()
+            in ("1", "true", "oui", "vrai"))
+        ttk.Checkbutton(
+            box, variable=self.var_debug, command=self._save_debug,
+            text=i18n.t("options.intellacmd_debug",
+                        "Journaliser IntellaCmd en détail (lecture des sources)")).pack(
+            anchor="w", padx=8, pady=(8, 2))
+        ttk.Label(box, wraplength=self.LECTURE, justify="left", style="Hint.TLabel",
+                  text=i18n.t(
+                      "options.intellacmd_debug_help",
+                      "À n'activer que pour comprendre une lecture de cas qui "
+                      "échoue. Coché, IntellaCmd est lancé en niveau DEBUG et "
+                      "l'intégralité de ses messages part au Journal — donc dans "
+                      "un journal exporté : ces messages citent les chemins et "
+                      "les noms des pièces du cas. Décoché, le motif d'un échec "
+                      "reste analysé et affiché, seule la trace complète manque.")).pack(
+            anchor="w", padx=8, pady=(0, 8))
+
         self._refresh_display_state()
 
     # -- affichage ------------------------------------------------------- #
@@ -214,6 +241,16 @@ class OptionsTab(ttk.Frame):
             v=i18n.t("common.yes", "oui") if self.var_dnd.get()
             else i18n.t("common.no", "non")))
 
+    def _save_debug(self):
+        actif = self.var_debug.get()
+        self.app.settings.set("intellacmd_debug", "1" if actif else "0")
+        self.app.settings.save()
+        self.app.log.log(i18n.t(
+            "options.intellacmd_debug_saved",
+            "Journalisation détaillée d'IntellaCmd : {v}.",
+            v=i18n.t("common.yes", "oui") if actif else i18n.t("common.no", "non")),
+            level="WARN" if actif else "INFO")
+
     def _save_recursive(self):
         valeur = "1" if self.var_recursive.get() else "0"
         self.app.settings.set("recursive_default", valeur)
@@ -241,12 +278,6 @@ class MimeTab(ttk.Frame):
     # ⚠ Les libellés se lisent à l'AFFICHAGE, pas au chargement du module : une
     # constante de classe figerait la langue du premier import, et la colonne
     # « Comes from » restait en français en US (constaté le 11/09/2026).
-    ORIGINES_COULEURS = {
-        "embedded": config.UI_INK_2,
-        "external": "#1d4ed8",
-        "user": "#0f766e",
-    }
-
     @staticmethod
     def origine_libelle(origine: str) -> str:
         return {

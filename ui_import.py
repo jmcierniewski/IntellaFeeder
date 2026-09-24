@@ -910,7 +910,10 @@ class ImportTab(ttk.Frame):
                 "import.tasks_file_loaded_log", "Fichier de tâches chargé : {n} tâche(s).",
                 n=len(self.tasks)))
             return True
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 — fichier de tâches écrit par
+            # Intella ou par l'opérateur : JSON invalide, encodage, structure
+            # inattendue, fichier disparu entre-temps. Aucun de ces cas ne doit
+            # laisser l'onglet dans un état à moitié chargé.
             self.tasks = []
             self._rebuild_columns()
             self.app.log.log(i18n.t(
@@ -1969,6 +1972,14 @@ class ImportTab(ttk.Frame):
 
         try:
             report = generator.generate(selected, params, self.tasks, self.app.log.log)
+        except ValueError as exc:
+            # Dernier verrou de `json_builder._q` : un caractère impossible à citer
+            # dans le .bat (guillemet, retour à la ligne). `validation.collect` le
+            # dit normalement avant d'arriver ici — si on y arrive quand même,
+            # c'est qu'il vient d'ailleurs (nom de source, arguments suppl.).
+            messagebox.showerror(
+                i18n.t("import.corrections_needed", "Corrections nécessaires"), str(exc))
+            return False
         except OSError as exc:
             messagebox.showerror(i18n.t("import.write_title", "Écriture"),
                                  i18n.t("common.export_failed", "Échec :\n{e}", e=exc))
@@ -2199,7 +2210,11 @@ class ImportTab(ttk.Frame):
             run_dir = op_validation.latest_run_dir(logs_dir)
             logs = op_validation.scan_logs(run_dir)
             self.after(0, self._validate_done, inventory, logs, run_dir)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 — worker : rien ne doit mourir
+            # ici sans repasser par le thread UI (IntellaCmd absent, licence,
+            # XML illisible, journaux disparus). `_validate_error` remet le
+            # bouton en état et journalise ; une exception nue tuerait le thread
+            # en silence, bouton grisé pour de bon.
             self.after(0, self._validate_error, str(exc))
 
     def _validate_error(self, msg):

@@ -27,7 +27,12 @@ def fake_export(rows_by_case, taches=None, fail=(), zero=None, case_names=None):
     (celles qui alimentent ``folder_unknown``). ``case_names`` : nom Intella du
     cas tel que le donnerait le XML, quand il diffère du nom du sous-cas.
     """
-    def _run(exe, user, case_loc, log, extra_args="", timeout_min=30):
+    def _run(exe, user, case_loc, log, extra_args="", timeout_min=30,
+             new_batch=True, debug=False):
+        # Un relevé compound = UN seul lot de XML temporaires : chaque sous-cas
+        # est lu sans rouvrir le lot, sinon le premier effacerait le XML du
+        # précédent en plein inventaire (cf. `start_export_batch`).
+        assert new_batch is False
         if case_loc in fail:
             raise RuntimeError("IntellaCmd a renvoyé le code 1")
         noms = rows_by_case[case_loc]

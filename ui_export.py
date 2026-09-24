@@ -308,20 +308,31 @@ class ExportTab(ttk.Frame):
         self.app.log.log(i18n.t("inventory.reading_log", "Inventaire des sources du cas : {c}", c=case))
         threading.Thread(target=self._worker, args=(exe, user, case), daemon=True).start()
 
+    def _debug_intellacmd(self) -> bool:
+        """Journalisation détaillée d'IntellaCmd (Maintenance → Options).
+
+        Décochée par défaut : en DEBUG, IntellaCmd cite le chemin et le nom de
+        chaque ressource, et ces lignes finissent dans un journal exportable.
+        """
+        return self.app.settings.get("intellacmd_debug", "0").strip() in (
+            "1", "true", "oui", "vrai")
+
     def _worker(self, exe, user, case):
         try:
             meta = self.app.case_meta or {}
+            debug = self._debug_intellacmd()
             if meta.get("is_compound"):
                 # Un compound n'a pas de source en propre : on interroge chacun
                 # de ses sous-cas et on concatène (colonne « Sous-cas »).
                 rows, columns, inventory = case_export.run_export_subcases(
                     exe, user, meta.get("subcases", []), self.app.log.log,
                     extra_args=self._extra_args(),
-                    case_name=meta.get("name", ""), case_path=case,
+                    case_name=meta.get("name", ""), case_path=case, debug=debug,
                 )
             else:
                 rows, columns, inventory = case_export.run_export_source_list(
-                    exe, user, case, self.app.log.log, extra_args=self._extra_args()
+                    exe, user, case, self.app.log.log,
+                    extra_args=self._extra_args(), debug=debug,
                 )
             self.after(0, self._done, rows, columns, inventory)
         except Exception as exc:  # FileNotFound, RuntimeError, parse…

@@ -11,11 +11,7 @@ import json
 import os
 
 import config
-
-
-def _strip_trailing(path: str) -> str:
-    """Retire les séparateurs de fin (problème connu entre guillemets)."""
-    return path.rstrip().rstrip("\\/")
+import path_parser
 
 
 def build_single_source_json(source, timezone: str, taskfile,
@@ -51,15 +47,83 @@ def build_single_source_json(source, timezone: str, taskfile,
     return path
 
 
+# 🔴 Les valeurs qui composent la commande ne sont PAS toutes saisies par
+# l'opérateur : le nom du cas et l'utilisateur sont lus dans le `case.xml`, un
+# fichier qui vit sur le partage (audit paranoid du 18/09/2026). Une ligne
+# assemblée par concaténation laissait donc un `case.xml` piégé refermer la
+# citation et enchaîner sa propre commande, exécutée au clic sur « Importer ».
+# D'où deux règles, appliquées par `_q` à CHAQUE argument :
+#   • toujours citer — entre guillemets, cmd.exe ne voit plus ni `&`, ni `|`,
+#     ni `<`, ni `>`, ni `^` ; un nom de cas « Dupont & Fils » reste légitime ;
+#   • doubler le `%` — sinon cmd le développe comme une variable AVANT
+#     l'exécution, et le chemin transmis à IntellaCmd n'est plus celui du
+#     fichier écrit (un scellé « Scellé %2024% » partait ainsi à l'import sous
+#     un chemin inexistant, sans que rien ne le signale : IntellaCmd renvoie 0
+#     même en échec).
+# Restent deux caractères qu'aucune citation ne dompte : le guillemet lui-même
+# (cmd compte les guillemets avant que CommandLineToArgvW ne lise `\"`) et le
+# retour à la ligne, qui couperait la commande en deux. Ils sont REFUSÉS — la
+# garde amont est dans `validation.collect`, celle-ci est le dernier verrou.
+_UNQUOTABLE = '"\r\n'
+
+
+def _q(arg: str) -> str:
+    """Argument prêt à être écrit dans un .bat : cité, ``%`` doublé.
+
+    ⚠ Le doublement du ``%`` ne vaut QUE dans un fichier .bat (là, ``%%`` donne
+    un ``%`` littéral). Ne pas réutiliser cette fonction pour un appel direct.
+    """
+    arg = arg or ""
+    if any(ch in arg for ch in _UNQUOTABLE):
+        raise ValueError(
+            "Caractère interdit dans la commande d'import (guillemet ou retour "
+            f"à la ligne) : {arg!r}")
+    return '"' + arg.replace("%", "%%") + '"'
+
+
+def _extra(extra_args: str) -> str:
+    """Champ « Arguments supplémentaires » : recopié VERBATIM.
+
+    C'est un fragment de ligne de commande écrit par l'opérateur lui-même, qui
+    peut légitimement y vouloir plusieurs arguments, des guillemets ou une
+    variable d'environnement. Seul le retour à la ligne est refusé : il
+    couperait la commande en deux dans le .bat.
+    """
+    txt = (extra_args or "").strip()
+    if "\r" in txt or "\n" in txt:
+        raise ValueError("Le champ « Arguments supplémentaires » ne doit pas "
+                         "contenir de retour à la ligne.")
+    return txt
+
+
+def import_argv(exe: str, user: str, case_path: str, case_name: str,
+                sources_json_path: str) -> list[str]:
+    """Arguments (liste, non cités) de l'ajout des sources d'un (sous-)cas.
+
+    ⚠ Le nettoyage du chemin du cas passe par ``path_parser.normalize_path``, et
+    par lui seul : la version locale d'autrefois réduisait ``X:\\`` à ``X:``, qui
+    désigne pour un processus Windows le **répertoire courant** du lecteur X et
+    non sa racine — IntellaCmd aurait ciblé un autre dossier que celui affiché,
+    en silence (audit paranoid du 18/09/2026).
+    """
+    argv = [exe, "-u", user, "-c", path_parser.normalize_path(case_path)]
+    if case_name.strip():
+        argv += ["-cn", case_name.strip()]
+    argv += ["-addSourcesFromJson", sources_json_path]
+    return argv
+
+
 def import_command(exe: str, user: str, case_path: str, case_name: str,
                    sources_json_path: str, extra_args: str = "") -> str:
-    """Commande IntellaCmd d'ajout/indexation des sources d'un (sous-)cas."""
-    cmd = f'"{exe}" -u "{user}" -c "{_strip_trailing(case_path)}"'
-    if case_name.strip():
-        cmd += f' -cn "{case_name.strip()}"'
-    cmd += f' -addSourcesFromJson "{sources_json_path}"'
-    if extra_args.strip():
-        cmd += f" {extra_args.strip()}"
+    """Commande IntellaCmd d'ajout/indexation des sources d'un (sous-)cas.
+
+    Destinée à un .bat : chaque argument est cité et ses ``%`` doublés (`_q`).
+    """
+    cmd = " ".join(_q(a) for a in import_argv(
+        exe, user, case_path, case_name, sources_json_path))
+    extra = _extra(extra_args)
+    if extra:
+        cmd += f" {extra}"
     return cmd
 
 
@@ -69,9 +133,10 @@ def import_one_command(exe: str, user: str, case_path: str, case_name: str,
     """Commande d'ajout d'UNE source, avec journalisation dans ``log_path``."""
     cmd = import_command(exe, user, case_path, case_name, sources_json_path, "")
     cmd += " -log INFO"
-    if extra_args.strip():
-        cmd += f" {extra_args.strip()}"
-    cmd += f' > "{log_path}" 2>&1'
+    extra = _extra(extra_args)
+    if extra:
+        cmd += f" {extra}"
+    cmd += f" > {_q(log_path)} 2>&1"
     return cmd
 
 
@@ -81,8 +146,12 @@ BAT_AUTO_FLAG = "auto"
 
 
 def _echo_safe(text: str) -> str:
-    """Neutralise les caractères spéciaux cmd pour un ``echo``."""
-    for ch in '&<>|^()%"':
+    """Neutralise les caractères spéciaux cmd pour un ``echo``.
+
+    Les retours à la ligne en font partie : un nom de source qui en contiendrait
+    ajouterait des lignes au .bat, exécutées comme des commandes.
+    """
+    for ch in '&<>|^()%"\r\n':
         text = text.replace(ch, "_")
     return text
 

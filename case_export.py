@@ -20,8 +20,10 @@ chemin).
 import csv
 import os
 import shlex
+import shutil
 import subprocess
 import tempfile
+import time
 import xml.etree.ElementTree as ET
 import json
 
@@ -94,41 +96,144 @@ def diagnose_no_xml(stdout: str, stderr: str) -> str:
     return ""
 
 
+# --- XML temporaires : durée de vie bornée --------------------------------
+#
+# `sources.xml` porte la liste complète des chemins de pièces, des scellés, des
+# tailles et des définitions de tâches du cas. Rien ne l'effaçait : chaque
+# lecture de cas — et chaque SOUS-CAS d'un compound — laissait un dossier de
+# plus dans %TEMP%, indéfiniment, où sauvegardes et profils itinérants vont le
+# chercher bien après la clôture du dossier (audit paranoid du 18/09/2026).
+# Il ne peut pas être supprimé aussitôt : `inventory["xml_path"]` est réutilisé
+# tant que l'inventaire courant vit (« Info Profil », « Exporter le XML »).
+# D'où la purge au relevé SUIVANT, quand l'inventaire précédent est remplacé.
+TEMP_PREFIX = "intellafeeder_export_"
+# Un dossier abandonné par une session précédente (fermeture brutale, plantage)
+# n'est purgé qu'au-delà de cet âge : en deçà, une AUTRE instance d'IntellaFeeder
+# peut être en train de s'en servir.
+ORPHAN_MAX_AGE_H = 24
+
+# Dossiers temporaires du relevé en cours (un par appel à -exportSourceList).
+_BATCH_TMPDIRS: list[str] = []
+
+
+def _purge(chemin: str) -> None:
+    shutil.rmtree(chemin, ignore_errors=True)
+
+
+def purge_orphan_exports(max_age_h: int = ORPHAN_MAX_AGE_H) -> int:
+    """Supprime les XML temporaires laissés par des sessions PRÉCÉDENTES.
+
+    Ne touche jamais au relevé en cours ni à un dossier récent (cf.
+    ``ORPHAN_MAX_AGE_H``). Ne lève pas : un temp illisible n'a pas à empêcher
+    la lecture d'un cas.
+    """
+    limite = time.time() - max_age_h * 3600
+    n = 0
+    try:
+        racine = tempfile.gettempdir()
+        for nom in os.listdir(racine):
+            chemin = os.path.join(racine, nom)
+            if not nom.startswith(TEMP_PREFIX) or chemin in _BATCH_TMPDIRS:
+                continue
+            try:
+                if not os.path.isdir(chemin) or os.path.getmtime(chemin) > limite:
+                    continue
+            except OSError:
+                continue
+            _purge(chemin)
+            n += 1
+    except OSError:
+        return n
+    return n
+
+
+def start_export_batch(log=None) -> None:
+    """Ouvre un relevé : purge les XML temporaires du relevé précédent.
+
+    Appelée automatiquement par ``run_export_source_list`` (et une seule fois
+    par ``run_export_subcases``, dont les N sous-cas forment UN relevé).
+    """
+    anciens, _BATCH_TMPDIRS[:] = list(_BATCH_TMPDIRS), []
+    for chemin in anciens:
+        _purge(chemin)
+    orphelins = purge_orphan_exports()
+    if log and (anciens or orphelins):
+        log(f"Nettoyage des XML temporaires : {len(anciens)} du relevé précédent"
+            + (f", {orphelins} abandonné(s) par une session antérieure" if orphelins else "")
+            + ".")
+
+
+# --- Journalisation des flux IntellaCmd ------------------------------------
+#
+# 🔴 `-log DEBUG` était câblé en dur et les deux flux recopiés INTÉGRALEMENT
+# dans le journal applicatif — qui s'affiche, se garde en mémoire et s'exporte.
+# Les traces DEBUG d'un moteur d'indexation citent chemin et nom de chaque
+# ressource : un journal joint à un ticket de support emportait des métadonnées
+# de procédure (audit paranoid du 18/09/2026). Par défaut on reste donc en
+# INFO et on ne journalise que la tête des flux ; `debug=True` rétablit
+# l'ancien comportement pour un diagnostic explicite.
+# ⚠ `diagnose_no_xml` continue de recevoir les flux ENTIERS : c'est le journal
+# qui est bridé, pas l'analyse.
+DEFAULT_LOG_LEVEL = "INFO"
+STREAM_MAX_LINES = 20
+
+
+def _log_stream(log, titre: str, flux: str, full: bool) -> None:
+    """Journalise un flux IntellaCmd, tronqué sauf en mode diagnostic."""
+    txt = (flux or "").strip()
+    if not txt:
+        return
+    lignes = txt.splitlines()
+    if full or len(lignes) <= STREAM_MAX_LINES:
+        log(f"{titre} :\n" + txt)
+        return
+    log(f"{titre} ({len(lignes)} lignes — {STREAM_MAX_LINES} premières) :\n"
+        + "\n".join(lignes[:STREAM_MAX_LINES])
+        + f"\n… {len(lignes) - STREAM_MAX_LINES} ligne(s) non journalisée(s).")
+
+
 def run_export_source_list(exe: str, user: str, case_loc: str, log,
-                           extra_args: str = "", timeout_min: int = 30):
+                           extra_args: str = "", timeout_min: int = 30,
+                           new_batch: bool = True, debug: bool = False):
     """Lance IntellaCmd -exportSourceList et retourne ``(rows, columns, inventory)``.
 
     ``extra_args`` : arguments supplémentaires (typiquement
     ``-autoSelectFullProcessingLicense``, sans lequel IntellaCmd réclame une
     licence et n'écrit aucun fichier). Lève ``RuntimeError`` en cas d'échec,
     ``FileNotFoundError`` si l'exe est introuvable.
+
+    ``new_batch`` : ouvre un relevé (purge les XML temporaires du précédent) —
+    mis à False par ``run_export_subcases``, dont les N sous-cas n'en forment
+    qu'un seul. ``debug`` : ``-log DEBUG`` et flux journalisés en entier.
     """
     if not os.path.isfile(exe):
         raise FileNotFoundError(f"IntellaCmd.exe introuvable : {exe}")
 
+    if new_batch:
+        start_export_batch(log)
+
     # Dossier temporaire neuf : on NE pré-crée PAS le fichier (mkstemp laissait un
     # fichier de 0 octet qui faussait la détection « non créé »). IntellaCmd écrit
     # sources.xml lui-même dans ce dossier que nous contrôlons.
-    tmpdir = tempfile.mkdtemp(prefix="intellafeeder_export_")
+    tmpdir = tempfile.mkdtemp(prefix=TEMP_PREFIX)
+    _BATCH_TMPDIRS.append(tmpdir)
     xml_path = os.path.join(tmpdir, "sources.xml")
 
     cmd = [exe, "-u", user, "-c", case_loc, "-exportSourceList", xml_path,
-           "-log", "DEBUG"]
+           "-log", "DEBUG" if debug else DEFAULT_LOG_LEVEL]
     cmd += _split_args(extra_args)
 
     log("Exécution : " + subprocess.list2cmdline(cmd))
     try:
         proc = subprocess.run(
-            cmd, capture_output=True, text=True,
+            cmd, capture_output=True, text=True, check=False,
             encoding="utf-8", errors="replace", timeout=timeout_min * 60,
         )
-    except subprocess.TimeoutExpired:
-        raise RuntimeError(f"Délai dépassé ({timeout_min} min).")
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError(f"Délai dépassé ({timeout_min} min).") from exc
 
-    if proc.stdout:
-        log("stdout IntellaCmd :\n" + proc.stdout.strip())
-    if proc.stderr:
-        log("stderr IntellaCmd :\n" + proc.stderr.strip())
+    _log_stream(log, "stdout IntellaCmd", proc.stdout, debug)
+    _log_stream(log, "stderr IntellaCmd", proc.stderr, debug)
     log(f"Code retour IntellaCmd : {proc.returncode}")
 
     if proc.returncode != 0:
@@ -206,7 +311,8 @@ def _merge_subcase_inventories(lus: list) -> dict:
 
 def run_export_subcases(exe: str, user: str, subcases: list, log,
                         extra_args: str = "", timeout_min: int = 30,
-                        case_name: str = "", case_path: str = ""):
+                        case_name: str = "", case_path: str = "",
+                        debug: bool = False):
     """Inventaire d'un cas COMPOUND : un ``-exportSourceList`` par sous-cas.
 
     Un compound ne porte aucune source en propre — il référence des sous-cas
@@ -225,6 +331,11 @@ def run_export_subcases(exe: str, user: str, subcases: list, log,
     """
     reports: list = []
     lus: list = []          # (nom, chemin retenu, rows, inventaire) par sous-cas lu
+
+    # Les N sous-cas ne forment qu'UN relevé : la purge des XML temporaires a
+    # lieu ici, pas à chaque appel — sinon le premier sous-cas effacerait le XML
+    # du précédent… puis le second celui du premier, en plein inventaire.
+    start_export_batch(log)
 
     for sc in subcases:
         name, path = sc.get("name", ""), sc.get("path", "")
@@ -254,7 +365,7 @@ def run_export_subcases(exe: str, user: str, subcases: list, log,
             try:
                 sub_rows, _cols, sub_inv = run_export_source_list(
                     exe, user, cand, log, extra_args=extra_args,
-                    timeout_min=timeout_min)
+                    timeout_min=timeout_min, new_batch=False, debug=debug)
             except Exception as exc:  # noqa: BLE001 — un sous-cas KO n'arrête pas les autres
                 report["error"] = str(exc)
                 log(f"Échec de lecture du sous-cas « {name} » : {exc}")

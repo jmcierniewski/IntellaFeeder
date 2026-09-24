@@ -17,6 +17,7 @@ import os
 
 import config
 import json_builder
+import path_parser
 import profile_catalog
 import sizing
 import task_builder
@@ -40,7 +41,10 @@ def generate(sources, params, tasks, log) -> dict:
     # (`-validateDiskImage false`), pas ici — voir ui_import._sync_integrity_arg.
     # {nom_profil: options_diff} (sans filtrage image ; filtré par source ci-dessous).
     profile_options = params.get("profile_options", {}) or {}
-    case = params["case"].rstrip().rstrip("\\/")
+    # ⚠ `normalize_path` et pas un `rstrip("\\/")` local : lui seul préserve la
+    # racine d'un lecteur (``X:\`` réduit à ``X:`` désigne le répertoire courant
+    # du lecteur X, pas sa racine).
+    case = path_parser.normalize_path(params["case"])
     case_name = params["casename"].strip() or os.path.basename(case) or "Case"
     safe = config.sanitize_filename(case_name)
     # Limite en octets (float) : ne PAS tronquer par int() — une limite
